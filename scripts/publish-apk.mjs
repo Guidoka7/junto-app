@@ -3,6 +3,7 @@ import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 export async function publishApk({metadata,apk,request,log=console.log}){
   const m=metadata,tag='latest';
+  if(!/^[0-9a-f]{64}$/.test(m.certificateSha256||''))throw new Error('Certificado debug ausente.');
   if(m.channel!=='main'||!m.testBuild||m.signing!=='debug'||!/^Junto-[A-Za-z0-9.-]+-teste\.apk$/.test(m.assetName))throw new Error('Metadados inválidos.');
   if(createHash('sha256').update(apk).digest('hex')!==m.sha256||apk.length!==m.apkSize)throw new Error('APK não corresponde aos metadados.');
   const head=await request('/git/ref/heads/main');
@@ -13,7 +14,7 @@ export async function publishApk({metadata,apk,request,log=console.log}){
   let release=await request('/releases/tags/'+tag,{allow404:true});
   if(release?.immutable)throw new Error('A release rolling precisa permitir atualização.');
   const previous=release?.body?.match(/<!-- junto-apk\n([\s\S]*?)\n-->/)?.[1];
-  if(previous){const p=JSON.parse(previous);if(p.runNumber>m.runNumber||(p.runNumber===m.runNumber&&p.runAttempt>m.runAttempt)){log('Execução mais recente já publicada.');return;}}
+  if(previous){const p=JSON.parse(previous);if(p.certificateSha256&&p.certificateSha256!==m.certificateSha256)throw new Error('A chave debug mudou; restaure a chave canônica antes de publicar.');if(p.runNumber>m.runNumber||(p.runNumber===m.runNumber&&p.runAttempt>m.runAttempt)){log('Execução mais recente já publicada.');return;}}
   const ref=await request('/git/ref/tags/'+tag,{allow404:true});
   if(!ref)await request('/git/refs',{method:'POST',json:{ref:'refs/tags/'+tag,sha:m.commitSha}});
   if(!release)release=await request('/releases',{method:'POST',json:{tag_name:tag,target_commitish:m.commitSha,name:'Juntô — APK automático de teste',body:'Primeiro APK em preparação.',prerelease:true,make_latest:'false'}});

@@ -36,10 +36,32 @@ jobs:
           packages: platform-tools
       - name: Instalar SDK
         run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'build-tools;35.0.0'
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
+        id: debug-key
         with:
           path: ~/.android/debug.keystore
           key: junto-debug-key-${{ github.repository_id }}-v1
+      - name: Preparar chave debug persistente
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -noprompt -storetype JKS -keystore "$HOME/.android/debug.keystore" -storepass android -keypass android -alias androiddebugkey -dname 'CN=Android Debug,O=Android,C=US' -keyalg RSA -keysize 2048 -validity 10000
+          fi
+          echo "JUNTO_DEBUG_KEYSTORE=$HOME/.android/debug.keystore" >> "$GITHUB_ENV"
+      - uses: actions/cache/save@v4
+        if: steps.debug-key.outputs.cache-hit != 'true'
+        with:
+          path: ~/.android/debug.keystore
+          key: junto-debug-key-${{ github.repository_id }}-v1
+      - name: Remover candidato e usar a chave canônica do cache
+        if: steps.debug-key.outputs.cache-hit != 'true'
+        run: rm "$HOME/.android/debug.keystore"
+      - uses: actions/cache/restore@v4
+        if: steps.debug-key.outputs.cache-hit != 'true'
+        with:
+          path: ~/.android/debug.keystore
+          key: junto-debug-key-${{ github.repository_id }}-v1
+          fail-on-cache-miss: true
       - name: Definir versão
         env:
           INPUT_VERSION: ${{ inputs.version_name }}
@@ -75,7 +97,11 @@ jobs:
           ./gradlew --no-daemon testDebugUnitTest assembleDebug
       - name: Verificar APK instalável
         run: |
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify android/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs android/app/build/outputs/apk/debug/app-debug.apk > "$RUNNER_TEMP/debug-cert.txt"
+          cat "$RUNNER_TEMP/debug-cert.txt"
+          CERT_SHA256="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/debug-cert.txt")"
+          [[ "$CERT_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          echo "DEBUG_CERT_SHA256=$CERT_SHA256" >> "$GITHUB_ENV"
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging android/app/build/outputs/apk/debug/app-debug.apk
       - name: Preparar assinatura
         if: startsWith(github.ref, 'refs/tags/v')

@@ -4,6 +4,7 @@ apply plugin: 'com.android.application'
 // Ex.: VERSION_CODE=12 VERSION_NAME=1.2.0 ./gradlew assembleRelease
 def envOr = { String name, String fallback -> System.getenv(name) ?: (project.findProperty(name) ?: fallback) }
 def keystorePath = envOr('ANDROID_KEYSTORE_FILE', '')
+def debugKeystorePath = envOr('JUNTO_DEBUG_KEYSTORE', '')
 def projectVersion = new groovy.json.JsonSlurper().parse(file('../../package.json')).version.toString()
 
 android {
@@ -23,6 +24,14 @@ android {
         }
     }
     signingConfigs {
+        debug {
+            if (debugKeystorePath) {
+                storeFile file(debugKeystorePath)
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
+        }
         release {
             if (keystorePath) {
                 storeFile file(keystorePath)

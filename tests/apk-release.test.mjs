@@ -5,7 +5,7 @@ import {createRequire} from 'node:module';
 import {publishApk} from '../scripts/publish-apk.mjs';
 const require=createRequire(import.meta.url),{getCurrent}=require('../updates/lib/current-apk.js');
 const apk=Buffer.from('fixture apk');
-const m={channel:'main',testBuild:true,signing:'debug',assetName:'Junto-1.1.1-abcdef0.3.1-teste.apk',apkSize:apk.length,
+const m={channel:'main',testBuild:true,signing:'debug',certificateSha256:'a'.repeat(64),assetName:'Junto-1.1.1-abcdef0.3.1-teste.apk',apkSize:apk.length,
 sha256:createHash('sha256').update(apk).digest('hex'),commitSha:'abcdef0123',version:'1.1.1-abcdef0.3.1',runNumber:3,runAttempt:1};
 const body=x=>'<!-- junto-apk\n'+JSON.stringify(x)+'\n-->';
 function fixture({head=m.commitSha,comparison='diverged',failUpload=false,previous={...m,runNumber:2}}={}){
@@ -61,4 +61,10 @@ test('central rejeita ausência de release e URL de página ou outro host',async
 test('APK validado publica enquanto um commit descendente ainda compila',async()=>{
  const f=fixture({head:'newer',comparison:'ahead'});await publishApk({metadata:m,apk,request:f.request,log:()=>{}});
  assert.ok(f.calls.some(c=>c.path==='/releases/9'&&c.method==='PATCH'));
+});
+
+test('mudança de assinatura preserva APK publicado',async()=>{
+ const f=fixture({previous:{...m,certificateSha256:'b'.repeat(64)}});
+ await assert.rejects(publishApk({metadata:m,apk,request:f.request}),/chave debug mudou/);
+ assert.ok(!f.calls.some(c=>c.method));
 });

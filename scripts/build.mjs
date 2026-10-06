@@ -14,10 +14,11 @@ export async function buildWeb(){
   await writeFile(appPath,app.replace('/* JUNTO_APP_API */',await readFile(join(src,'features/app-api.js'),'utf8')));
   await rm(join(dist,'features'),{recursive:true,force:true});
   await build({absWorkingDir:root,entryPoints:['src/js/native.js','src/js/banking.js','src/js/cloud.js'],outdir:join(dist,'js'),bundle:true,format:'iife',platform:'browser',target:['chrome109','safari16'],legalComments:'eof'});
-  const config={url:process.env.SUPABASE_URL||'',publishableKey:process.env.SUPABASE_PUBLISHABLE_KEY||''};
+  const config={url:process.env.SUPABASE_URL||'',publishableKey:process.env.SUPABASE_PUBLISHABLE_KEY||'',appUrl:String(process.env.JUNTO_APP_URL||'').replace(/\/+$/,'')};
   if(Boolean(config.url)!==Boolean(config.publishableKey))throw new Error('Defina SUPABASE_URL e SUPABASE_PUBLISHABLE_KEY juntas.');
   if(config.publishableKey&&config.publishableKey.startsWith('eyJ')){let role;try{role=JSON.parse(Buffer.from(config.publishableKey.split('.')[1],'base64url').toString()).role;}catch{}if(role!=='anon')throw new Error('Use apenas chave publishable ou anon.');}
   if(config.publishableKey&&!config.publishableKey.startsWith('eyJ')&&!config.publishableKey.startsWith('sb_publishable_'))throw new Error('Nunca use uma chave secreta no app.');
+  if(config.appUrl&&!/^https:\/\/[a-z0-9.-]+(?::\d+)?$/i.test(config.appUrl))throw new Error('JUNTO_APP_URL precisa ser uma URL HTTPS pública.');
   await writeFile(join(dist,'js/config.js'),`window.JuntoCloudConfig=${JSON.stringify(config)};\n`);
   const files=(await walk(dist)).filter(f=>!f.endsWith(`${sep}sw.js`)).sort(),hash=createHash('sha256');
   for(const f of files){hash.update(relative(dist,f));hash.update(await readFile(f));}

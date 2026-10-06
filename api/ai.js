@@ -17,8 +17,10 @@ export default async function handler(req,res){
   if(!token)return json(res,401,{code:'unauthorized',message:'Entre novamente no Juntô.'});
 
   const apiKey=String(process.env.GEMINI_API_KEY||'').trim();
-  const model=String(process.env.GEMINI_MODEL||'').trim();
-  if(!apiKey||!model)return json(res,503,{code:'not_configured',message:'A inteligência do Juntô está temporariamente indisponível.'});
+  const requestedModel=String(process.env.GEMINI_MODEL||'').trim().toLowerCase();
+  const allowedModels=new Set(['gemini-3.5-flash','gemini-3.5-flash-lite','gemini-3.6-flash','gemini-3.7-flash']);
+  const model=allowedModels.has(requestedModel)?requestedModel:'gemini-3.5-flash';
+  if(!apiKey)return json(res,503,{code:'not_configured',message:'A inteligência do Juntô está temporariamente indisponível.'});
 
   let body=req.body;
   if(typeof body==='string'){try{body=JSON.parse(body);}catch{return json(res,400,{code:'bad_request',message:'Solicitação inválida.'});}}

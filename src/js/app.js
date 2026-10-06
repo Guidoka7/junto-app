@@ -1064,7 +1064,7 @@ ${JSON.stringify(chatContext())}`;
     if(typeof getAccessToken!=='function')throw Object.assign(new Error('Sua sessão ainda não está pronta.'),{code:'unauthorized'});
     const token=await getAccessToken();
     if(!token)throw Object.assign(new Error('Sua sessão expirou.'),{code:'unauthorized'});
-    const body={contents,systemInstruction:{parts:[{text:system}]},generationConfig:{temperature:chatDeep?.42:.34,topP:.9,maxOutputTokens:maxOutputTokens||(chatDeep?1400:850)}};
+    const body={contents,systemInstruction:{parts:[{text:system}]},generationConfig:{temperature:chatDeep?.42:.34,topP:.9,maxOutputTokens:maxOutputTokens||(chatDeep?4096:2048),thinkingConfig:{thinkingBudget:chatDeep?1024:0}}};
     if(tools)body.tools=[{functionDeclarations:geminiToolDeclarations()}];
     const native=Boolean(window.Capacitor?.isNativePlatform?.());
     const base=native?String(window.JuntoCloudConfig?.appUrl||'').replace(/\/+$/,''):'';
@@ -1074,7 +1074,7 @@ ${JSON.stringify(chatContext())}`;
     catch(e){if(e?.name==='AbortError')throw Object.assign(e,{code:'cancelled'});throw Object.assign(e,{code:'network'});}
     let data={};try{data=await res.json();}catch{}
     if(!res.ok){const msg=data?.message||data?.error?.message||`Erro ${res.status}`;let code=data?.code||'upstream_error';if(res.status===401)code='unauthorized';if(res.status===429)code='rate_limited';throw Object.assign(new Error(msg),{code,status:res.status});}
-    const content=data?.candidates?.[0]?.content;if(!content)throw Object.assign(new Error('A inteligência do Juntô não retornou conteúdo.'),{code:'empty'});
+    const candidate=data?.candidates?.[0],content=candidate?.content;if(!content){const reason=candidate?.finishReason||data?.promptFeedback?.blockReason||'EMPTY';throw Object.assign(new Error(`A inteligência do Juntô não retornou conteúdo (${reason}).`),{code:'empty',finishReason:reason});}
     return {content,data};
   }
   async function geminiRunConversation(q,ctl,msg,update){
@@ -1551,6 +1551,53 @@ ${JSON.stringify(chatContext())}`;
     const form=event.target.closest('[data-form]');if(!form)return;event.preventDefault();error('');
     const d=new FormData(form),type=form.dataset.form,id=form.dataset.id,actor=form.dataset.actor||active;
     if(type==='chat'){sendChat();return;}
+    if(type==='ask'){
+      const title=titleValue(d,'request-title'),amount=amountValue(d,'request-amount');if(title==null||amount==null)return;
+      learnFrom(title,d.get('request-category'),$('#request-category')?.dataset.touched==='1');const r={id:uid(),title:smartName(title),amount,category:d.get('request-category'),...itemFields(title,d.get('request-category')),note:String(d.get('request-note')||'').trim(),author:active,recipient:other(),status:'pending',createdAt:Date.now()};state.requests.push(r);
+      notify(r.recipient,'Amor, posso gastar?',`${first(user().name)} quer combinar ${title} por ${money(amount)}.`,'request',r.id);log(active,`pediu um combinado: ${title} por ${money(amount)}.`);close();route='requests';requestFilter='all';persist();toast('Pedido entregue. Agora é com teu amor.',`Responda no celular de ${first(user(other()).name)} ou troque de perfil.`,'chat');return;
+    }
+    if(type==='expense'){
+      const title=titleValue(d,'expense-title'),amount=amountValue(d,'expense-amount'),payer=d.get('expense-payer'),kind=d.get('expense-type'),date=d.get('expense-date'),category=d.get('expense-category');
+      if(title==null||amount==null)return;learnFrom(title,category,$('#expense-category')?.dataset.touched==='1');const itf=itemFields(title,category),nm=smartName(title);if(!['a','b','half','prop'].includes(payer)||!/^\d{4}-\d{2}-\d{2}$/.test(date)){error('Confira quem paga e a data do gasto.');return;}
+      if(kind==='spent'){
+        const c=charge(amount,payer);if(c.error){error(c.error);return;}
+        state.transactions.push({id:uid(),name:nm,amount,category,payer,date,...itf,by:active,...(c.shares.length>1?{split:c.shares}:{})});log(active,`registrou ${nm}: ${money(amount)}, ${c.shares.length>1?payerLabel(payer).toLowerCase():'na conta de '+first(user(payer).name)}.`);
+      }else{state.bills.push({id:uid(),name:nm,amount,category,payer,due:date,item:itf.item,icon:itf.icon,recurring:kind==='fixed',status:'open'});log(active,`adicionou ${kind==='fixed'?'uma conta fixa':'uma conta a pagar'}: ${title}.`);}
+      notify(other(),'Conta atualizada.',`${first(user().name)} registrou ${title} por ${money(amount)}.`);close();route='bills';billFilter='all';persist();toast(kind==='spent'?'Gasto anotado. Sem mistério.':'Conta no radar da dupla.',`${title} · ${money(amount)}`);return;
+    }
+    if(type==='balance'){
+      const amount=amountValue(d,'balance-amount',true),who=form.dataset.user;if(amount==null||!user(who))return;
+      user(who).balance=amount;log(who,`atualizou o saldo atual para ${money(amount)}.`);notify(other(who),'O saldo da dupla mudou.',`${first(user(who).name)} atualizou o saldo atual.`);close();persist();toast('Saldo atualizado.','O livre do mês também foi recalculado.');return;
+    }
+    if(type==='contribute'){
+      const amount=amountValue(d,'contribute-amount'),g=state.goals.find(g=>g.id===id);if(amount==null||!g)return;
+      if(amount>free()){error(`Vocês têm ${money(Math.max(0,free()))} livres. Escolha um valor que preserve as contas e os outros planos.`);return;}
+      g.saved+=amount;state.saves.push({id:uid(),goalId:g.id,amount,date:dateISO(),actor:active,source:'manual'});log(active,`separou ${money(amount)} para ${g.name}.`);notify(other(),'Nosso sonho andou mais um pouco. 💚',`${first(user().name)} separou ${money(amount)} para ${g.name}.`);close();persist();toast('O sonho tá mais perto.',`${money(amount)} protegidos para ${g.name}.`);return;
+    }
+    if(type==='decline'){
+      const r=state.requests.find(r=>r.id===id),note=String(d.get('decline-note')||'').trim();if(!r||r.status!=='pending'||r.recipient!==actor)return;
+      if(!note){error('Manda uma resposta com carinho.');return;}r.status='declined';r.response=note;r.respondedAt=Date.now();
+      state.notifications.forEach(n=>{if(n.to===actor&&n.requestId===id)n.read=true;});notify(r.author,'Hoje não, amor. 💚',`${first(user(actor).name)} respondeu ao pedido ${r.title}: ${note}`,'declined',id);log(actor,`deixou ${r.title} para depois, com uma resposta.`);close();persist();toast('Resposta entregue com carinho.','O pedido não descontou dinheiro.','chat');return;
+    }
+    if(type==='purchase'){
+      const r=state.requests.find(r=>r.id===id),payer=d.get('purchase-payer');if(!r||r.status!=='approved'||r.author!==actor||!['a','b','half','prop'].includes(payer))return;
+      const c=charge(r.amount,payer);if(c.error){error(c.error);return;}
+      r.status='purchased';r.payer=payer;r.purchasedAt=Date.now();state.transactions.push({id:uid(),requestId:r.id,name:r.title,item:r.item,icon:r.icon,by:actor,amount:r.amount,category:r.category,payer,date:dateISO(),...(c.shares.length>1?{split:c.shares}:{})});log(actor,`comprou ${r.title} por ${money(r.amount)}. Combinado cumprido.`);notify(r.recipient,'Combinado virou compra.',`${first(user(actor).name)} registrou ${r.title}. O saldo foi atualizado.`,'purchased',id);close();persist();toast('Comprou e registrou. Tudo certo.','O valor saiu da conta uma única vez.');return;
+    }
+    if(type==='pay-bill'){
+      const b=state.bills.find(b=>b.id===id),payer=d.get('bill-payer');if(!b||b.status!=='open'||!['a','b','half','prop'].includes(payer))return;
+      const c=charge(b.amount,payer);if(c.error){error(c.error);return;}
+      b.status='paid';b.paidAt=Date.now();b.payer=payer;state.transactions.push({id:uid(),billId:b.id,name:b.name,by:active,amount:b.amount,category:b.category,payer,date:dateISO(),...(c.shares.length>1?{split:c.shares}:{})});log(active,c.shares.length>1?`confirmou ${b.name} pago ${payerLabel(payer).toLowerCase()}: ${c.shares.map(x=>first(user(x.id).name)+' '+money(x.amount)).join(', ')}.`:`confirmou ${b.name} pago por ${first(user(payer).name)}: ${money(b.amount)}.`);notify(other(),'Um boleto a menos. 🙌',`${first(user().name)} marcou ${b.name} como pago.`);close();persist();toast('Conta paga. Respira.','O gasto foi registrado e a conta saiu das pendências.');return;
+    }
+    if(type==='cancel-request'){
+      const r=state.requests.find(r=>r.id===id);if(!r||r.author!==actor||!['pending','approved'].includes(r.status))return;r.status='cancelled';log(actor,`cancelou o pedido ${r.title}.`);notify(r.recipient,'Planos mudam. Tudo bem.',`${first(user(actor).name)} cancelou o pedido ${r.title}.`,'cancelled',id);close();persist();toast('Pedido cancelado.','Se havia dinheiro reservado, ele voltou ao livre.');return;
+    }
+    if(type==='remove-bill'){
+      const b=state.bills.find(b=>b.id===id);if(!b||b.status!=='open')return;state.bills=state.bills.filter(q=>q.id!==id);log(active,`removeu ${b.name} das contas a pagar.`);close();persist();toast('Conta retirada do planejamento.');return;
+    }
+    if(type==='release-goal'){
+      const g=state.goals.find(g=>g.id===id);if(!g)return;state.goals=state.goals.filter(q=>q.id!==id);log(active,`encerrou o plano ${g.name} e liberou ${money(g.saved)}.`);notify(other(),'A dupla mudou de plano.',`${first(user().name)} encerrou ${g.name}. O dinheiro separado voltou ao livre.`);close();persist();toast('Plano encerrado. Dinheiro liberado.');return;
+    }
     if(type==='rename'){
       const a=titleValue(d,'name-a',1,24),b=isSolo()?'':titleValue(d,'name-b',1,24);if(a==null||b==null)return;state.users[0].name=a;if(!isSolo())state.users[1].name=b;close();persist();toast('A dupla ganhou os nomes de vocês.');return;
     }

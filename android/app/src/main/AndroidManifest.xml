@@ -15,6 +15,7 @@
         <package android:name="br.com.uol.ps.myaccount" />
         <package android:name="br.com.neon" />
         <package android:name="br.com.bradesco.next" />
+        <package android:name="io.cloudwalk.infinitepaydash" />
         <package android:name="com.transferwise.android" />
         <package android:name="com.btg.pactual.digital.mobile" />
         <package android:name="br.com.bancopan.cartoes" />

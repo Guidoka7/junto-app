@@ -30,7 +30,7 @@ Pix e débito podem descontar do saldo. Recebimentos podem somar ao saldo e se r
 
 Notificações repetidas são identificadas; **Já registrei / ignorar** retira uma sugestão sem alterar as finanças. Desativar a captura apaga a lista de pendentes. A leitura começa desligada e não adiciona gastos automaticamente.
 
-Bancos e carteiras configuráveis: Nubank, Inter, Itaú, Itaú Cartões, Banco do Brasil, Caixa, Santander, Bradesco, C6 Bank, PicPay, Mercado Pago, PagBank, Neon, Next, Wise, BTG Pactual, Banco PAN, Banco BV, Sicoob, Sicredi, Safra e Google Wallet. A tela permite busca, seleção por grupos e mostra os bancos em cartões com suas marcas. A presença na lista não significa que todos os formatos enviados por cada banco foram testados.
+Bancos e carteiras configuráveis: Nubank, Inter, Itaú, Itaú Cartões, Banco do Brasil, Caixa, Santander, Bradesco, C6 Bank, PicPay, Mercado Pago, PagBank, Neon, Next, InfinitePay, Wise, BTG Pactual, Banco PAN, Banco BV, Sicoob, Sicredi, Safra e Google Wallet. A tela permite busca, seleção por grupos e mostra os bancos em cartões com suas marcas. A presença na lista não significa que todos os formatos enviados por cada banco foram testados.
 
 A captura depende de notificações novas, com texto e valor reconhecíveis. Avisos ocultos, extratos, saldos e mensagens ambíguas não são importados. Formatos com vários valores, falhas, cancelamentos ou pagamentos agendados são descartados para evitar lançamentos incorretos. O navegador/PWA não lê as notificações de outros aplicativos.
 

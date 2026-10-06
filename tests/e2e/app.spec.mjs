@@ -11,6 +11,7 @@ async function fakeNative(page,inbox){await page.addInitScript(inbox=>{
     {name:'Nubank',packageName:'com.nu.production',installed:true},
     {name:'Itaú',packageName:'com.itau',installed:true},
     {name:'PicPay',packageName:'com.picpay',installed:true},
+    {name:'InfinitePay',packageName:'io.cloudwalk.infinitepaydash',installed:true},
     {name:'Wise',packageName:'com.transferwise.android',installed:false},
     {name:'BTG Pactual',packageName:'com.btg.pactual.digital.mobile',installed:false},
     {name:'Google Wallet',packageName:'com.google.android.apps.walletnfcrel',installed:true}
@@ -42,7 +43,7 @@ test('Android back closes a dialog, chat, navigation, then exits',async({page})=
 test('bank picker is compact, searchable and keeps branded choices',async({page})=>{
  await fakeNative(page,[]);await page.goto('/');await personal(page);await page.locator('#settings-button').click();await page.locator('[data-feature="bank-settings"]').click();
  await expect(page.locator('.bank-settings-screen')).toBeVisible();await expect(page.locator('.bank-search input')).toHaveAttribute('placeholder','Buscar banco ou carteira...');
- await expect(page.locator('[data-bank-card] .bank-brand-icon')).toHaveCount(6);
+ await expect(page.locator('[data-bank-card] .bank-brand-icon')).toHaveCount(7);
  await page.locator('[data-bank-search]').fill('PicPay');await expect(page.locator('[data-bank-card][data-search*="picpay"]')).toBeVisible();await expect(page.locator('[data-bank-card][data-search*="nubank"]')).toBeHidden();
  await page.locator('[data-bank-search]').fill('');await page.locator('[data-bank-select="digital"]').click();
  await expect(page.locator('input[name="packages"][value="com.picpay"]')).toBeChecked();await expect(page.locator('input[name="packages"][value="com.transferwise.android"]')).toBeChecked();

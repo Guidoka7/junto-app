@@ -1,5 +1,25 @@
 const json=(res,status,body)=>{res.statusCode=status;res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify(body));};
 
+function allowOrigin(origin){
+  if(!origin)return null;
+  try{
+    const url=new URL(origin);
+    const host=url.hostname.toLowerCase();
+    if(origin==='capacitor://localhost'||origin==='https://localhost'||origin==='http://localhost')return origin;
+    if(url.protocol==='https:'&&(host==='junto-app-juntoapp.vercel.app'||host==='junto-app-tan.vercel.app'||host.endsWith('-juntoapp.vercel.app')))return origin;
+  }catch{}
+  return null;
+}
+function cors(req,res){
+  const origin=String(req.headers.origin||'');
+  const allowed=allowOrigin(origin);
+  if(allowed){res.setHeader('Access-Control-Allow-Origin',allowed);res.setHeader('Vary','Origin');}
+  res.setHeader('Access-Control-Allow-Methods','POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization');
+  res.setHeader('Access-Control-Max-Age','86400');
+  return !origin||Boolean(allowed);
+}
+
 async function verifyUser(token){
   const url=String(process.env.SUPABASE_URL||'').replace(/\/+$/,'');
   const key=String(process.env.SUPABASE_PUBLISHABLE_KEY||'');
@@ -10,7 +30,10 @@ async function verifyUser(token){
 }
 
 export default async function handler(req,res){
-  if(req.method!=='POST'){res.setHeader('Allow','POST');return json(res,405,{code:'method_not_allowed',message:'Método não permitido.'});}
+  if(!cors(req,res))return json(res,403,{code:'origin_not_allowed',message:'Origem não autorizada.'});
+  if(req.method==='OPTIONS'){res.statusCode=204;return res.end();}
+  if(req.method!=='POST'){res.setHeader('Allow','POST, OPTIONS');return json(res,405,{code:'method_not_allowed',message:'Método não permitido.'});}
+
   const auth=String(req.headers.authorization||'');
   if(!auth.startsWith('Bearer '))return json(res,401,{code:'unauthorized',message:'Entre novamente no Juntô.'});
   const token=auth.slice(7).trim();
@@ -18,8 +41,8 @@ export default async function handler(req,res){
 
   const apiKey=String(process.env.GEMINI_API_KEY||'').trim();
   const requestedModel=String(process.env.GEMINI_MODEL||'').trim().toLowerCase();
-  const allowedModels=new Set(['gemini-3.5-flash','gemini-3.5-flash-lite','gemini-3.6-flash','gemini-3.7-flash']);
-  const model=allowedModels.has(requestedModel)?requestedModel:'gemini-3.5-flash';
+  const allowedModels=new Set(['gemini-2.5-flash','gemini-2.5-flash-lite','gemini-3-flash-preview']);
+  const model=allowedModels.has(requestedModel)?requestedModel:'gemini-2.5-flash';
   if(!apiKey)return json(res,503,{code:'not_configured',message:'A inteligência do Juntô está temporariamente indisponível.'});
 
   let body=req.body;

@@ -1065,8 +1065,9 @@ ${JSON.stringify(chatContext())}`;
     if(!token)throw Object.assign(new Error('Sua sessão expirou.'),{code:'unauthorized'});
     const body={contents,systemInstruction:{parts:[{text:system}]},generationConfig:{temperature:chatDeep?.42:.34,topP:.9,maxOutputTokens:maxOutputTokens||(chatDeep?1400:850)}};
     if(tools)body.tools=[{functionDeclarations:geminiToolDeclarations()}];
-    const base=String(window.JuntoCloudConfig?.appUrl||'').replace(/\/+$/,'');
-    const url=(base||location.origin)+'/api/ai';
+    const native=Boolean(window.Capacitor?.isNativePlatform?.());
+    const base=native?String(window.JuntoCloudConfig?.appUrl||'').replace(/\/+$/,''):'';
+    const url=native?(base+'/api/ai'):'/api/ai';
     let res;
     try{res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify(body),signal});}
     catch(e){if(e?.name==='AbortError')throw Object.assign(e,{code:'cancelled'});throw Object.assign(e,{code:'network'});}

@@ -30,7 +30,7 @@ Pix e débito podem descontar do saldo. Recebimentos podem somar ao saldo e se r
 
 Notificações repetidas são identificadas; **Já registrei / ignorar** retira uma sugestão sem alterar as finanças. Desativar a captura apaga a lista de pendentes. A leitura começa desligada e não adiciona gastos automaticamente.
 
-Bancos e carteiras configuráveis: Nubank, Inter, Itaú, Itaú Cartões, Banco do Brasil, Caixa, Santander, Bradesco, C6, PicPay, Mercado Pago, PagBank, Neon, Next e Google Wallet. A presença na lista não significa que todos os formatos enviados por cada banco foram testados.
+Bancos e carteiras configuráveis: Nubank, Inter, Itaú, Itaú Cartões, Banco do Brasil, Caixa, Santander, Bradesco, C6 Bank, PicPay, Mercado Pago, PagBank, Neon, Next, Wise, BTG Pactual, Banco PAN, Banco BV, Sicoob, Sicredi, Safra e Google Wallet. A tela permite busca, seleção por grupos e mostra os bancos em cartões com suas marcas. A presença na lista não significa que todos os formatos enviados por cada banco foram testados.
 
 A captura depende de notificações novas, com texto e valor reconhecíveis. Avisos ocultos, extratos, saldos e mensagens ambíguas não são importados. Formatos com vários valores, falhas, cancelamentos ou pagamentos agendados são descartados para evitar lançamentos incorretos. O navegador/PWA não lê as notificações de outros aplicativos.
 
@@ -188,3 +188,8 @@ A leitura de notificações deve ser explicada na política de privacidade e nas
 Para os testes de navegador, rode `npx playwright install chromium` uma vez. `node_modules/`, `dist/`, arquivos de ambiente, builds locais e chaves não devem ser enviados ao GitHub. A pasta `dist/` incluída no pacote é uma prévia gerada; o GitHub a reconstrói.
 
 Se o login informar que o servidor precisa ser ativado, confira a execução de `supabase/setup.sql`. Se o Android não detectar movimentos, confira a permissão de acesso às notificações, a seleção do banco e o texto enviado por ele. Teste com uma nova notificação real; a lista histórica de notificações do sistema não é importada.
+
+
+### Créditos de terceiros
+
+Os vetores usados para representar as marcas bancárias na tela de seleção foram adaptados de `@edusites/bancos-brasil` (MIT). Consulte `THIRD_PARTY_NOTICES.md`. As marcas e logotipos pertencem aos seus respectivos titulares e são usados apenas para identificação das instituições.

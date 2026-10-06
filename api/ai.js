@@ -41,7 +41,7 @@ export default async function handler(req,res){
 
   const apiKey=String(process.env.GEMINI_API_KEY||'').trim();
   const requestedModel=String(process.env.GEMINI_MODEL||'').trim().toLowerCase();
-  const allowedModels=new Set(['gemini-2.5-flash','gemini-2.5-flash-lite','gemini-3-flash-preview']);
+  const allowedModels=new Set(['gemini-2.5-flash','gemini-2.5-flash-lite','gemini-3-flash-preview','gemini-3.1-flash-lite','gemini-3.5-flash','gemini-3.5-flash-lite','gemini-3.6-flash','gemini-3.7-flash']);
   const model=allowedModels.has(requestedModel)?requestedModel:'gemini-2.5-flash';
   if(!apiKey)return json(res,503,{code:'not_configured',message:'A inteligência do Juntô está temporariamente indisponível.'});
 
@@ -49,10 +49,22 @@ export default async function handler(req,res){
   if(typeof body==='string'){try{body=JSON.parse(body);}catch{return json(res,400,{code:'bad_request',message:'Solicitação inválida.'});}}
   if(!body||typeof body!=='object'||!Array.isArray(body.contents))return json(res,400,{code:'bad_request',message:'Solicitação inválida.'});
 
+  const generationConfig={...(body.generationConfig||{})};
+  if(model.startsWith('gemini-3')){
+    delete generationConfig.temperature;
+    delete generationConfig.topP;
+    delete generationConfig.topK;
+    delete generationConfig.candidateCount;
+    const deep=Number(generationConfig?.thinkingConfig?.thinkingBudget||0)>0;
+    generationConfig.thinkingConfig={thinkingLevel:deep?'medium':'minimal'};
+  }else if(model.startsWith('gemini-2.5')){
+    const deep=Number(generationConfig?.thinkingConfig?.thinkingBudget||0)>0;
+    generationConfig.thinkingConfig={thinkingBudget:deep?1024:0};
+  }
   const allowed={
     contents:body.contents,
     systemInstruction:body.systemInstruction,
-    generationConfig:body.generationConfig,
+    generationConfig,
     ...(Array.isArray(body.tools)?{tools:body.tools}:{})
   };
   const encoded=JSON.stringify(allowed);

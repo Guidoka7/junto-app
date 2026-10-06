@@ -18,7 +18,9 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/mobile-compact.css">
 </head>
-<body>
+<body data-auth="locked">
+  <section id="auth-gate" aria-live="polite"><div class="auth-card"><h1>Juntô</h1><p>Verificando acesso…</p></div></section>
+  <div id="authenticated-app" hidden inert>
   <aside class="sidebar" aria-label="Navegação principal">
     <div class="brand" data-brand></div>
     <p class="side-caption">Nosso espaço</p>
@@ -29,11 +31,11 @@
   <main class="workspace">
     <div class="mobile-brand"><div class="brand" data-brand></div><div id="mobile-user-switch"></div></div>
     <header class="topbar"><div><p class="top-eyebrow" id="couple-label">Nossa vida, em dia</p><h1 id="main-title">Nosso dinheiro</h1></div><div class="top-tools"><span class="date-label" id="month-label"></span><div id="desktop-user-switch"></div><button class="icon-btn" data-action="notifications" aria-label="Ver notificações" id="notification-button"></button><button class="icon-btn" data-action="settings" aria-label="Ajustes da dupla" id="settings-button"></button></div></header>
-    <div class="demo-strip"><div class="flex"><span class="badge">Prévia interativa</span><span class="extra-demo-text">Dois perfis. Uma mesma vida financeira.</span></div><div class="flex"><button class="text-link other-mobile" data-action="peer" id="open-peer-button"></button><button class="text-link" data-action="onboard">Criar nossa dupla</button></div></div>
     <div class="columns"><section class="app-content" id="app-content" aria-label="Finanças da dupla"></section><aside class="peer-rail" id="peer-rail" aria-label="Simulação do celular da outra pessoa"></aside></div>
-    <footer class="app-foot"><span>Juntô · amor, planos e uns boletos no caminho.</span><button data-action="about">Sobre esta demonstração</button></footer>
+    <footer class="app-foot"><span>Juntô · amor, planos e uns boletos no caminho.</span></footer>
   </main>
   <nav class="mobile-nav" id="mobile-nav" aria-label="Navegação pelo celular"></nav>
+  </div>
   <div class="toast-zone" id="toast-zone" role="status" aria-live="polite" aria-atomic="false"></div>
   <dialog id="modal" aria-labelledby="modal-title"><div class="modal-wrap" id="modal-content"></div></dialog>
   <input type="file" id="couple-photo-input" accept="image/*" hidden>

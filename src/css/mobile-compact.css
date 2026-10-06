@@ -138,3 +138,13 @@
   .forecast-strip b { font-size: 15px !important; }
   .hero-stats b { font-size: 14px !important; }
 }
+
+/* Authentication is closed in the initial HTML, including before scripts load. */
+#authenticated-app[hidden],#auth-gate[hidden]{display:none!important}
+body[data-auth="locked"] #chat-panel,body[data-auth="locked"] #chat-fab,body[data-auth="locked"] .toast-zone{display:none!important}
+#auth-gate{min-height:100dvh;display:grid;place-items:center;padding:24px 18px;background:var(--bg,#F5F5F7)}
+.auth-card{width:min(100%,420px);padding:26px 22px;background:var(--surface,#fff);border:1px solid var(--line,#e1e3e8);border-radius:24px}
+.auth-card h1{font-size:28px;margin-bottom:12px}.auth-card .form{margin-top:18px}.auth-card .feature-actions{margin-top:16px}
+body[data-auth="locked"] .auth-card .modal-close{display:none}
+
+.auth-notice{margin:16px 0;padding:13px 14px;border-radius:12px;background:#edf3f1;color:#284d43;font-size:13px;line-height:1.55}.auth-notice span{display:block;margin-top:5px;font-weight:600;overflow-wrap:anywhere}.auth-confirm-actions{margin-top:16px;padding-top:12px;border-top:1px solid var(--line,#e1e3e8)}

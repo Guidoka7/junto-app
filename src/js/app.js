@@ -311,7 +311,7 @@
       notifications:[{id:'not1',to:'b',title:'Amor, posso gastar?',body:'Gui quer combinar Jantar de sexta por R$ 148,00.',kind:'request',requestId:'req1',read:false,createdAt:t-3600000}],demo:true};
   }
   const valid=(s)=>s&&s.schema===1&&Array.isArray(s.users)&&(s.users.length===2||s.users.length===1)&&s.users.every(u=>['a','b'].includes(u.id)&&typeof u.name==='string'&&Number.isSafeInteger(u.balance))&&['bills','goals','transactions','requests','activity','notifications'].every(k=>Array.isArray(s[k]));
-  let state;try{const s=JSON.parse(localStorage.getItem(KEY));state=migrate(valid(s)?s:seedSolo());}catch{state=migrate(seedSolo());}
+  let state;try{const s=JSON.parse(localStorage.getItem(KEY));state=migrate(valid(s)?s:freshPersonalState());}catch{state=freshPersonalState();}
   let active='a';try{active=sessionStorage.getItem(PROFILE)==='b'?'b':'a';}catch{}if(state.users.length<2)active='a';
   let route='home',billFilter='all',requestFilter='all',hidden=false,noticesEnabled=true;
   let analysisTab='overview',futureTab='forecast',incomeTab='overview',planTab='plan';
@@ -357,7 +357,6 @@
     $('#desktop-user-switch').innerHTML=switcher();$('#mobile-user-switch').innerHTML=switcher();
     $('#notification-button').innerHTML=icon('bell')+(unread()?`<span class="dot-count">${Math.min(9,unread())}</span>`:'');
     $('#settings-button').innerHTML=icon('settings');
-    $('#open-peer-button').innerHTML=isSolo()?icon('heart')+'<span>Conectar meu amor</span>':icon('phone')+`<span>Celular de ${esc(first(user(other()).name))}</span>`;$('#open-peer-button').dataset.action=isSolo()?'connect':'peer';
     $('#side-couple').innerHTML=isSolo()?`<div class="av-stack">${avatar('a')}</div><div><strong>${esc(first(user('a').name))}</strong><small>Modo individual</small></div><button class="icon-btn" data-action="settings" aria-label="Ajustes">${icon('settings')}</button>`:`<div class="av-stack">${avatar('a')}${avatar('b')}</div><div><strong>${esc(first(user('a').name))} & ${esc(first(user('b').name))}</strong><small>Nossa dupla</small></div><button class="icon-btn" data-action="settings" aria-label="Personalizar a dupla">${icon('settings')}</button>`;
   }
   function topicTabs(kind,current,items){
@@ -1338,9 +1337,9 @@ ${JSON.stringify(chatContext())}`;
     const head={ok:['Pode, sem apertar.','O mês aguenta tranquilo.'],tight:['Cabe, mas aperta.','Dá, mas o resto do mês fica mais curto.'],no:['Melhor esperar.','Hoje isso passa do que está livre.']}[level];
     return `<div class="can-card ${level}"><div class="can-head"><span>${icon(level==='ok'?'circleCheck':level==='tight'?'info':'x')}</span><div><b>${head[0]}</b><small>${head[1]}</small></div></div><ul>${lines.map(l=>`<li>${l}</li>`).join('')}</ul><div class="can-actions"><button type="button" class="btn ${level==='no'?'secondary':'primary'}" data-action="can-buy">${icon('cart')}Comprei, registrar</button><button type="button" class="btn ${level==='no'?'primary':'secondary'}" data-action="can-wait">Vou esperar</button></div></div>`;
   }
-  function render(){if(cloudSlot)active=cloudSlot;if(isSolo()){active='a';if(route==='requests')route='home';if(futureTab==='people')futureTab='forecast';}document.body.classList.toggle('solo',isSolo());renderNav();document.body.dataset.route=route;for(const k in chartStore)delete chartStore[k];$('#app-content').innerHTML=({home:homeView,future:futureView,analysis:analysisView,incomes:incomesView,bills:billsView,requests:requestsView,goals:goalsView,activity:activityView}[route]||homeView)();arrangeContextBar();renderPeer();if(chatOpen)renderChat();soloizeAll();}
+  function render(){if(!appAccess)return;if(cloudSlot)active=cloudSlot;if(isSolo()){active='a';if(route==='requests')route='home';if(futureTab==='people')futureTab='forecast';}document.body.classList.toggle('solo',isSolo());renderNav();document.body.dataset.route=route;for(const k in chartStore)delete chartStore[k];$('#app-content').innerHTML=({home:homeView,future:futureView,analysis:analysisView,incomes:incomesView,bills:billsView,requests:requestsView,goals:goalsView,activity:activityView}[route]||homeView)();arrangeContextBar();renderPeer();if(chatOpen)renderChat();soloizeAll();}
   function modalHead(title){return `<div class="modal-head"><h2 id="modal-title">${esc(title)}</h2><button class="icon-btn" data-action="close" aria-label="Fechar">${icon('x')}</button></div>`;}
-  function openModal(title,body,kind=''){const d=$('#modal');d.dataset.kind=kind;d.classList.toggle('peer-modal',kind==='peer');$('#modal-content').innerHTML=modalHead(title)+body;soloize($('#modal-content'));if(!d.open)d.showModal();}
+  function openModal(title,body,kind=''){if(!appAccess){if(!kind.startsWith('cloud-'))return;document.querySelector('#auth-gate').innerHTML=`<div class="auth-card"><h1>${esc(title)}</h1>${body}${kind==='cloud-forgot'?'<button class="btn ghost wide" data-feature="cloud-auth-login">Voltar ao login</button>':''}</div>`;return;}const d=$('#modal');d.dataset.kind=kind;d.classList.toggle('peer-modal',kind==='peer');$('#modal-content').innerHTML=modalHead(title)+body;soloize($('#modal-content'));if(!d.open)d.showModal();}
   const optionUsers=(selected=active)=>state.users.map(u=>`<option value="${u.id}" ${u.id===selected?'selected':''}>${esc(u.name)}</option>`).join('');
   const optionCategories=(selected='Outros')=>categories.map(c=>`<option ${c===selected?'selected':''}>${c}</option>`).join('');
   const field=(name,label,placeholder='',value='',moneyField=false)=>`<div class="field"><label for="${name}">${label}</label>${moneyField?'<div class="money-input"><span>R$</span>':''}<input id="${name}" name="${name}" type="text" ${moneyField?'inputmode="decimal" autocomplete="off"':'maxlength="60"'} placeholder="${esc(placeholder)}" value="${esc(value)}" required>${moneyField?'</div>':''}</div>`;
@@ -1662,9 +1661,6 @@ ${JSON.stringify(chatContext())}`;
   $('#modal').addEventListener('click',(event)=>{if(event.target===$('#modal')){const r=$('#modal').getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)close();}});
   document.querySelectorAll('[data-brand]').forEach(el=>el.innerHTML=brand());
   /* JUNTO_APP_API */
-  if(rollRecurring())state.updatedAt=Date.now();
-  const autoRun=processAuto();if(autoRun.n){state.updatedAt=Date.now();setTimeout(()=>toast(`${autoRun.n} ${autoRun.n===1?'entrada confirmada':'entradas confirmadas'} sozinho.`,autoRun.saved?`E ${money(autoRun.saved)} já foram pro cofre, pelo piloto automático.`:'O saldo foi atualizado.','coins'),500);}
-  try{localStorage.setItem(KEY,JSON.stringify(state));}catch{}
   document.body.insertAdjacentHTML('beforeend',chatShell());
   let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(['home','future'].includes(route)&&!$('#modal').open)render();},180);});
   render();

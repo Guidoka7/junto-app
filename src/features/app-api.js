@@ -1,6 +1,6 @@
 // This source is inserted inside app.js's existing closure by scripts/integrate.mjs.
 // Keep all financial mutations in the existing model rather than a second ledger.
-  let cloudSlot = null;
+  let cloudSlot = null, appAccess = false;
   try{const slot=localStorage.getItem("junto-cloud-slot");if(["a","b"].includes(slot))cloudSlot=slot;}catch{}
   const copyState = () => structuredClone(state);
   const publishChange = () => window.dispatchEvent(new CustomEvent('junto:state-changed', {detail: copyState()}));
@@ -10,6 +10,7 @@
       bankImports:[],budgets:{},learned:{},commitments:[],challenges:[],plan:null,settings:{variableEstimate:0,yieldRate:10},demo:false});
   }
   function confirmBankMovement(event, fields) {
+    if (!appAccess) throw new Error('Entre na sua conta e escolha seu espaço.');
     if (!event || !/^[a-f0-9]{64}$/.test(event.id) || !Number.isSafeInteger(fields.amount) || fields.amount <= 0 || fields.amount > 99999999999) throw new Error('Confira o valor do movimento.');
     if (state.demo) throw new Error('Crie seu controle pessoal antes de importar movimentos reais.');
     if ((state.bankImports||[]).some(item=>item.id===event.id)) return {duplicate:true};
@@ -53,7 +54,19 @@
       return {duplicate:false,kind,id};
     } catch (e) { state=before;render();throw e; }
   }
+  for(const type of ['click','submit'])document.addEventListener(type,event=>{
+    if(!appAccess&&(event.target.closest('#authenticated-app')||event.target.closest('[data-action]')||event.target.closest('[data-feature^="bank-"]'))){event.preventDefault();event.stopImmediatePropagation();}
+  },true);
   window.JuntoApp = Object.freeze({
+    hasAccess:()=>appAccess,
+    setAccess(allowed) {
+      const wasAllowed=appAccess;appAccess=Boolean(allowed);
+      const shell=document.getElementById('authenticated-app'),gate=document.getElementById('auth-gate');
+      shell.hidden=!appAccess;shell.inert=!appAccess;gate.hidden=appAccess;
+      document.body.dataset.auth=appAccess?'ready':'locked';
+      if(appAccess){if(!wasAllowed){if(rollRecurring())state.updatedAt=Date.now();const result=processAuto();if(result.n)persist();}if(!document.querySelector('#chat-panel')?.firstChild){document.querySelector('#chat-panel')?.remove();document.querySelector('#chat-fab')?.remove();document.body.insertAdjacentHTML('beforeend',chatShell());}render();window.dispatchEvent(new Event('junto:access-ready'));}
+      else{close();closeChat();for(const id of ['app-content','desktop-nav','mobile-nav','peer-rail','side-couple','mobile-user-switch','desktop-user-switch','chat-messages','modal-content']){const el=document.getElementById(id);if(el)el.replaceChildren();}document.getElementById('chat-panel')?.replaceChildren();chatBusy?.abort();chatLog=[];chatTurns=[];route='home';delete document.body.dataset.route;}
+    },
     getState:copyState, getActive:()=>active, getCategories:()=>[...categories],
     freshState:freshPersonalState,
     applyState(data) {

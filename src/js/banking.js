@@ -6,7 +6,8 @@ const plugin=native?registerPlugin('BankNotifications'):null;
 let events=[],status={enabled:false,accessGranted:false,promptsGranted:false,packages:[]},banks=[],selected=null;
 let loading=false,refreshQueued=false,requestedId=null;
 function settingsHTML(){return `<div class="feature-card"><div><span class="feature-eyebrow">Seu dinheiro, sem esquecer</span><h3>Movimentos do banco</h3><p>${native?'Pix, pagamentos e recebimentos viram sugestões. Você confere antes de registrar.':'A leitura dos avisos do banco funciona no APK Android.'}</p></div><button class="btn secondary" data-feature="bank-settings">${native?'Configurar':'Como funciona'}</button>${events.length?`<button class="btn primary wide" data-feature="bank-inbox">Conferir ${events.length} movimento${events.length===1?'':'s'}</button>`:''}</div>`;}
-async function refresh(openId){
+let pendingOpenId=null;
+async function refresh(openId){if(!api.hasAccess()){if(openId)pendingOpenId=openId;return;}openId=openId||pendingOpenId;pendingOpenId=null;
   if(!plugin)return;if(openId)requestedId=openId;if(loading){refreshQueued=true;return;}loading=true;
   try{const [s,q,b]=await Promise.all([plugin.getStatus(),plugin.getPending(),plugin.listBanks()]);status=s;events=q.events||[];banks=b.banks||[];updateBadge();
     if(requestedId&&events.some(e=>e.id===requestedId)){const id=requestedId;requestedId=null;review(id);}
@@ -40,4 +41,5 @@ document.addEventListener('submit',async event=>{const form=event.target.closest
   }catch(e){error.textContent=e.message||'Não foi possível salvar.';}finally{button.disabled=false;}
 });
 window.JuntoBank={settingsHTML,openSettings,refresh};
+window.addEventListener('junto:access-ready',()=>refresh());
 if(plugin){plugin.addListener('bankEvent',event=>refresh(event?.id)).catch(()=>{});window.addEventListener('focus',async()=>{const launch=await plugin.getLaunchEvent();await refresh(launch.id);});document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});plugin.getLaunchEvent().then(x=>refresh(x.id));}

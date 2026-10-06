@@ -1,6 +1,7 @@
 name: Gerar APK Android
 on:
   push:
+    branches: [main]
     tags: ['v*']
   workflow_dispatch:
     inputs:
@@ -9,9 +10,11 @@ on:
         required: false
         default: ''
 permissions:
-  contents: write
+  contents: read
 jobs:
   apk:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     env:
       VERSION_CODE: ${{ github.run_number }}
@@ -52,18 +55,30 @@ jobs:
             echo 'Versão inválida.' >&2
             exit 1
           fi
+          P="$(node -p "require('./package.json').version")"
+          echo "PACKAGE_VERSION=$P" >> "$GITHUB_ENV"
+          if [[ "$GITHUB_REF" == refs/heads/main ]]; then
+            V="${P}-${GITHUB_SHA:0:7}.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
+          fi
           echo "VERSION_NAME=$V" >> "$GITHUB_ENV"
       - run: npm ci
       - run: npm run check
       - run: npm test
       - run: npm run test:android-parser
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
       - run: npm run android:sync
       - name: Testes e APK de desenvolvimento
         working-directory: android
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon testDebugUnitTest assembleDebug
+      - name: Verificar APK instalável
+        run: |
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify android/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging android/app/build/outputs/apk/debug/app-debug.apk
       - name: Preparar assinatura
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
@@ -86,13 +101,17 @@ jobs:
         run: |
           mkdir -p out
           cp android/app/build/outputs/apk/debug/app-debug.apk "out/Junto-${VERSION_NAME}-teste.apk"
-          if [ "$SIGNED" = 'true' ]; then
+          if [ "${SIGNED:-false}" = 'true' ]; then
             cp android/app/build/outputs/apk/release/app-release.apk "out/Junto-${VERSION_NAME}.apk"
             cp android/app/build/outputs/bundle/release/app-release.aab "out/Junto-${VERSION_NAME}.aab"
           fi
+      - name: Metadados do APK de teste
+        run: node scripts/apk-metadata.mjs
       - uses: actions/upload-artifact@v4
         with:
-          name: junto-android-${{ env.VERSION_NAME }}
+          name: junto-android-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 7
+          if-no-files-found: error
           path: out/*
       - name: Publicar Release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -103,3 +122,28 @@ jobs:
       - name: Apagar chave temporária
         if: always()
         run: rm -f "$RUNNER_TEMP/release.keystore"
+
+  rolling:
+    if: github.ref == 'refs/heads/main'
+    needs: apk
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: junto-android-rolling
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: junto-android-${{ github.run_id }}-${{ github.run_attempt }}
+          path: out
+      - name: Atualizar entrega automática de teste
+        run: node scripts/publish-apk.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}

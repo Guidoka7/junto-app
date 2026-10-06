@@ -21,9 +21,9 @@ export async function buildWeb(){
   await writeFile(join(dist,'js/config.js'),`window.JuntoCloudConfig=${JSON.stringify(config)};\n`);
   const files=(await walk(dist)).filter(f=>!f.endsWith(`${sep}sw.js`)).sort(),hash=createHash('sha256');
   for(const f of files){hash.update(relative(dist,f));hash.update(await readFile(f));}
-  const version=`${pkg.version}-${hash.digest('hex').slice(0,8)}`,precache=['./',...files.map(f=>'./'+relative(dist,f).split(sep).join('/'))];
+  const version=process.env.VERSION_NAME||`${pkg.version}-${hash.digest('hex').slice(0,8)}`,precache=['./',...files.map(f=>'./'+relative(dist,f).split(sep).join('/'))];
   const swPath=join(dist,'sw.js'),sw=(await readFile(swPath,'utf8')).replace('__VERSION__',version).replace('__PRECACHE__',JSON.stringify(precache));
-  await writeFile(swPath,sw);await writeFile(join(dist,'version.json'),JSON.stringify({version,builtAt:new Date().toISOString()},null,2));await writeFile(join(dist,'.nojekyll'),'');
+  await writeFile(swPath,sw);await writeFile(join(dist,'version.json'),JSON.stringify({version,packageVersion:pkg.version,commitSha:process.env.GITHUB_SHA||process.env.VERCEL_GIT_COMMIT_SHA||null,runNumber:process.env.GITHUB_RUN_NUMBER?Number(process.env.GITHUB_RUN_NUMBER):null,builtAt:new Date().toISOString()},null,2));await writeFile(join(dist,'.nojekyll'),'');
   console.log(`✓ dist/ pronto · versão ${version} · ${precache.length} arquivos offline`);return version;
 }
 if(process.argv[1]&&fileURLToPath(import.meta.url)===resolve(process.argv[1]))await buildWeb();

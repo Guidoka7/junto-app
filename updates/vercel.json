@@ -1,0 +1,40 @@
+{
+  "rewrites": [
+    {
+      "source": "/version.json",
+      "destination": "/api/status"
+    },
+    {
+      "source": "/apk",
+      "destination": "/api/apk"
+    },
+    {
+      "source": "/download",
+      "destination": "/"
+    },
+    {
+      "source": "/updates",
+      "destination": "/"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/version.json",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
+    },
+    {
+      "source": "/apk",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
+    }
+  ]
+}

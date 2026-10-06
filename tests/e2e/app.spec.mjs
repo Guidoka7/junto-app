@@ -6,8 +6,16 @@ import {PGlite} from '@electric-sql/pglite';
 import {readFile} from 'node:fs/promises';
 const event=(id='1',method='pix',direction='expense')=>({id:id.repeat(64),amount:2500,method,direction,timestamp:Date.now(),bank:'Banco de teste',packageName:'com.nu.production',preview:'Pix enviado de R$ 25,00. Aviso privado do banco.'});
 async function fakeNative(page,inbox){await page.addInitScript(inbox=>{
-  window.__nativeEvents={};window.__bankInbox=inbox;window.__bankAck=[];window.androidBridge={};
-  const bank={getStatus:async()=>({enabled:true,accessGranted:true,promptsGranted:true,packages:['com.nu.production']}),getPending:async()=>({events:window.__bankInbox}),getLaunchEvent:async()=>({id:null}),listBanks:async()=>({banks:[{name:'Nubank',packageName:'com.nu.production',installed:true}]}),addListener:async(name,callback)=>{window.__nativeEvents[name]=callback;return{remove(){}};},acknowledge:async({id})=>{window.__bankAck.push(id);window.__bankInbox=window.__bankInbox.filter(x=>x.id!==id);},exportFile:async fields=>{window.__exportedBackup=fields;return{saved:true};},requestPrompts:async()=>({}),openNotificationSettings:async()=>({}),setEnabled:async()=>({})};
+  window.__nativeEvents={};window.__bankInbox=inbox;window.__bankAck=[];window.__bankSettings=[];window.androidBridge={};
+  const banks=[
+    {name:'Nubank',packageName:'com.nu.production',installed:true},
+    {name:'Itaú',packageName:'com.itau',installed:true},
+    {name:'PicPay',packageName:'com.picpay',installed:true},
+    {name:'Wise',packageName:'com.transferwise.android',installed:false},
+    {name:'BTG Pactual',packageName:'com.btg.pactual.digital.mobile',installed:false},
+    {name:'Google Wallet',packageName:'com.google.android.apps.walletnfcrel',installed:true}
+  ];
+  const bank={getStatus:async()=>({enabled:true,accessGranted:true,promptsGranted:true,packages:['com.nu.production']}),getPending:async()=>({events:window.__bankInbox}),getLaunchEvent:async()=>({id:null}),listBanks:async()=>({banks}),addListener:async(name,callback)=>{window.__nativeEvents[name]=callback;return{remove(){}};},acknowledge:async({id})=>{window.__bankAck.push(id);window.__bankInbox=window.__bankInbox.filter(x=>x.id!==id);},exportFile:async fields=>{window.__exportedBackup=fields;return{saved:true};},requestPrompts:async()=>({}),openNotificationSettings:async()=>({}),setEnabled:async fields=>{window.__bankSettings.push(fields);return{};}};
   const app={addListener:async(name,callback)=>{window.__nativeEvents[name]=callback;return{remove(){}};},getLaunchUrl:async()=>({}),exitApp:async()=>{window.__exited=true;}};
   const plugins={BankNotifications:bank,App:app,SystemBars:{setStyle:async()=>({})},SplashScreen:{hide:async()=>({})}};
   const capacitor={};Object.defineProperty(capacitor,'registerPlugin',{get:()=>name=>plugins[name],set:()=>{}});window.Capacitor=capacitor;
@@ -30,6 +38,17 @@ test('Android back closes a dialog, chat, navigation, then exits',async({page})=
  await fakeNative(page,[]);await page.goto('/');await page.locator('#settings-button').click();await expect(page.locator('#modal')).toBeVisible();await page.evaluate(()=>window.__nativeEvents.backButton());await expect(page.locator('#modal')).not.toBeVisible();
  await page.evaluate(()=>document.querySelector('[data-action="chat-open"]').click());await expect(page.locator('#chat-panel')).toBeVisible();await page.evaluate(()=>window.__nativeEvents.backButton());await expect(page.locator('#chat-panel')).not.toBeVisible();
  await page.locator('#mobile-nav [data-route="bills"]').click();await page.evaluate(()=>window.__nativeEvents.backButton());await expect(page.locator('body')).toHaveAttribute('data-route','home');await page.evaluate(()=>window.__nativeEvents.backButton());expect(await page.evaluate(()=>window.__exited)).toBe(true);
+});
+test('bank picker is compact, searchable and keeps branded choices',async({page})=>{
+ await fakeNative(page,[]);await page.goto('/');await personal(page);await page.locator('#settings-button').click();await page.locator('[data-feature="bank-settings"]').click();
+ await expect(page.locator('.bank-settings-screen')).toBeVisible();await expect(page.locator('.bank-search input')).toHaveAttribute('placeholder','Buscar banco ou carteira...');
+ await expect(page.locator('[data-bank-card] .bank-brand-icon')).toHaveCount(6);
+ await page.locator('[data-bank-search]').fill('PicPay');await expect(page.locator('[data-bank-card][data-search*="picpay"]')).toBeVisible();await expect(page.locator('[data-bank-card][data-search*="nubank"]')).toBeHidden();
+ await page.locator('[data-bank-search]').fill('');await page.locator('[data-bank-select="digital"]').click();
+ await expect(page.locator('input[name="packages"][value="com.picpay"]')).toBeChecked();await expect(page.locator('input[name="packages"][value="com.transferwise.android"]')).toBeChecked();
+ await page.locator('[data-feature-form="bank-settings"] [type="submit"]').click();
+ await expect.poll(()=>page.evaluate(()=>window.__bankSettings.length)).toBe(1);
+ const selected=await page.evaluate(()=>window.__bankSettings[0].packages);expect(selected).toContain('com.nu.production');expect(selected).toContain('com.picpay');expect(selected).toContain('com.transferwise.android');
 });
 test('bank confirmation is persistent, idempotent and excludes raw text',async({page})=>{
  await fakeNative(page,[event()]);await page.goto('/');await personal(page);await page.locator('#bank-inbox-button').click();await page.locator('[data-feature="bank-review"]').click();await page.locator('#bank-name').fill('Almoço');await page.locator('#bank-category').selectOption('Alimentação');await page.locator('[data-feature-form="bank-confirm"] [type="submit"]').click();

@@ -18,8 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VERSION_CODE: ${{ github.run_number }}
-      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-      SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+      # Configuração pública do cliente Supabase. Não são credenciais secretas.
+      # Mantidas no workflow para que todo APK gerado na main seja funcional.
+      SUPABASE_URL: https://sbquedasoydfsvbarvos.supabase.co
+      SUPABASE_PUBLISHABLE_KEY: sb_publishable_hld9OVwKT7nJ0xEzYr71KA_ZE9GAuhp
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -83,6 +85,12 @@ jobs:
             V="${P}-${GITHUB_SHA:0:7}.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
           fi
           echo "VERSION_NAME=$V" >> "$GITHUB_ENV"
+      - name: Validar configuração pública do Supabase
+        run: |
+          test -n "$SUPABASE_URL" || { echo "SUPABASE_URL ausente" >&2; exit 1; }
+          test -n "$SUPABASE_PUBLISHABLE_KEY" || { echo "SUPABASE_PUBLISHABLE_KEY ausente" >&2; exit 1; }
+          case "$SUPABASE_URL" in https://*.supabase.co) ;; *) echo "SUPABASE_URL inválida" >&2; exit 1 ;; esac
+          case "$SUPABASE_PUBLISHABLE_KEY" in sb_publishable_*) ;; *) echo "Chave Supabase pública inválida" >&2; exit 1 ;; esac
       - run: npm ci
       - run: npm run check
       - run: npm test

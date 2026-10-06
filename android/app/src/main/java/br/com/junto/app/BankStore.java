@@ -22,6 +22,10 @@ final class BankStore {
         banks.put("com.c6bank.app", "C6 Bank"); banks.put("com.picpay", "PicPay");
         banks.put("com.mercadopago.wallet", "Mercado Pago"); banks.put("br.com.uol.ps.myaccount", "PagBank");
         banks.put("br.com.neon", "Neon"); banks.put("br.com.bradesco.next", "Next");
+        banks.put("com.transferwise.android", "Wise");
+        banks.put("com.btg.pactual.digital.mobile", "BTG Pactual"); banks.put("br.com.bancopan.cartoes", "Banco PAN");
+        banks.put("com.votorantim.bvpd", "Banco BV"); banks.put("br.com.sicoobnet", "Sicoob");
+        banks.put("br.com.sicredi.app", "Sicredi"); banks.put("br.livetouch.safra.net", "Safra");
         banks.put("com.google.android.apps.walletnfcrel", "Google Wallet");
         BANKS = Collections.unmodifiableMap(banks);
     }

@@ -1,0 +1,40 @@
+{
+  "name": "junto-app",
+  "version": "1.1.1",
+  "private": true,
+  "description": "Juntô — controle financeiro individual ou em dupla. Web (PWA) e Android (Capacitor).",
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "build": "node scripts/build.mjs",
+    "check": "node scripts/check.mjs",
+    "icons": "npx @capacitor/assets generate --android --iconBackgroundColor \"#19233A\" --iconBackgroundColorDark \"#19233A\" --splashBackgroundColor \"#19233A\" --splashBackgroundColorDark \"#19233A\"",
+    "android:sync": "npm run build && npx cap sync android",
+    "android:open": "npx cap open android",
+    "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug",
+    "android:release": "npm run android:sync && cd android && ./gradlew assembleRelease bundleRelease",
+    "test": "node --test tests/*.test.mjs",
+    "test:browser": "playwright test",
+    "test:android-parser": "node scripts/test-android-parser.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4",
+    "@supabase/supabase-js": "2.117.2"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.2",
+    "@electric-sql/pglite": "0.5.8",
+    "@fontsource-variable/manrope": "^5.3.0",
+    "@playwright/test": "1.63.0",
+    "agent-browser": "0.38.2",
+    "esbuild": "0.28.2"
+  },
+  "type": "module"
+}

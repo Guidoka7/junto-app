@@ -1,0 +1,21 @@
+# Dependências e build
+node_modules/
+dist/
+
+# Assinatura do Android: NUNCA suba isso pro GitHub
+*.keystore
+*.jks
+keystore.properties
+
+# Ambiente e sistema
+.env
+.env.*
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
+
+!.env.example
+playwright-report/
+test-results/

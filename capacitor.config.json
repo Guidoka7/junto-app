@@ -1,0 +1,27 @@
+{
+  "appId": "br.com.junto.app",
+  "appName": "Juntô",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#F5F5F7",
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "launchAutoHide": true,
+      "backgroundColor": "#19233A",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "LIGHT",
+      "backgroundColor": "#F5F5F7"
+    },
+    "SystemBars": {
+      "style": "LIGHT",
+      "insetsHandling": "native",
+      "initialViewportFitValueHint": "cover"
+    }
+  }
+}

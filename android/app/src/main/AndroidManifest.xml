@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <queries>
+        <package android:name="com.nu.production" />
+        <package android:name="br.com.intermedium" />
+        <package android:name="com.itau" />
+        <package android:name="com.itaucard" />
+        <package android:name="br.com.bb.android" />
+        <package android:name="br.com.gabba.Caixa" />
+        <package android:name="com.santander.app" />
+        <package android:name="com.bradesco" />
+        <package android:name="com.c6bank.app" />
+        <package android:name="com.picpay" />
+        <package android:name="com.mercadopago.wallet" />
+        <package android:name="br.com.uol.ps.myaccount" />
+        <package android:name="br.com.neon" />
+        <package android:name="br.com.bradesco.next" />
+        <package android:name="com.google.android.apps.walletnfcrel" />
+    </queries>
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="false"
+        android:theme="@style/AppTheme">
+        <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:launchMode="singleTask"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="junto" android:host="auth-callback" />
+            </intent-filter>
+        </activity>
+        <service android:name=".BankNotificationService" android:label="Juntô · movimentos do banco"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" android:exported="true">
+            <intent-filter><action android:name="android.service.notification.NotificationListenerService" /></intent-filter>
+        </service>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+
+    <!-- Permissions -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+</manifest>

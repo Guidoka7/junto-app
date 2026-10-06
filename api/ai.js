@@ -10,7 +10,19 @@ async function verifyUser(token){
 }
 
 export default async function handler(req,res){
-  if(req.method!=='POST'){res.setHeader('Allow','POST');return json(res,405,{code:'method_not_allowed',message:'Método não permitido.'});}
+  const origin=String(req.headers.origin||'');
+  const allowedNativeOrigins=new Set(['capacitor://localhost','http://localhost','https://localhost']);
+  if(allowedNativeOrigins.has(origin)){
+    res.setHeader('Access-Control-Allow-Origin',origin);
+    res.setHeader('Vary','Origin');
+    res.setHeader('Access-Control-Allow-Headers','Authorization, Content-Type');
+    res.setHeader('Access-Control-Allow-Methods','POST, OPTIONS');
+  }
+  if(req.method==='OPTIONS'){
+    if(!allowedNativeOrigins.has(origin))return json(res,403,{code:'cors_denied',message:'Origem não permitida.'});
+    res.statusCode=204;return res.end();
+  }
+  if(req.method!=='POST'){res.setHeader('Allow','POST, OPTIONS');return json(res,405,{code:'method_not_allowed',message:'Método não permitido.'});}
   const auth=String(req.headers.authorization||'');
   if(!auth.startsWith('Bearer '))return json(res,401,{code:'unauthorized',message:'Entre novamente no Juntô.'});
   const token=auth.slice(7).trim();

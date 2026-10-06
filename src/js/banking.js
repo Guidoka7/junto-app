@@ -11,7 +11,7 @@ const BANK_META={
   'br.com.bb.android':{key:'bancodobrasil',group:'main'},'br.com.gabba.Caixa':{key:'caixa',group:'main'},'com.santander.app':{key:'santander',group:'main'},
   'br.com.intermedium':{key:'inter',group:'main'},'com.c6bank.app':{key:'c6',group:'main'},
   'com.picpay':{key:'picpay',group:'digital'},'com.mercadopago.wallet':{key:'mercadopago',group:'digital'},'br.com.uol.ps.myaccount':{key:'pagbank',group:'digital'},
-  'br.com.neon':{key:'neon',group:'digital'},'br.com.bradesco.next':{key:'next',group:'digital'},'com.transferwise.android':{key:'wise',group:'digital'},
+  'br.com.neon':{key:'neon',group:'digital'},'br.com.bradesco.next':{key:'next',group:'digital'},'io.cloudwalk.infinitepaydash':{key:'infinitepay',group:'digital'},'com.transferwise.android':{key:'wise',group:'digital'},
   'com.google.android.apps.walletnfcrel':{key:'googlewallet',group:'digital'},
   'com.itaucard':{key:'itau',group:'other'},'com.btg.pactual.digital.mobile':{key:'btg',group:'other'},'br.com.bancopan.cartoes':{key:'pan',group:'other'},
   'com.votorantim.bvpd':{key:'bv',group:'other'},'br.com.sicoobnet':{key:'sicoob',group:'other'},'br.com.sicredi.app':{key:'sicredi',group:'other'},

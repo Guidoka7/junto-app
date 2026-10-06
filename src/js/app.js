@@ -922,17 +922,13 @@
     stop:'<rect x="7" y="7" width="10" height="10" rx="2"/>'
   });
   const CHAT_KEY='junto-chat-v1';
-  const GEMINI_KEY='junto-gemini-config-v1';
-  const GEMINI_MODELS=['gemini-3.5-flash','gemini-3.5-flash-lite'];
-  let geminiCfg={apiKey:'',model:'gemini-3.5-flash'};
-  try{const g=JSON.parse(localStorage.getItem(GEMINI_KEY));if(g&&typeof g==='object'){geminiCfg.apiKey=String(g.apiKey||'');geminiCfg.model=GEMINI_MODELS.includes(g.model)?g.model:'gemini-3.5-flash';}}catch{}
-  const saveGeminiCfg=()=>{try{localStorage.setItem(GEMINI_KEY,JSON.stringify(geminiCfg));}catch{}};
-  const geminiReady=()=>/^AIza[\w-]{20,}$/.test(geminiCfg.apiKey)||geminiCfg.apiKey.length>25;
+  try{localStorage.removeItem('junto-gemini-config-v1');}catch{}
+  const geminiReady=()=>Boolean(window.JuntoCloud?.getAccessToken);
   let chatLog=[],chatTurns=[],chatBusy=null,chatOpen=false,chatDeep=false;
   try{const c=JSON.parse(localStorage.getItem(CHAT_KEY));if(c&&Array.isArray(c.log)){chatLog=c.log.slice(-60);chatTurns=Array.isArray(c.turns)?c.turns.slice(-16):[];}}catch{}
   const saveChat=()=>{try{localStorage.setItem(CHAT_KEY,JSON.stringify({log:chatLog.filter(m=>!m.streaming).slice(-60),turns:chatTurns.slice(-16)}));}catch{}};
   const R=(c)=>Math.round(c)/100;
-  function chatMode(){const el=$('#chat-mode');if(!el)return;el.textContent=geminiReady()?`Gemini · lendo os números reais de vocês`:'Conecte o Gemini nos Ajustes';el.classList.toggle('gemini-on',geminiReady());el.classList.toggle('gemini-off',!geminiReady());}
+  function chatMode(){const el=$('#chat-mode');if(!el)return;el.textContent='Inteligência do Juntô · protegida no servidor';el.classList.add('gemini-on');el.classList.remove('gemini-off');}
   function fmt(text){
     const lines=esc(text).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').split('\n');let html='',list=false;
     lines.forEach(l=>{const m=l.match(/^\s*(?:[-•*]|\d+[.)])\s+(.*)/);if(m){if(!list){html+='<ul>';list=true;}html+=`<li>${m[1]}</li>`;}else{if(list){html+='</ul>';list=false;}if(l.trim())html+=`<p>${l}</p>`;}});
@@ -1063,16 +1059,20 @@ ${JSON.stringify(chatContext())}`;
   function geminiToolDeclarations(){return chatTools().map(t=>({name:t.name,description:t.description,parameters:t.inputSchema}));}
   function geminiHistory(){return chatTurns.slice(-14).map(t=>({role:t.role==='assistant'?'model':'user',parts:[{text:String(t.content||'')}]}));}
   async function geminiRequest(contents,{signal,tools=true,system=instructions(),maxOutputTokens}={}){
-    if(!geminiReady())throw Object.assign(new Error('Gemini não configurado.'),{code:'not_configured'});
+    const getAccessToken=window.JuntoCloud?.getAccessToken;
+    if(typeof getAccessToken!=='function')throw Object.assign(new Error('Sua sessão ainda não está pronta.'),{code:'unauthorized'});
+    const token=await getAccessToken();
+    if(!token)throw Object.assign(new Error('Sua sessão expirou.'),{code:'unauthorized'});
     const body={contents,systemInstruction:{parts:[{text:system}]},generationConfig:{temperature:chatDeep?.42:.34,topP:.9,maxOutputTokens:maxOutputTokens||(chatDeep?1400:850)}};
     if(tools)body.tools=[{functionDeclarations:geminiToolDeclarations()}];
-    const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(geminiCfg.model)}:generateContent`;
+    const base=String(window.JuntoCloudConfig?.appUrl||'').replace(/\/+$/,'');
+    const url=(base||location.origin)+'/api/ai';
     let res;
-    try{res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':geminiCfg.apiKey},body:JSON.stringify(body),signal});}
+    try{res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify(body),signal});}
     catch(e){if(e?.name==='AbortError')throw Object.assign(e,{code:'cancelled'});throw Object.assign(e,{code:'network'});}
     let data={};try{data=await res.json();}catch{}
-    if(!res.ok){const msg=data?.error?.message||`Erro ${res.status}`;let code='upstream_error';if(res.status===400)code='bad_request';if(res.status===401||res.status===403)code='auth';if(res.status===404)code='model';if(res.status===429)code='rate_limited';throw Object.assign(new Error(msg),{code,status:res.status,details:data});}
-    const content=data?.candidates?.[0]?.content;if(!content)throw Object.assign(new Error('O Gemini não retornou conteúdo.'),{code:'empty'});
+    if(!res.ok){const msg=data?.message||data?.error?.message||`Erro ${res.status}`;let code=data?.code||'upstream_error';if(res.status===401)code='unauthorized';if(res.status===429)code='rate_limited';throw Object.assign(new Error(msg),{code,status:res.status});}
+    const content=data?.candidates?.[0]?.content;if(!content)throw Object.assign(new Error('A inteligência do Juntô não retornou conteúdo.'),{code:'empty'});
     return {content,data};
   }
   async function geminiRunConversation(q,ctl,msg,update){
@@ -1099,17 +1099,12 @@ ${JSON.stringify(chatContext())}`;
     }
     throw Object.assign(new Error('Muitas etapas na mesma solicitação.'),{code:'too_many_tools'});
   }
-  async function testGeminiConnection(key=geminiCfg.apiKey,model=geminiCfg.model){
-    const prev={...geminiCfg};geminiCfg={apiKey:String(key||'').trim(),model:GEMINI_MODELS.includes(model)?model:'gemini-3.5-flash'};
-    try{const {content}=await geminiRequest([{role:'user',parts:[{text:'Responda apenas: conectado'}]}],{tools:false,system:'Você está executando um teste de conexão. Responda apenas com a palavra conectado.',maxOutputTokens:20});return (content.parts||[]).map(p=>p.text||'').join('').trim()||'conectado';}
-    catch(e){throw e;}finally{if(!geminiCfg.apiKey)geminiCfg=prev;}
-  }
   // ---- conversa ----
   function addBot(text){const m={kind:'bot',id:uid(),text};chatLog.push(m);renderChat();saveChat();return m;}
   function chatStatus(t){const el=document.querySelector('.chat-msg.streaming .chat-status');if(el)el.textContent=t;}
   function renderChat(){
     const log=$('#chat-log');if(!log)return;
-    if(!chatLog.length){chatLog.push({kind:'bot',id:uid(),text:geminiReady()?`Oi, ${first(user().name)}. Estou conectado ao Gemini e vou responder usando **os números atuais do Juntô**, sem completar lacunas no chute. Pode falar do seu jeito — inclusive “gastei pizza 45”, “quem está gastando mais?” ou “se eu cortar delivery, quando chegamos na meta?”.`:`Oi, ${first(user().name)}. Para eu responder com inteligência real, conecte a chave gratuita do Gemini em **Ajustes → Inteligência Gemini**. Sem a API, não vou fingir uma resposta inteligente.`});}
+    if(!chatLog.length){chatLog.push({kind:'bot',id:uid(),text:`Oi, ${first(user().name)}. A inteligência do Juntô está ativa e usa **os números atuais do app**, sem completar lacunas no chute. Pode falar do seu jeito — inclusive “gastei pizza 45”, “quem está gastando mais?” ou “se eu cortar delivery, quando chegamos na meta?”.`});}
     log.innerHTML=chatLog.map(m=>m.kind==='user'?`<div class="chat-msg user"><p>${esc(m.text)}</p></div>`:m.kind==='card'?cardHTML(m):`<div class="chat-msg bot ${m.streaming?'streaming':''} ${m.error?'err':''}" id="msg-${m.id}">${m.streaming&&!m.text?`<span class="chat-status">Pensando…</span><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>`:fmt(m.text)}${m.streaming&&m.text?'<span class="chat-status"></span>':''}${m.retry?`<button class="text-link" data-action="chat-retry">Tentar de novo</button>`:''}</div>`).join('');
     log.scrollTop=log.scrollHeight;
     const sug=$('#chat-suggest');if(sug)sug.hidden=chatLog.filter(m=>m.kind==='user').length>1;
@@ -1119,21 +1114,17 @@ ${JSON.stringify(chatContext())}`;
   async function sendChat(text){
     const q=String(text??$('#chat-input')?.value??'').trim();if(!q||chatBusy)return;const inp=$('#chat-input');if(inp){inp.value='';inp.style.height='';}
     chatLog.push({kind:'user',id:uid(),text:q});renderChat();saveChat();
-    if(/^(gastei|comprei|paguei|registra|anota|lan[cç]a)\b/i.test(q)){const pp=parseQuick(q);if(!geminiReady()||(pp.amount&&recognizeP(pp))){const at=chatLog.length,a=localAnswer(q);chatTurns.push({role:'user',content:q},{role:'assistant',content:a});chatLog.splice(at,0,{kind:'bot',id:uid(),text:a});renderChat();saveChat();return;}}
-    if(!geminiReady()){
-      const a='O Gemini ainda não está conectado. Abra **Ajustes → Inteligência Gemini**, cole a chave gratuita do Google AI Studio e salve. Depois disso eu respondo usando os números reais do app — sem resposta pronta.';
-      chatTurns.push({role:'user',content:q},{role:'assistant',content:a});chatLog.push({kind:'bot',id:uid(),text:a,error:true});renderChat();saveChat();return;
-    }
+    if(/^(gastei|comprei|paguei|registra|anota|lan[cç]a)\b/i.test(q)){const pp=parseQuick(q);if(pp.amount&&recognizeP(pp)){const at=chatLog.length,a=localAnswer(q);chatTurns.push({role:'user',content:q},{role:'assistant',content:a});chatLog.splice(at,0,{kind:'bot',id:uid(),text:a});renderChat();saveChat();return;}}
     chatTurns.push({role:'user',content:q});const msg={kind:'bot',id:uid(),text:'',streaming:true};chatLog.push(msg);const ctl=new AbortController();chatBusy=ctl;renderChat();chatMode();
     const update=()=>{const el=document.getElementById('msg-'+msg.id);if(el)el.innerHTML=fmt(msg.text)+'<span class="chat-status"></span>';const lg=$('#chat-log');if(lg)lg.scrollTop=lg.scrollHeight;};
     try{const answer=await geminiRunConversation(q,ctl,msg,update);msg.text=answer;chatTurns.push({role:'assistant',content:answer});}
     catch(e){const code=e?.code||'upstream_error';msg.error=true;msg.retry=true;msg.retryQ=q;
       if(code==='cancelled'){msg.text=(msg.text?msg.text+'\n':'')+'(Parei aqui.)';msg.retry=false;}
-      else if(code==='auth')msg.text='A chave do Gemini foi recusada. Abra **Ajustes → Inteligência Gemini** e confira a chave do Google AI Studio.';
-      else if(code==='rate_limited')msg.text='O Gemini atingiu o limite gratuito deste projeto agora. Não vou inventar uma resposta. Aguarde a cota liberar ou confira os limites no Google AI Studio.';
-      else if(code==='model')msg.text='Esse modelo do Gemini não está disponível para esta chave. Troque o modelo em **Ajustes → Inteligência Gemini**.';
-      else if(code==='network')msg.text='Não consegui chegar à API do Gemini. Verifique a internet e tente novamente. Nenhuma resposta genérica foi usada.';
-      else if(code==='not_configured')msg.text='O Gemini não está configurado. Conecte a chave em **Ajustes → Inteligência Gemini**.';
+      else if(code==='unauthorized')msg.text='Sua sessão expirou. Entre novamente no Juntô para usar a inteligência.';
+      else if(code==='rate_limited')msg.text='A inteligência do Juntô atingiu o limite disponível agora. Não vou inventar uma resposta; tente novamente em alguns instantes.';
+      else if(code==='model')msg.text='A inteligência do Juntô está temporariamente indisponível. A configuração do servidor precisa ser revisada.';
+      else if(code==='network')msg.text='Não consegui chegar ao serviço de inteligência agora. Verifique a internet e tente novamente. Nenhuma resposta genérica foi usada.';
+      else if(code==='not_configured')msg.text='A inteligência do Juntô está temporariamente indisponível. A configuração do servidor precisa ser revisada.';
       else msg.text=`O Gemini não conseguiu concluir esta resposta${e?.message?`: ${e.message}`:'.'} Não vou substituir por uma resposta artificial.`;
     }
     finally{msg.streaming=false;chatBusy=null;renderChat();saveChat();chatMode();}
@@ -1373,9 +1364,9 @@ ${JSON.stringify(chatContext())}`;
     openModal(`Chegou para ${first(user().name)}`,`<p class="modal-sub">Os avisos da dupla, sem perder nenhum combinado.</p><div class="notice-list">${list.length?list.map(n=>`<div class="notice-item"><strong>${esc(n.title)}</strong><p>${esc(n.body)}</p><time>${timeText(n.createdAt)}</time>${n.requestId?`<button class="btn secondary" style="font-size:11px;min-height:35px;margin-top:12px" data-action="notice-request" data-id="${n.requestId}">Ver combinado</button>`:''}</div>`).join(''):`<div class="empty">${icon('bell')}<p>Tudo quietinho por aqui.<br>Os próximos avisos aparecem neste espaço.</p></div>`}</div>`,'notifications');
   }
   function settingsModal(){
-    const src=state.settings?.couplePhoto||'',tone=profileTone(active),z=Number(state.settings?.profileZoom||1.08),y=Math.round(state.settings?.profileY||50),ready=geminiReady();
+    const src=state.settings?.couplePhoto||'',tone=profileTone(active),z=Number(state.settings?.profileZoom||1.08),y=Math.round(state.settings?.profileY||50);
     const preview=`<div class="photo-preview ${tone}" style="--profile-zoom:${z.toFixed(2)};--profile-y:${y}%">${src?`<img src="${src}" alt="Prévia da foto do casal">`:`<div class="photo-preview-empty">${esc(coupleInitials())}</div>`}</div>`;
-    const geminiCard=`<form class="ai-settings-card" data-form="gemini-settings"><div class="ai-settings-head"><div><h3>Inteligência Gemini</h3><p>As respostas usam saldo, gastos, contas, entradas, metas e o perfil que está falando.</p></div><span class="ai-status ${ready?'on':''}" id="gemini-status">${ready?'Conectado':'Não configurado'}</span></div><div class="ai-grid"><div class="field"><label for="gemini-api-key">Chave da API</label><div class="ai-key-wrap"><input id="gemini-api-key" name="gemini-api-key" type="password" autocomplete="off" spellcheck="false" value="${esc(geminiCfg.apiKey)}" placeholder="AIza..."><button type="button" class="icon-btn" data-action="gemini-toggle-key" aria-label="Mostrar ou ocultar chave">${icon('eye')}</button></div></div><div class="field"><label for="gemini-model">Modelo</label><select id="gemini-model" name="gemini-model"><option value="gemini-3.5-flash" ${geminiCfg.model==='gemini-3.5-flash'?'selected':''}>Gemini 3.5 Flash</option><option value="gemini-3.5-flash-lite" ${geminiCfg.model==='gemini-3.5-flash-lite'?'selected':''}>Gemini 3.5 Flash-Lite</option></select></div></div><div class="ai-actions"><button class="btn primary" type="submit">Salvar e testar</button>${ready?'<button class="btn ghost" type="button" data-action="gemini-remove">Remover chave</button>':''}</div><p class="ai-note">Nesta prévia HTML, a chave fica somente neste navegador. Para produção, o ideal é colocar a chave no servidor/Vercel e nunca no código público.</p><div id="gemini-test-result"></div></form>`;
+    const geminiCard=`<div class="ai-settings-card"><div class="ai-settings-head"><div><h3>Inteligência do Juntô</h3><p>As respostas usam saldo, gastos, contas, entradas, metas e o perfil que está falando.</p></div><span class="ai-status on">Ativa</span></div><p class="ai-note">A chave e o modelo ficam protegidos no servidor. Nenhuma chave de IA é pedida ou armazenada neste aparelho.</p></div>`;
     openModal('Ajustes da dupla',`${window.JuntoFeatures?.settingsHTML?.()||''}${geminiCard}<div class="photo-settings-card"><div class="photo-settings-top">${preview}<div class="photo-settings-copy"><h3>Foto do casal</h3><p>Esta é a foto usada na bolinha do topo. Na tela principal, tocar nela apenas troca o perfil.</p><div class="photo-settings-actions"><button class="btn secondary" data-action="pick-couple-photo">${src?'Trocar foto':'Adicionar foto'}</button>${src?'<button class="btn ghost" data-action="remove-couple-photo">Remover</button>':''}</div></div></div>${src?`<div class="photo-control"><div class="photo-control-head"><b>Zoom</b><span id="photo-zoom-value">${Math.round(z*100)}%</span></div><input id="profile-zoom" type="range" min="1" max="1.8" step="0.02" value="${z}"><div class="photo-control-head" style="margin-top:14px"><b>Posição vertical</b><span id="photo-y-value">${y}%</span></div><input id="profile-y" type="range" min="0" max="100" step="1" value="${y}"><div class="photo-settings-note">A prévia continua circular para você enxergar exatamente como ficará no topo.</div></div>`:''}</div><div class="settings-row mode-row"><div><h3>Modo do app <span class="badge ${isSolo()?'':'success'}">${isSolo()?'Individual':'Dupla'}</span></h3><p>${isSolo()?'Controle só seu. Conecte seu amor quando quiser, sem perder nada.':`${esc(first(user('a').name))} & ${esc(first(user('b').name))} na mesma conta.`}</p></div>${isSolo()?'<button class="btn primary" data-action="connect">Conectar meu amor</button>':''}</div><div class="settings-row"><div><h3>Quem somos nós</h3><p>${isSolo()?esc(user('a').name):`${esc(user('a').name)} & ${esc(user('b').name)}`}</p></div><button class="btn secondary" data-action="rename">Editar nomes</button></div><div class="settings-row"><div><h3>Saldos atuais</h3><p>“Quanto tu tem em conta?”</p></div><button class="btn secondary" data-action="balance" data-user="${active}">Atualizar o meu</button></div><div class="settings-row"><div><h3>Avisos nesta demonstração</h3><p>Mensagens rápidas ao enviar e responder.</p></div><button class="toggle ${noticesEnabled?'on':''}" data-action="toggle-notices" role="switch" aria-checked="${noticesEnabled}" aria-label="Avisos na demonstração"></button></div><div class="settings-row"><div><h3>Web push no app final</h3><p>Pedido novo no celular, mesmo com o app fechado.</p></div><button class="btn secondary" data-action="test-push">Testar prévia</button></div><div class="settings-row"><div><h3>Instalar como PWA</h3><p>Ícone na tela inicial e jeito de aplicativo.</p></div><button class="btn secondary" data-action="pwa">Ver proposta</button></div><div class="settings-row"><div><h3>Recomeçar a demonstração</h3><p>Voltar ao casal Gui & Bia e aos valores de exemplo.</p></div><button class="btn ghost" data-action="reset-confirm">Reiniciar</button></div><button class="btn secondary wide" style="margin-top:18px" data-action="about">O que esta versão já faz</button>`,'settings');
   }
   function aboutModal(){
@@ -1435,8 +1426,6 @@ ${JSON.stringify(chatContext())}`;
     if(action==='pay-bill')return payBillModal(id);
     if(action==='notifications')return notificationsModal();
     if(action==='settings')return settingsModal();
-    if(action==='gemini-toggle-key'){const i=$('#gemini-api-key');if(i)i.type=i.type==='password'?'text':'password';return;}
-    if(action==='gemini-remove'){geminiCfg={apiKey:'',model:'gemini-3.5-flash'};saveGeminiCfg();settingsModal();chatMode();toast('Gemini desconectado.','A chave foi removida deste navegador.','info');return;}
     if(action==='about')return aboutModal();
     if(action==='peer'){openModal(`Celular de ${first(user(other()).name)}`,peerHTML()+'<p class="peer-caption">Responda como a outra pessoa.<br>As duas telas são simuladas neste navegador.</p>','peer');return;}
     if(action==='onboard'){onboardDraft={};onboard(0);return;}
@@ -1560,64 +1549,6 @@ ${JSON.stringify(chatContext())}`;
     const form=event.target.closest('[data-form]');if(!form)return;event.preventDefault();error('');
     const d=new FormData(form),type=form.dataset.form,id=form.dataset.id,actor=form.dataset.actor||active;
     if(type==='chat'){sendChat();return;}
-    if(type==='gemini-settings'){
-      const key=String(d.get('gemini-api-key')||'').trim(),model=String(d.get('gemini-model')||'gemini-3.5-flash');
-      if(key.length<20){error('Cole uma chave válida do Google AI Studio.');return;}
-      geminiCfg={apiKey:key,model:GEMINI_MODELS.includes(model)?model:'gemini-3.5-flash'};saveGeminiCfg();
-      const result=$('#gemini-test-result');if(result){result.className='ai-test-result';result.textContent='Testando conexão com o Gemini…';}
-      testGeminiConnection(key,geminiCfg.model).then(()=>{const r=$('#gemini-test-result');if(r){r.className='ai-test-result ok';r.textContent='Conectado. O Juntô já está usando o Gemini com os dados reais do app.';}const s=$('#gemini-status');if(s){s.className='ai-status on';s.textContent='Conectado';}chatMode();toast('Gemini conectado.','As próximas respostas já usam a API.','sparkle');}).catch(e=>{const r=$('#gemini-test-result');if(r){r.className='ai-test-result bad';r.textContent=e?.code==='rate_limited'?'A chave respondeu, mas o limite gratuito está esgotado agora.':`Não conectou: ${e?.message||'verifique a chave e o modelo.'}`;}chatMode();});return;
-    }
-    if(type==='ask'){
-      const title=titleValue(d,'request-title'),amount=amountValue(d,'request-amount');if(title==null||amount==null)return;
-      learnFrom(title,d.get('request-category'),$('#request-category')?.dataset.touched==='1');const r={id:uid(),title:smartName(title),amount,category:d.get('request-category'),...itemFields(title,d.get('request-category')),note:String(d.get('request-note')||'').trim(),author:active,recipient:other(),status:'pending',createdAt:Date.now()};state.requests.push(r);
-      notify(r.recipient,'Amor, posso gastar?',`${first(user().name)} quer combinar ${title} por ${money(amount)}.`,'request',r.id);log(active,`pediu um combinado: ${title} por ${money(amount)}.`);close();route='requests';requestFilter='all';persist();toast('Pedido entregue. Agora é com teu amor.',`Responda no celular de ${first(user(other()).name)} ou troque de perfil.`,'chat');return;
-    }
-    if(type==='expense'){
-      const title=titleValue(d,'expense-title'),amount=amountValue(d,'expense-amount'),payer=d.get('expense-payer'),kind=d.get('expense-type'),date=d.get('expense-date'),category=d.get('expense-category');
-      if(title==null||amount==null)return;learnFrom(title,category,$('#expense-category')?.dataset.touched==='1');const itf=itemFields(title,category),nm=smartName(title);if(!['a','b','half','prop'].includes(payer)||!/^\d{4}-\d{2}-\d{2}$/.test(date)){error('Confira quem paga e a data do gasto.');return;}
-      if(kind==='spent'){
-        const c=charge(amount,payer);if(c.error){error(c.error);return;}
-        state.transactions.push({id:uid(),name:nm,amount,category,payer,date,...itf,by:active,...(c.shares.length>1?{split:c.shares}:{})});log(active,`registrou ${nm}: ${money(amount)}, ${c.shares.length>1?payerLabel(payer).toLowerCase():'na conta de '+first(user(payer).name)}.`);
-      }else{state.bills.push({id:uid(),name:nm,amount,category,payer,due:date,item:itf.item,icon:itf.icon,recurring:kind==='fixed',status:'open'});log(active,`adicionou ${kind==='fixed'?'uma conta fixa':'uma conta a pagar'}: ${title}.`);}
-      notify(other(),'Conta atualizada.',`${first(user().name)} registrou ${title} por ${money(amount)}.`);close();route='bills';billFilter='all';persist();toast(kind==='spent'?'Gasto anotado. Sem mistério.':'Conta no radar da dupla.',`${title} · ${money(amount)}`);return;
-    }
-    if(type==='balance'){
-      const amount=amountValue(d,'balance-amount',true),who=form.dataset.user;if(amount==null||!user(who))return;
-      user(who).balance=amount;log(who,`atualizou o saldo atual para ${money(amount)}.`);notify(other(who),'O saldo da dupla mudou.',`${first(user(who).name)} atualizou o saldo atual.`);close();persist();toast('Saldo atualizado.','O livre do mês também foi recalculado.');return;
-    }
-    if(type==='goal'){
-      const title=titleValue(d,'goal-title'),target=amountValue(d,'goal-target');if(title==null||target==null)return;
-      state.goals.push({id:uid(),name:title,target,saved:0,icon:d.get('goal-icon')});log(active,`criou um plano: ${title}.`);notify(other(),'Tem sonho novo na dupla.',`${first(user().name)} criou o plano ${title}.`);close();route='goals';persist();toast('O sonho ganhou um lugar.',title);return;
-    }
-    if(type==='contribute'){
-      const amount=amountValue(d,'contribute-amount'),g=state.goals.find(g=>g.id===id);if(amount==null||!g)return;
-      if(amount>free()){error(`Vocês têm ${money(Math.max(0,free()))} livres. Escolha um valor que preserve as contas e os outros planos.`);return;}
-      g.saved+=amount;state.saves.push({id:uid(),goalId:g.id,amount,date:dateISO(),actor:active,source:'manual'});log(active,`separou ${money(amount)} para ${g.name}.`);notify(other(),'Nosso sonho andou mais um pouco. 💚',`${first(user().name)} separou ${money(amount)} para ${g.name}.`);close();persist();toast('O sonho tá mais perto.',`${money(amount)} protegidos para ${g.name}.`);return;
-    }
-    if(type==='decline'){
-      const r=state.requests.find(r=>r.id===id),note=String(d.get('decline-note')||'').trim();if(!r||r.status!=='pending'||r.recipient!==actor)return;
-      if(!note){error('Manda uma resposta com carinho.');return;}r.status='declined';r.response=note;r.respondedAt=Date.now();
-      state.notifications.forEach(n=>{if(n.to===actor&&n.requestId===id)n.read=true;});notify(r.author,'Hoje não, amor. 💚',`${first(user(actor).name)} respondeu ao pedido ${r.title}: ${note}`,'declined',id);log(actor,`deixou ${r.title} para depois, com uma resposta.`);close();persist();toast('Resposta entregue com carinho.','O pedido não descontou dinheiro.','chat');return;
-    }
-    if(type==='purchase'){
-      const r=state.requests.find(r=>r.id===id),payer=d.get('purchase-payer');if(!r||r.status!=='approved'||r.author!==actor||!['a','b','half','prop'].includes(payer))return;
-      const c=charge(r.amount,payer);if(c.error){error(c.error);return;}
-      r.status='purchased';r.payer=payer;r.purchasedAt=Date.now();state.transactions.push({id:uid(),requestId:r.id,name:r.title,item:r.item,icon:r.icon,by:actor,amount:r.amount,category:r.category,payer,date:dateISO(),...(c.shares.length>1?{split:c.shares}:{})});log(actor,`comprou ${r.title} por ${money(r.amount)}. Combinado cumprido.`);notify(r.recipient,'Combinado virou compra.',`${first(user(actor).name)} registrou ${r.title}. O saldo foi atualizado.`,'purchased',id);close();persist();toast('Comprou e registrou. Tudo certo.','O valor saiu da conta uma única vez.');return;
-    }
-    if(type==='pay-bill'){
-      const b=state.bills.find(b=>b.id===id),payer=d.get('bill-payer');if(!b||b.status!=='open'||!['a','b','half','prop'].includes(payer))return;
-      const c=charge(b.amount,payer);if(c.error){error(c.error);return;}
-      b.status='paid';b.paidAt=Date.now();b.payer=payer;state.transactions.push({id:uid(),billId:b.id,name:b.name,by:active,amount:b.amount,category:b.category,payer,date:dateISO(),...(c.shares.length>1?{split:c.shares}:{})});log(active,c.shares.length>1?`confirmou ${b.name} pago ${payerLabel(payer).toLowerCase()}: ${c.shares.map(x=>first(user(x.id).name)+' '+money(x.amount)).join(', ')}.`:`confirmou ${b.name} pago por ${first(user(payer).name)}: ${money(b.amount)}.`);notify(other(),'Um boleto a menos. 🙌',`${first(user().name)} marcou ${b.name} como pago.`);close();persist();toast('Conta paga. Respira.','O gasto foi registrado e a conta saiu das pendências.');return;
-    }
-    if(type==='cancel-request'){
-      const r=state.requests.find(r=>r.id===id);if(!r||r.author!==actor||!['pending','approved'].includes(r.status))return;r.status='cancelled';log(actor,`cancelou o pedido ${r.title}.`);notify(r.recipient,'Planos mudam. Tudo bem.',`${first(user(actor).name)} cancelou o pedido ${r.title}.`,'cancelled',id);close();persist();toast('Pedido cancelado.','Se havia dinheiro reservado, ele voltou ao livre.');return;
-    }
-    if(type==='remove-bill'){
-      const b=state.bills.find(b=>b.id===id);if(!b||b.status!=='open')return;state.bills=state.bills.filter(q=>q.id!==id);log(active,`removeu ${b.name} das contas a pagar.`);close();persist();toast('Conta retirada do planejamento.');return;
-    }
-    if(type==='release-goal'){
-      const g=state.goals.find(g=>g.id===id);if(!g)return;state.goals=state.goals.filter(q=>q.id!==id);log(active,`encerrou o plano ${g.name} e liberou ${money(g.saved)}.`);notify(other(),'A dupla mudou de plano.',`${first(user().name)} encerrou ${g.name}. O dinheiro separado voltou ao livre.`);close();persist();toast('Plano encerrado. Dinheiro liberado.');return;
-    }
     if(type==='rename'){
       const a=titleValue(d,'name-a',1,24),b=isSolo()?'':titleValue(d,'name-b',1,24);if(a==null||b==null)return;state.users[0].name=a;if(!isSolo())state.users[1].name=b;close();persist();toast('A dupla ganhou os nomes de vocês.');return;
     }

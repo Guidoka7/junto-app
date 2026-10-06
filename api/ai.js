@@ -41,8 +41,8 @@ export default async function handler(req,res){
 
   const apiKey=String(process.env.GEMINI_API_KEY||'').trim();
   const requestedModel=String(process.env.GEMINI_MODEL||'').trim().toLowerCase();
-  const allowedModels=new Set(['gemini-3.8-flash','gemini-3.7-flash','gemini-3.6-flash','gemini-3.5-flash','gemini-3.5-flash-lite']);
-  const model=allowedModels.has(requestedModel)?requestedModel:'gemini-3.8-flash';
+  const allowedModels=new Set(['gemini-2.5-flash','gemini-2.5-flash-lite','gemini-3-flash-preview']);
+  const model=allowedModels.has(requestedModel)?requestedModel:'gemini-2.5-flash';
   if(!apiKey)return json(res,503,{code:'not_configured',message:'A inteligência do Juntô está temporariamente indisponível.'});
 
   let body=req.body;

@@ -27,7 +27,10 @@ test('mobile app renders, navigates and preserves the fixed bottom bar',async({p
  if(process.env.JUNTO_CHROME){try{execFileSync('node_modules/.bin/agent-browser',['--executable-path',process.env.JUNTO_CHROME,'--session','junto-smoke','open','http://127.0.0.1:5173'],{stdio:'pipe',timeout:20000});execFileSync('node_modules/.bin/agent-browser',['--session','junto-smoke','snapshot','-i'],{stdio:'pipe',timeout:10000});execFileSync('node_modules/.bin/agent-browser',['--session','junto-smoke','close'],{stdio:'pipe',timeout:10000});}catch{console.log('agent-browser unavailable; browser verification continues with Playwright.');}}
  const nav=page.locator('#mobile-nav');expect((await nav.boundingBox()).y+(await nav.boundingBox()).height).toBeLessThanOrEqual(845);
  for(const route of ['future','analysis','bills','goals','home']){await page.locator(`#mobile-nav [data-route="${route}"]`).click();await expect(page.locator('body')).toHaveAttribute('data-route',route);}
- expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(errors).toEqual([]);await page.screenshot({path:'test-results/mobile.png'});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ expect(await page.evaluate(()=>[...document.styleSheets].some(x=>x.href?.endsWith('/css/refine.css')))).toBe(true);
+ expect(await page.locator('.mobile-nav').evaluate(el=>getComputedStyle(el).position)).toBe('fixed');
+ expect(errors).toEqual([]);await page.screenshot({path:'test-results/mobile.png'});
 });
 test('new Home stays functional in solo and couple modes',async({page})=>{
  await page.goto('/');await personal(page,250000);
@@ -210,6 +213,107 @@ test('couple request flow reserves then charges only when purchase is confirmed'
  expect(state.requests[0].status).toBe('purchased');
  expect(state.transactions).toHaveLength(1);
  expect(state.users[0].balance).toBe(98000);expect(state.users[1].balance).toBe(98000);
+});
+
+
+test('income automation persists and income forecast respects start date',async({page})=>{
+ await page.goto('/');await personal(page,100000);
+ await page.locator('#mobile-nav [data-route="future"]').click();
+ await page.locator('.future-v3-tabs [data-route="incomes"]').click();
+ await page.locator('[data-action="income-new"]').click();
+ await page.locator('#income-name').fill('Semanal');
+ await page.locator('#income-amount').fill('250');
+ await page.locator('input[name="income-rule"][value="weekly"]').check();
+ await page.locator('input[name="income-auto"]').check();
+ await page.locator('[data-form="income"] [type="submit"]').click();
+ let state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.incomes[0].auto).toBe(true);
+
+ await page.evaluate(()=>{
+   const s=window.JuntoApp.getState(),d=new Date(),future=new Date(d.getFullYear(),d.getMonth()+1,15);
+   const iso=x=>String(x.getFullYear())+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
+   s.incomes=[{id:'future-source',name:'Renda futura',person:'a',amount:90000,rule:'monthly',day:1,since:iso(future),auto:false}];
+   window.JuntoApp.applyState(s);
+ });
+ await page.locator('#mobile-nav [data-route="future"]').click();
+ await page.locator('.future-v3-tabs [data-route="incomes"]').click();
+ await expect(page.locator('.income-v3-total strong')).toContainText('R$ 0');
+});
+
+test('same-name recurring bills stay separate and stopping one series does not stop the other',async({page})=>{
+ await page.goto('/');await personal(page,500000);
+ await page.evaluate(()=>{
+   const s=window.JuntoApp.getState(),today=new Date(),iso=x=>String(x.getFullYear())+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
+   const prev=new Date(today.getFullYear(),today.getMonth()-1,10),cur=new Date(today.getFullYear(),today.getMonth(),10);
+   s.bills=[
+     {id:'a-prev',recurringKey:'series-a',name:'Internet',amount:10000,category:'Assinaturas',payer:'a',due:iso(prev),recurring:true,status:'paid'},
+     {id:'a-cur',recurringKey:'series-a',name:'Internet',amount:10000,category:'Assinaturas',payer:'a',due:iso(cur),recurring:true,status:'open'},
+     {id:'b-cur',recurringKey:'series-b',name:'Internet',amount:20000,category:'Assinaturas',payer:'a',due:iso(cur),recurring:true,status:'open'}
+   ];
+   window.JuntoApp.applyState(s);
+ });
+ await page.locator('#mobile-nav [data-route="analysis"]').click();
+ await page.locator('[data-action="topic-tab"][data-kind="analysis"][data-value="fixed"]').click();
+ await expect(page.locator('.fixed-card')).toHaveCount(2);
+
+ await page.locator('#mobile-nav [data-route="bills"]').click();
+ await page.locator('[data-action="bill-filter"][data-value="fixed"]').click();
+ await page.locator('[data-action="bill-detail"][data-id="a-cur"]').click();
+ await page.locator('[data-action="edit-bill"]').click();
+ await page.locator('input[name="edit-bill-recurring"]').uncheck();
+ await page.locator('[data-form="edit-bill"] [type="submit"]').click();
+ const state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.bills.filter(b=>b.recurringKey==='series-a').every(b=>b.recurring===false)).toBe(true);
+ expect(state.bills.find(b=>b.id==='b-cur').recurring).toBe(true);
+});
+
+test('editing and reopening a bank-linked paid bill restores the exact balance',async({page})=>{
+ await fakeNative(page,[event('9','pix')]);await page.goto('/');await personal(page,10000);
+ await page.evaluate(()=>{
+   const s=window.JuntoApp.getState(),date=new Date().toISOString().slice(0,10);
+   s.bills=[{id:'bill-1',recurringKey:'net-series',name:'Internet',amount:2500,category:'Assinaturas',payer:'a',due:date,recurring:true,status:'open'}];
+   window.JuntoApp.applyState(s);
+ });
+ await page.locator('#bank-inbox-button').click();
+ await page.locator('[data-feature="bank-review"]').click();
+ await expect(page.locator('#bank-bill')).toHaveValue('bill-1');
+ await page.locator('[data-feature-form="bank-confirm"] [type="submit"]').click();
+ let state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.users[0].balance).toBe(7500);
+ expect(state.transactions[0].recurringKey).toBe('net-series');
+
+ await page.locator('#modal [data-action="close"]').click().catch(()=>{});
+ await page.locator('#mobile-nav [data-route="bills"]').click();
+ await page.locator('[data-action="bill-filter"][data-value="paid"]').click();
+ await page.locator('[data-action="bill-detail"][data-id="bill-1"]').click();
+ await page.locator('[data-action="edit-bill"]').click();
+ await page.locator('#edit-bill-amount').fill('30,00');
+ await page.locator('[data-form="edit-bill"] [type="submit"]').click();
+ state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.users[0].balance).toBe(7000);
+ expect(state.transactions[0].balanceDelta).toBe(-3000);
+
+ await page.locator('[data-action="bill-detail"][data-id="bill-1"]').click();
+ await page.locator('[data-action="reopen-bill"]').click();
+ await page.locator('[data-form="reopen-bill"] [type="submit"]').click();
+ state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.users[0].balance).toBe(10000);
+ expect(state.transactions).toHaveLength(0);
+ expect(state.bills[0].status).toBe('open');
+});
+
+test('contextual transaction rows open details without losing the current flow',async({page})=>{
+ await page.goto('/');await personal(page,50000);
+ await page.evaluate(()=>{
+   const s=window.JuntoApp.getState(),date=new Date().toISOString().slice(0,10);
+   s.transactions=[{id:'tx-context',name:'Mercado',item:'Mercado',icon:'cart',amount:3200,category:'Alimentação',payer:'a',by:'a',date,createdAt:Date.now()}];
+   window.JuntoApp.applyState(s);
+ });
+ await page.locator('#mobile-nav [data-route="home"]').click();
+ await page.locator('.home-more-v3>summary').click();
+ await page.locator('.home-latest-row').click();
+ await expect(page.locator('dialog[data-kind="ledger-detail"]')).toBeVisible();
+ await expect(page.locator('.ledger-detail-hero')).toContainText('R$ 32');
 });
 
 test.describe('offline PWA',()=>{

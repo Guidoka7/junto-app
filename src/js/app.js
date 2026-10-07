@@ -890,15 +890,44 @@
   function itemFields(title,category){const p=parseQuick(title),r=recognizeP(p);return {item:r?r.item:cap(p.label||p.name),icon:r?r.icon:categoryIcon(category),...(p.qty>1?{qty:p.qty}:{})};}
   function learnFrom(title,category,touched){const p=parseQuick(title),label=p.label||p.name,key=norm(label).trim(),r=recognizeP(p);if(!key||key.length<2)return;if(r&&(!touched||r.category===category))return;const entry={item:r?r.item:cap(label),category,icon:r?r.icon:categoryIcon(category)};state.learned=state.learned||{};state.learned[key]=entry;const w=firstWord(key);if(w.length>3)state.learned['w:'+w]=entry;}
   const READ_DEFAULT='Escreva do seu jeito: “3 reais de cigarro”, “2 cigarros a 3”, “pizza 45 meio a meio”, “uber 18,90 ontem”. O Juntô entende o item, o valor, quem pagou e quando, mesmo com erro de digitação.';
+  function historyPrefill(text){
+    const p=parseQuick(text),r=recognizeP(p),key=norm(p.label||p.name).trim();
+    if(key.length<2)return null;
+    const matches=state.transactions.filter(t=>!t.billId).filter(t=>{
+      const nameKey=norm(t.name||''),itemKey=norm(t.item||itemOf(t).item||'');
+      if(r&&itemKey===norm(r.item))return true;
+      return nameKey===key||(firstWord(nameKey).length>3&&firstWord(nameKey)===firstWord(key));
+    }).slice(-24);
+    if(!matches.length)return null;
+    const mode=(fn)=>{
+      const counts={};
+      matches.forEach(t=>{const value=fn(t);if(value)counts[value]=(counts[value]||0)+1;});
+      const best=Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+      return best&&best[1]>=Math.max(2,Math.ceil(matches.length*.55))?best[0]:null;
+    };
+    const category=mode(t=>t.category),payer=isSolo()?'a':mode(t=>t.payer);
+    const amounts=matches.map(t=>t.amount).filter(Number.isSafeInteger).sort((a,b)=>a-b);
+    let amount=null;
+    if(amounts.length>=3){
+      const med=amounts[Math.floor(amounts.length/2)],q1=amounts[Math.floor((amounts.length-1)*.25)],q3=amounts[Math.floor((amounts.length-1)*.75)];
+      if(med>0&&(q3-q1)/med<=.28)amount=med;
+    }
+    return {category,payer,amount,count:matches.length};
+  }
   function smartRead(prefix){
-    const input=$('#'+prefix+'-title');if(!input)return;const p=parseQuick(input.value),r=recognizeP(p),sel=$('#'+prefix+'-category'),tile=$('#'+prefix+'-icon'),read=$('#'+prefix+'-read'),amt=$('#'+prefix+'-amount');
-    if(r&&sel&&sel.dataset.touched!=='1'&&categories.includes(r.category))sel.value=r.category;
+    const input=$('#'+prefix+'-title');if(!input)return;
+    const p=parseQuick(input.value),r=recognizeP(p),hist=prefix==='expense'?historyPrefill(input.value):null,sel=$('#'+prefix+'-category'),tile=$('#'+prefix+'-icon'),read=$('#'+prefix+'-read'),amt=$('#'+prefix+'-amount');
+    const suggestedCategory=r?.category||hist?.category;
+    if(suggestedCategory&&sel&&sel.dataset.touched!=='1'&&categories.includes(suggestedCategory))sel.value=suggestedCategory;
     const cat=sel?.value||'Outros',ic=r?r.icon:input.value.trim()?categoryIcon(cat):'sparkle';
-    if(tile){tile.innerHTML=icon(ic);tile.classList.toggle('known',!!r);}
-    if(amt&&p.amount&&amt.dataset.touched!=='1')amt.value=moneyNumber(p.amount);
-    const pay=$('#'+prefix+'-payer');if(pay&&p.payer&&pay.dataset.touched!=='1')pay.value=p.payer;const dt=$('#'+prefix+'-date');if(dt&&p.date&&dt.dataset.touched!=='1')dt.value=p.date;
+    if(tile){tile.innerHTML=icon(ic);tile.classList.toggle('known',!!r||!!hist);}
+    if(amt&&amt.dataset.touched!=='1'){if(p.amount)amt.value=moneyNumber(p.amount);else if(hist?.amount)amt.value=moneyNumber(hist.amount);else if(input.value.trim())amt.value='';}
+    const pay=$('#'+prefix+'-payer'),payer=p.payer||hist?.payer;
+    if(pay&&payer&&pay.dataset.touched!=='1'&&[...state.users.map(u=>u.id),'half','prop'].includes(payer))pay.value=payer;
+    const dt=$('#'+prefix+'-date');if(dt&&p.date&&dt.dataset.touched!=='1')dt.value=p.date;
     if(!read)return;if(!input.value.trim()){read.innerHTML=READ_DEFAULT;return;}
-    read.innerHTML=`<span class="chip strong">${icon(ic)}${esc(r?r.item:cap(p.label||p.name))}</span><span class="chip">${esc(catPath(cat))}</span>${p.qty>1&&p.unit?`<span class="chip">${p.qty} × ${money(p.unit)}</span>`:''}${p.payer?`<span class="chip">${esc(payerLabel(p.payer))}</span>`:''}${p.date?`<span class="chip">${dateText(p.date)}</span>`:''}${r?.fuzzy?`<span class="chip soft">entendi “${esc(p.label)}” como ${esc(r.item.toLowerCase())}</span>`:''}${r?.learned?'<span class="chip soft">aprendido com vocês</span>':!r?'<span class="chip soft">novo: o Juntô aprende com a categoria escolhida</span>':''}<button type="button" class="text-link" data-action="cat-change" data-prefix="${prefix}">Trocar categoria</button>`;
+    const learnedByHistory=hist&&!p.payer&&!p.amount;
+    read.innerHTML=`<span class="chip strong">${icon(ic)}${esc(r?r.item:cap(p.label||p.name))}</span><span class="chip">${esc(catPath(cat))}</span>${p.qty>1&&p.unit?`<span class="chip">${p.qty} × ${money(p.unit)}</span>`:''}${payer?`<span class="chip">${esc(payerLabel(payer))}</span>`:''}${p.date?`<span class="chip">${dateText(p.date)}</span>`:''}${hist?.amount&&!p.amount?`<span class="chip soft">valor habitual ${money(hist.amount)}</span>`:''}${r?.fuzzy?`<span class="chip soft">entendi “${esc(p.label)}” como ${esc(r.item.toLowerCase())}</span>`:''}${r?.learned?'<span class="chip soft">aprendido com você</span>':learnedByHistory?`<span class="chip soft">preenchido pelo histórico (${hist.count}x)</span>`:!r?'<span class="chip soft">novo: o Juntô aprende com a categoria escolhida</span>':''}<button type="button" class="text-link" data-action="cat-change" data-prefix="${prefix}">Trocar categoria</button>`;
   }
   function smartEntry(prefix,label){return `<div class="smart-entry"><span class="item-tile" id="${prefix}-icon" aria-hidden="true">${icon('sparkle')}</span><div class="field"><label for="${prefix}-title">${label}</label><input id="${prefix}-title" name="${prefix}-title" type="text" maxlength="60" autocomplete="off" placeholder="Ex.: 2 cigarros a 3, pizza 45, uber 18" required></div></div><p class="smart-read" id="${prefix}-read" aria-live="polite">${READ_DEFAULT}</p>`;}
   function askModal(){

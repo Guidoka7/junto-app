@@ -1712,7 +1712,7 @@ ${JSON.stringify(chatContext())}`;
     toast('Combinado fechado. 💚',`${first(user(r.author).name)} já recebeu tua resposta.`);
   }
   function incomingSync(data){
-    if(!valid(data)||JSON.stringify(data)===JSON.stringify(state))return;
+    if(!validBackup(data)||JSON.stringify(data)===JSON.stringify(state))return;
     const oldIds=new Set(state.notifications.map(n=>n.id));state=migrate(data);
     if(!hasUser(active)){active=state.users[0]?.id||'a';try{sessionStorage.setItem(PROFILE,active);}catch{}}
     render();

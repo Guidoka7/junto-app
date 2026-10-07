@@ -1395,6 +1395,7 @@ ${JSON.stringify(chatContext())}`;
       else if(code==='rate_limited')msg.text='A inteligência do Juntô atingiu o limite disponível agora. Não vou inventar uma resposta; tente novamente em alguns instantes.';
       else if(code==='model')msg.text='A inteligência do Juntô está temporariamente indisponível. A configuração do servidor precisa ser revisada.';
       else if(code==='network')msg.text='Não consegui chegar ao serviço de inteligência agora. Verifique a internet e tente novamente. Nenhuma resposta genérica foi usada.';
+      else if(code==='timeout')msg.text='A inteligência demorou mais do que o esperado desta vez. Não vou completar a resposta no chute; tente novamente.';
       else if(code==='not_configured')msg.text='A inteligência do Juntô está temporariamente indisponível. A configuração do servidor precisa ser revisada.';
       else msg.text=`O Gemini não conseguiu concluir esta resposta${e?.message?`: ${e.message}`:'.'} Não vou substituir por uma resposta artificial.`;
     }

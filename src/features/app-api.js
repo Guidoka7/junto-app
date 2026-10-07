@@ -68,6 +68,19 @@
       else{close();closeChat();for(const id of ['app-content','desktop-nav','mobile-nav','peer-rail','side-couple','mobile-user-switch','desktop-user-switch','chat-messages','modal-content']){const el=document.getElementById(id);if(el)el.replaceChildren();}document.getElementById('chat-panel')?.replaceChildren();chatBusy?.abort();chatLog=[];chatTurns=[];route='home';delete document.body.dataset.route;}
     },
     getState:copyState, getActive:()=>active, getCategories:()=>[...categories],
+    suggestEntry:(text)=>{
+      const p=parseQuick(text),r=recognizeP(p),hist=historyPrefill(text),bill=billHistoryPrefill(text);
+      return {
+        name:smartName(text),
+        category:r?.category||hist?.category||bill?.category||'Outros',
+        amount:p.amount||hist?.amount||bill?.amount||null,
+        payer:p.payer||hist?.payer||bill?.payer||active,
+        date:p.date||bill?.date||null,
+        kind:p.kind||bill?.kind||'spent',
+        source:r?'catalog':hist?'history':bill?'bills':'new',
+        openBillId:bill?.openId||null
+      };
+    },
     freshState:freshPersonalState,
     applyState(data) {
       if (!valid(data)) throw new Error('O arquivo de finanças é inválido.');

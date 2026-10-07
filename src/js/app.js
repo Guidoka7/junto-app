@@ -100,13 +100,16 @@
     if(typeof s.settings.couplePhoto!=='string')s.settings.couplePhoto='';
     if(!Number.isFinite(s.settings.profileZoom))s.settings.profileZoom=1.08;
     if(!Number.isFinite(s.settings.profileY))s.settings.profileY=50;
-    if(!('plan' in s))s.plan=null;s.budgets=s.budgets&&typeof s.budgets==='object'?s.budgets:{};s.learned=s.learned&&typeof s.learned==='object'?s.learned:{};s.commitments=Array.isArray(s.commitments)?s.commitments:[];s.challenges=Array.isArray(s.challenges)?s.challenges:[];return s;
+    if(!('plan' in s))s.plan=null;s.budgets=s.budgets&&typeof s.budgets==='object'?s.budgets:{};s.learned=s.learned&&typeof s.learned==='object'?s.learned:{};s.commitments=Array.isArray(s.commitments)?s.commitments:[];s.challenges=Array.isArray(s.challenges)?s.challenges:[];
+    s.received.forEach(r=>{if(r.status!=='received')return;const inc=s.incomes.find(i=>i.id===r.incomeId);if(!r.person&&inc)r.person=inc.person;if(!Number.isSafeInteger(r.balanceDelta))r.balanceDelta=r.amount;});
+    s.bills.forEach(b=>{if(b.recurring&&!b.recurringKey)b.recurringKey=b.id;});
+    return s;
   }
   // ===== Entradas =====
   const handled=(incId,date)=>state.received.find(r=>r.incomeId===incId&&r.date===date);
-  function pendingArrivals(){const T=dateISO(),from=dateISO(addDays(new Date(),-14)),out=[];state.incomes.forEach(i=>occurrences(i,from,T).forEach(d=>{if(d>=(i.since||'0000')&&!handled(i.id,d))out.push({inc:i,date:d});}));return out.sort((a,b)=>a.date.localeCompare(b.date)||b.inc.amount-a.inc.amount);}
-  function nextArrivals(days=60){const f=dateISO(addDays(new Date(),1)),t=dateISO(addDays(new Date(),days)),out=[];state.incomes.forEach(i=>occurrences(i,f,t).forEach(d=>out.push({inc:i,date:d})));return out.sort((a,b)=>a.date.localeCompare(b.date)||b.inc.amount-a.inc.amount);}
-  function monthIncome(y,m,id){const f=dateISO(new Date(y,m,1)),t=dateISO(new Date(y,m+1,0));return state.incomes.filter(i=>!id||i.person===id).reduce((s,i)=>s+occurrences(i,f,t).length*i.amount,0);}
+  function pendingArrivals(lookbackDays=45){const T=dateISO(),from=dateISO(addDays(new Date(),-Math.max(1,lookbackDays))),out=[];state.incomes.forEach(i=>occurrences(i,from,T).forEach(d=>{if(d>=(i.since||'0000')&&!handled(i.id,d))out.push({inc:i,date:d});}));return out.sort((a,b)=>a.date.localeCompare(b.date)||b.inc.amount-a.inc.amount);}
+  function nextArrivals(days=60){const f=dateISO(addDays(new Date(),1)),t=dateISO(addDays(new Date(),days)),out=[];state.incomes.forEach(i=>occurrences(i,f,t).filter(d=>d>=(i.since||'0000')).forEach(d=>out.push({inc:i,date:d})));return out.sort((a,b)=>a.date.localeCompare(b.date)||b.inc.amount-a.inc.amount);}
+  function monthIncome(y,m,id){const f=dateISO(new Date(y,m,1)),t=dateISO(new Date(y,m+1,0));return state.incomes.filter(i=>!id||i.person===id).reduce((s,i)=>s+occurrences(i,f,t).filter(d=>d>=(i.since||'0000')).length*i.amount,0);}
   function incomeShare(){const n=new Date(),a=monthIncome(n.getFullYear(),n.getMonth(),'a'),b=monthIncome(n.getFullYear(),n.getMonth(),'b');return a+b?a/(a+b):.5;}
   function remainingMonthOcc(){const ym=dateISO().slice(0,7);return pendingArrivals().filter(p=>p.date.slice(0,7)===ym).concat(nextArrivals(31).filter(x=>x.date.slice(0,7)===ym));}
   // ===== Quem paga: um, meio a meio ou proporcional =====
@@ -144,10 +147,11 @@
   }
   function refundTransaction(t){applyBalanceShares(transactionShares(t),1);}
   const optionPayers=(selected=active)=>isSolo()?`<option value="a" selected>${esc(user('a').name)}</option>`:state.users.map(u=>`<option value="${u.id}" ${u.id===selected?'selected':''}>${esc(u.name)}</option>`).join('')+`<option value="half" ${selected==='half'?'selected':''}>Meio a meio</option><option value="prop" ${selected==='prop'?'selected':''}>Proporcional à renda</option>`;
+  function recurringKey(b){return String(b.recurringKey||b.id);}
   function rollRecurring(){
-    const now=new Date(),cm=dateISO().slice(0,7),names=new Set(state.bills.filter(b=>b.due.slice(0,7)===cm).map(b=>b.name.toLowerCase())),latest={};let changed=false;
-    state.bills.filter(b=>b.recurring&&b.due.slice(0,7)<cm).forEach(b=>{const k=b.name.toLowerCase();if(!latest[k]||b.due>latest[k].due)latest[k]=b;});
-    Object.values(latest).forEach(b=>{if(names.has(b.name.toLowerCase()))return;const dd=Math.min(pd(b.due).getDate(),daysInMonth(now.getFullYear(),now.getMonth()));state.bills.push({id:'recurring:'+String(b.recurringKey||b.id)+':'+cm,recurringKey:b.recurringKey||b.id,name:b.name,amount:b.amount,category:b.category,payer:b.payer,due:dateISO(new Date(now.getFullYear(),now.getMonth(),dd)),recurring:true,status:'open'});changed=true;});
+    const now=new Date(),cm=dateISO().slice(0,7),existing=new Set(state.bills.filter(b=>b.due.slice(0,7)===cm&&b.recurring).map(recurringKey)),latest={};let changed=false;
+    state.bills.filter(b=>b.recurring&&b.due.slice(0,7)<cm).forEach(b=>{const k=recurringKey(b);if(!latest[k]||b.due>latest[k].due)latest[k]=b;});
+    Object.values(latest).forEach(b=>{const key=recurringKey(b);if(existing.has(key))return;const dd=Math.min(pd(b.due).getDate(),daysInMonth(now.getFullYear(),now.getMonth()));state.bills.push({id:'recurring:'+key+':'+cm,recurringKey:key,name:b.name,amount:b.amount,category:b.category,payer:b.payer,due:dateISO(new Date(now.getFullYear(),now.getMonth(),dd)),recurring:true,status:'open'});existing.add(key);changed=true;});
     return changed;
   }
   // ===== Leitura dos gastos =====
@@ -188,7 +192,7 @@
     const weekAvg=[1,2,3,4,5].reduce((a,i)=>a+(avg[i]||0),0)/5,weekendAvg=((avg[0]||0)+(avg[6]||0))/2;
     return {fc,fTotal,months:complete.length,daily,measured,coverage,age,factor,byCat,byCatPrev,byPerson,byPersonPrev,catPerson,count,small,scale:30.4/coverage,spentToday:sum(vars.filter(t=>t.date===today)),weekAvg,weekendAvg,hasPrev:age>=55,confidence:coverage>=28?'alta':coverage>=14?'média':'baixa',monthlyVar:daily*30.4};
   });}
-  function templates(){const map={};state.bills.filter(b=>b.recurring).forEach(b=>{const k=b.name.toLowerCase();if(!map[k]||b.due>map[k].due)map[k]=b;});return Object.values(map);}
+  function templates(){const map={};state.bills.filter(b=>b.recurring).forEach(b=>{const k=recurringKey(b);if(!map[k]||b.due>map[k].due)map[k]=b;});return Object.values(map);}
   const fixedMonthly=(id)=>templates().reduce((s,b)=>s+(id?((splitShares(b.amount,b.payer).find(x=>x.id===id)||{}).amount||0):b.amount),0);
   const avgIncome=()=>{const n=new Date();return (monthIncome(n.getFullYear(),n.getMonth())+monthIncome(n.getFullYear(),n.getMonth()+1)+monthIncome(n.getFullYear(),n.getMonth()+2))/3;};
   const savedInMonth=(ym)=>state.saves.filter(s=>s.date.slice(0,7)===ym).reduce((a,s)=>a+s.amount,0);
@@ -197,7 +201,7 @@
   function simulate(o={}){
     const days=o.days??45,cut=o.cut||0,extra=o.extra||0,save=o.save||0,M=model(),T=new Date(),today=dateISO(T),end=dateISO(addDays(T,days)),ev={};
     const add=(d,k,v)=>{const e=ev[d]||(ev[d]={inc:0,bill:0,save:0,extra:0});e[k]+=v;};
-    pendingArrivals().forEach(p=>add(today,'inc',p.inc.amount));
+    pendingArrivals(45).filter(p=>Math.max(0,-daysUntil(p.date))<=3).forEach(p=>add(today,'inc',p.inc.amount));
     state.incomes.forEach(i=>occurrences(i,dateISO(addDays(T,1)),end).forEach(d=>add(d,'inc',i.amount)));
     state.bills.filter(b=>b.status==='open').forEach(b=>{const d=b.due<today?today:b.due;if(d<=end)add(d,'bill',b.amount);});
     const tpl=templates();
@@ -348,6 +352,7 @@
   let onboardDraft={},onboardStep=1,channel=null;
   try{channel=new BroadcastChannel('junto-demo-sync');}catch{}
   const user=(id=active)=>state.users.find(u=>u.id===id)||{id:'b',name:'Seu amor',balance:0,tone:'pink'};
+  const hasUser=(id)=>state.users.some(u=>u.id===id);
   const other=(id=active)=>id==='a'?'b':'a';
   const first=(name)=>name.split(' ')[0];
   const avatar=(id,size='')=>`<span class="avatar ${id==='b'?'b':''} ${size}" aria-hidden="true">${esc(user(id).name.slice(0,1).toUpperCase())}</span>`;
@@ -757,8 +762,8 @@
     return out.slice(0,3);
   }
   function processAuto(){
-    let n=0,saved=0;pendingArrivals().forEach(({inc,date})=>{if(!inc.auto||(cloudSlot&&inc.person!==cloudSlot))return;const p=state.plan,g=p&&p.auto!==false?state.goals.find(x=>x.id===p.goalId):null,share=g?planShare(inc,date):0;
-      user(inc.person).balance+=inc.amount;state.received.push({id:`received:${inc.id}:${date}`,incomeId:inc.id,date,amount:inc.amount,status:'received',at:Date.now(),auto:true});n++;
+    let n=0,saved=0;pendingArrivals(3).forEach(({inc,date})=>{if(!inc.auto||(cloudSlot&&inc.person!==cloudSlot))return;const p=state.plan,g=p&&p.auto!==false?state.goals.find(x=>x.id===p.goalId):null,share=g?planShare(inc,date):0;
+      user(inc.person).balance+=inc.amount;state.received.push({id:`received:${inc.id}:${date}`,incomeId:inc.id,person:inc.person,date,amount:inc.amount,status:'received',at:Date.now(),auto:true,balanceDelta:inc.amount});n++;
       if(share>0){g.saved+=share;saved+=share;state.saves.push({id:`save:${inc.id}:${date}:${g.id}`,goalId:g.id,amount:share,date,actor:inc.person,source:'auto',incomeId:inc.id});}
       log(inc.person,`teve ${inc.name.toLowerCase()} confirmado sozinho (${money(inc.amount)})${share>0?` e o Juntô já guardou ${money(share)} em ${g.name}`:''}.`);});
     return {n,saved};
@@ -1842,7 +1847,7 @@ ${JSON.stringify(chatContext())}`;
       }else{
         const duplicate=state.bills.find(b=>b.status==='open'&&b.amount===amount&&b.due===date&&b.payer===payer&&norm(b.name)===norm(nm));
         if(duplicate){error('Essa conta parece já ter sido adicionada agora. Abra a existente para editar, em vez de duplicar.');return;}
-        state.bills.push({id:uid(),name:nm,amount,category,payer,due:date,item:itf.item,icon:itf.icon,recurring:kind==='fixed',status:'open',createdAt:now});log(active,`adicionou ${kind==='fixed'?'uma conta fixa':'uma conta a pagar'}: ${title}.`);
+        const billId=uid();state.bills.push({id:billId,name:nm,amount,category,payer,due:date,item:itf.item,icon:itf.icon,recurring:kind==='fixed',...(kind==='fixed'?{recurringKey:billId}:{}),status:'open',createdAt:now});log(active,`adicionou ${kind==='fixed'?'uma conta fixa':'uma conta a pagar'}: ${title}.`);
       }
       notify(other(),'Conta atualizada.',`${first(user().name)} registrou ${title} por ${money(amount)}.`);close();route='bills';billFilter=kind==='spent'?'month':kind==='fixed'?'fixed':'open';persist();toast(kind==='spent'?'Gasto anotado. Sem mistério.':'Conta no radar.',`${title} · ${money(amount)}`);return;
     }
@@ -1858,7 +1863,7 @@ ${JSON.stringify(chatContext())}`;
       if(name==null||amount==null||!categories.includes(category)||!['a','b','half','prop'].includes(payer)||!/^\d{4}-\d{2}-\d{2}$/.test(due)){error('Confira os dados da conta.');return;}
       const paidTx=state.transactions.find(t=>t.billId===b.id);let shares=null;if(b.status==='paid'&&paidTx){const moved=reallocateTransaction(paidTx,amount,payer);if(moved.error){error(moved.error);return;}shares=moved.shares;}
       const itf=itemFields(name,category),newName=smartName(name);Object.assign(b,{name:newName,amount,category,payer,due,recurring,item:itf.item,icon:itf.icon});
-      if(paidTx){Object.assign(paidTx,{name:newName,amount,category,payer,item:itf.item,icon:itf.icon,split:shares&&shares.length>1?shares:undefined});if(!shares||shares.length<2)delete paidTx.split;}
+      if(paidTx){Object.assign(paidTx,{name:newName,amount,category,payer,item:itf.item,icon:itf.icon,split:shares&&shares.length>1?shares:undefined});if(!shares||shares.length<2)delete paidTx.split;if(Number.isSafeInteger(paidTx.balanceDelta))paidTx.balanceDelta=paidTx.balanceDelta===0?0:-amount;}
       learnFrom(name,category,true);log(active,`editou a conta ${b.name}: ${money(amount)}.`);close();persist();toast('Conta atualizada.',`${b.name} · ${money(amount)}`);return;
     }
     if(type==='delete-tx'){
@@ -1877,7 +1882,7 @@ ${JSON.stringify(chatContext())}`;
       state.bills=state.bills.filter(x=>x.id!==b.id);log(active,`excluiu a conta ${b.name}${related.length?' e estornou o pagamento':''}${wasRecurring?'; repetição encerrada':''}.`);close();persist();toast('Conta excluída.',wasRecurring?'A repetição também foi encerrada.':related.length?'O pagamento também foi estornado.':'Ela saiu do planejamento.');return;
     }
     if(type==='balance'){
-      const amount=amountValue(d,'balance-amount',true),who=form.dataset.user;if(amount==null||!user(who))return;
+      const amount=amountValue(d,'balance-amount',true),who=form.dataset.user;if(amount==null||!hasUser(who))return;
       user(who).balance=amount;log(who,`atualizou o saldo atual para ${money(amount)}.`);notify(other(who),'O saldo da dupla mudou.',`${first(user(who).name)} atualizou o saldo atual.`);close();persist();toast('Saldo atualizado.','O livre do mês também foi recalculado.');return;
     }
     if(type==='contribute'){
@@ -1942,13 +1947,13 @@ ${JSON.stringify(chatContext())}`;
     if(type==='arrival'){
       const inc=state.incomes.find(i=>i.id===id),date=form.dataset.date;if(!inc||handled(id,date))return;const amount=amountValue(d,'arrival-amount');if(amount==null)return;
       let save=0,g=null;if(d.has('arrival-save')){save=amountValue(d,'arrival-save',true);if(save==null)return;if(save>amount){error('Não dá pra guardar mais do que entrou.');return;}g=state.goals.find(x=>x.id===d.get('arrival-goal'));if(save&&!g){error('Escolha um plano pra guardar.');return;}}
-      user(inc.person).balance+=amount;state.received.push({id:uid(),incomeId:id,date,amount,status:'received',at:Date.now()});
+      user(inc.person).balance+=amount;state.received.push({id:uid(),incomeId:id,person:inc.person,date,amount,status:'received',at:Date.now(),balanceDelta:amount});
       if(save){g.saved+=save;state.saves.push({id:uid(),goalId:g.id,amount:save,date:dateISO(),actor:inc.person,source:'income'});}
       log(inc.person,`recebeu ${inc.name.toLowerCase()} (${money(amount)})${save?` e guardou ${money(save)} primeiro, em ${g.name}`:''}.`);notify(other(inc.person),save?'Entrou e já foi guardado. 💚':'Dinheiro na conta.',`${first(user(inc.person).name)} confirmou ${inc.name.toLowerCase()}: ${money(amount)}${save?`. ${money(save)} foram direto pra ${g.name}`:''}.`);close();persist();toast(save?'Entrou e já guardou primeiro.':'Entrada confirmada.',save?`${money(save)} protegidos em ${g.name}. O resto é pra viver.`:`${money(amount)} somados ao saldo de ${first(user(inc.person).name)}.`,'coins');return;
     }
     if(type==='income'){
-      const v=readIncomeForm(form);if(v.name.length<2||v.name.length>40){error('Dê um nome com 2 a 40 caracteres.');return;}if(!Number.isFinite(v.amount)||v.amount<=0){error('Informe um valor maior que zero. Ex.: 3.200,00.');return;}if(!user(v.person)){error('Escolha de quem é a entrada.');return;}
-      const data={name:v.name,person:v.person,amount:v.amount,rule:v.rule,nth:v.nth,countSat:v.countSat,weekday:v.weekday,day:v.day};
+      const v=readIncomeForm(form);if(v.name.length<2||v.name.length>40){error('Dê um nome com 2 a 40 caracteres.');return;}if(!Number.isFinite(v.amount)||v.amount<=0){error('Informe um valor maior que zero. Ex.: 3.200,00.');return;}if(!hasUser(v.person)){error('Escolha de quem é a entrada.');return;}
+      const data={name:v.name,person:v.person,amount:v.amount,rule:v.rule,nth:v.nth,countSat:v.countSat,weekday:v.weekday,day:v.day,auto:v.auto};
       if(id){const inc=state.incomes.find(i=>i.id===id);if(!inc)return;Object.assign(inc,data);log(active,`ajustou a entrada ${v.name}: ${ruleText(inc).toLowerCase()}.`);}
       else{const inc={id:uid(),...data,since:dateISO()};state.incomes.push(inc);log(active,`configurou ${v.name.toLowerCase()} de ${first(user(v.person).name)}: ${ruleText(inc).toLowerCase()}.`);}
       close();route='incomes';persist();toast(id?'Entrada ajustada.':'Entrada na previsão.','O futuro do mês já foi recalculado.','trend');return;

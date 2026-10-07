@@ -23,6 +23,25 @@ async function fakeNative(page,inbox){await page.addInitScript(inbox=>{
 },inbox);}
 async function personal(page,balance=10000){await expect(page.locator('#authenticated-app')).toBeVisible();await page.evaluate(balance=>{const s=window.JuntoApp.freshState('Guilherme');s.users[0].balance=balance;window.JuntoApp.applyState(s);},balance);}
 
+test('individual tips protect the bus and basic food while the shared history remains contestable',async({page})=>{
+ await page.goto('/');await personal(page,100000);
+ await page.evaluate(()=>{const s=window.JuntoApp.getState(),date=new Date().toISOString().slice(0,10);s.users.push({id:'b',name:'Bia',balance:80000,tone:'pink'});s.settings.personalBudget={a:{fare:550,trips:2}};s.incomes=[{id:'vt',name:'Vale transporte',person:'a',purpose:'transport',benefitDaily:1860,amount:9300,rule:'weekly',weekday:2,since:date}];s.transactions=[
+  {id:'uber-a',name:'Uber',item:'Corrida de app',amount:4000,payer:'a',by:'a',category:'Transporte',expenseContext:'work',date},
+  {id:'food-a',name:'Almoço',amount:2500,payer:'a',by:'a',category:'Alimentação',date},
+  {id:'cig-a',name:'2 cigarros',item:'Cigarro',amount:600,payer:'a',by:'a',category:'Hábitos',date},
+  {id:'choc-b',name:'Chocolate da Bia',amount:10000,payer:'b',by:'b',category:'Lanches',date},
+  {id:'uber-b',name:'Uber trabalho Bia',amount:5000,payer:'b',by:'b',category:'Transporte',date}
+ ];window.JuntoApp.applyState(s);});
+ await page.locator('#mobile-nav [data-route="future"]').click();await page.locator('.future-v3-tabs [data-value="tips"]').click();
+ const tips=page.locator('.tip-list');await expect(tips).toContainText('R$ 11,00');await expect(tips).toContainText('R$ 18,60');await expect(tips.locator('.tip').filter({hasText:'Seu Uber'})).toContainText('R$ 29,00');await expect(tips).toContainText('Cigarro');await expect(tips).not.toContainText('Bia');await expect(tips).not.toContainText('Chocolate');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:'test-results/individual-tips.png'});
+ await page.locator('#mobile-nav [data-route="analysis"]').click();await page.locator('.analysis-v3-tabs [data-value="history"]').click();await expect(page.locator('.month-transactions')).toContainText('Chocolate da Bia');await expect(page.locator('.month-transactions')).toContainText('Uber');
+ await page.locator('.month-transactions [data-id="choc-b"]').click();await expect(page.locator('#modal [data-action="edit-tx"]')).toHaveCount(0);await page.locator('#modal [data-action="contest"]').click();await page.locator('#contest-note').fill('Vamos reduzir os lanches?');await page.locator('[data-form="contest"] [type="submit"]').click();
+ expect(await page.evaluate(()=>window.JuntoApp.getState().transactions.find(t=>t.id==='choc-b').contest.by)).toBe('a');expect(await page.evaluate(()=>window.JuntoApp.getState().users.map(u=>u.balance))).toEqual([100000,80000]);
+ await page.locator('[data-action="bill-filter"][data-value="month"]').click();await page.locator('[data-action="tx-detail"][data-id="uber-a"]').click();await page.locator('#modal [data-action="edit-tx"]').click();await page.locator('#edit-tx-context').selectOption('necessary');await page.locator('[data-form="edit-tx"] [type="submit"]').click();
+ await page.locator('#mobile-nav [data-route="future"]').click();await page.locator('.future-v3-tabs [data-value="tips"]').click();await expect(page.locator('.tip-list')).not.toContainText('Seu Uber');expect(await page.evaluate(()=>window.JuntoApp.getState().users.map(u=>u.balance))).toEqual([100000,80000]);
+});
+
 test('a debt paid during onboarding does not repeat every day in the month forecast',async({page})=>{
  await page.goto('/');await personal(page,100000);
  await page.evaluate(()=>{const s=window.JuntoApp.getState(),today=new Date(),iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`,yesterday=new Date(today);yesterday.setDate(today.getDate()-1);
@@ -679,12 +698,12 @@ test('two independent accounts invite, sync offline edits and keep their own pro
   await a.page.evaluate(()=>window.JuntoCloud.synchronize());
   for(const [device,own,other] of[[a,'Salário só do Gui','Salário só da Bia'],[b,'Salário só da Bia','Salário só do Gui']]){
     await device.page.evaluate(()=>window.JuntoApp.closeModal());await device.page.locator('#mobile-nav [data-route="future"]').click();await device.page.locator('#app-content [data-route="incomes"]').first().click();
-    await expect(device.page.locator('#app-content')).toContainText(own);await expect(device.page.locator('#app-content')).not.toContainText(other);
-    await device.page.locator('#app-content [data-action="income-edit"]').first().click();await expect(device.page.locator('#income-person option')).toHaveCount(1);await device.page.evaluate(()=>window.JuntoApp.closeModal());
+    await expect(device.page.locator('#app-content')).toContainText(own);await expect(device.page.locator('#app-content')).toContainText(other);
+    await device.page.locator('.income-v3-tabs [data-value="sources"]').click();await device.page.locator('#app-content [data-action="income-edit"]').click();await expect(device.page.locator('#income-person option')).toHaveCount(1);await device.page.evaluate(()=>window.JuntoApp.closeModal());
     await device.page.locator('#app-content [data-kind="income"][data-value="base"]').click();await expect(device.page.locator('#estimate-amount')).toHaveValue(device===a?'50,00':'70,00');
     if(device===b){await device.page.locator('#estimate-amount').fill('80,00');await device.page.locator('[data-form="estimate"] [type="submit"]').click();await device.page.evaluate(()=>window.JuntoCloud.synchronize());}
-    await device.page.locator('#mobile-nav [data-route="analysis"]').click();await expect(device.page.locator('[data-action="analysis-person"]')).toHaveCount(1);
-    await expect(device.page.locator('#app-content')).not.toContainText(device===a?'Café solo':'Conta individual Gui');
+    await device.page.locator('#mobile-nav [data-route="analysis"]').click();await expect(device.page.locator('[data-action="analysis-person"]')).toHaveCount(3);
+    await device.page.locator('.analysis-v3-tabs [data-value="history"]').click();await expect(device.page.locator('.month-transactions')).toContainText('Café solo');await expect(device.page.locator('.month-transactions')).toContainText('Conta individual Gui');
   }
   await a.page.evaluate(()=>window.JuntoCloud.synchronize());expect(await a.page.evaluate(()=>window.JuntoApp.getState().settings.personalEstimates)).toEqual({a:5000,b:8000});
   for(const device of[a,b]){await device.page.evaluate(()=>window.JuntoApp.closeModal());await device.page.evaluate(()=>document.querySelector('[data-action="settings"]').click());await device.page.locator('#modal [data-action="balance"]').click();await device.page.locator('#balance-amount').fill('1.000,00');await device.page.locator('[data-form="balance"] [type="submit"]').click();await device.page.evaluate(()=>window.JuntoCloud.synchronize());}
@@ -697,6 +716,14 @@ test('two independent accounts invite, sync offline edits and keep their own pro
   await b.page.evaluate(e=>window.JuntoApp.confirmBankMovement(e,{name:'Almoço',amount:2500,date:new Date().toISOString().slice(0,10),category:'Alimentação'}),event('b'));await b.page.evaluate(()=>window.JuntoCloud.synchronize());await a.context.setOffline(false);await a.page.evaluate(()=>window.JuntoCloud.synchronize());
   await expect.poll(async()=>{await a.page.evaluate(()=>window.JuntoCloud.synchronize());return a.page.evaluate(()=>window.JuntoApp.getState().transactions.length);}).toBe(4);await b.page.evaluate(()=>window.JuntoCloud.synchronize());
   await expect.poll(()=>b.page.evaluate(()=>window.JuntoApp.getState().transactions.length)).toBe(4);expect(await b.page.evaluate(()=>window.JuntoApp.getState().users.map(u=>u.balance))).toEqual([97500,97500]);await expect(b.page.locator('[data-action="profile-photo-switch"]')).toHaveCount(0);expect(await b.page.evaluate(()=>window.JuntoApp.getActive())).toBe('b');
+  // Shared history and the conversation cross accounts without changing cash.
+  await a.page.locator('#mobile-nav [data-route="bills"]').click();await a.page.locator('[data-action="bill-filter"][data-value="month"]').click();
+  await a.page.locator('.bills-v3-row').filter({hasText:'Café solo'}).click();await expect(a.page.locator('#modal [data-action="edit-tx"]')).toHaveCount(0);await a.page.locator('#modal [data-action="contest"]').click();
+  await a.page.locator('#contest-note').fill('Vamos combinar este gasto?');await a.page.locator('[data-form="contest"] [type="submit"]').click();await a.page.evaluate(()=>window.JuntoCloud.synchronize());await b.page.evaluate(()=>window.JuntoCloud.synchronize());
+  await b.page.locator('#mobile-nav [data-route="bills"]').click();await b.page.locator('[data-action="bill-filter"][data-value="contested"]').click();await expect(b.page.locator('.contest-note')).toContainText('Vamos combinar este gasto?');
+  await b.page.locator('[data-action="contest-reply"]').click();await b.page.locator('#contest-text').fill('Combinado, vou planejar melhor.');await b.page.locator('[data-form="contest-reply"] [type="submit"]').click();await b.page.evaluate(()=>window.JuntoCloud.synchronize());await a.page.evaluate(()=>window.JuntoCloud.synchronize());
+  await a.page.locator('[data-action="bill-filter"][data-value="contested"]').click();await expect(a.page.locator('.contest-msg')).toContainText('vou planejar melhor');await a.page.locator('[data-action="contest-resolve"]').click();await a.page.locator('#contest-text').fill('Vamos seguir esse combinado.');await a.page.locator('[data-form="contest-resolve"] [type="submit"]').click();await a.page.evaluate(()=>window.JuntoCloud.synchronize());await b.page.evaluate(()=>window.JuntoCloud.synchronize());
+  expect(await b.page.evaluate(()=>window.JuntoApp.getState().users.map(u=>u.balance))).toEqual([97500,97500]);expect(await b.page.evaluate(()=>window.JuntoApp.getState().transactions.find(t=>t.name==='Café solo').contest.status)).toBe('resolved');
   // Disconnect while the partner has an offline expense: each solo ledger
   // keeps its own history, and the queued bank movement still reaches the server.
   await b.context.setOffline(true);await b.page.evaluate(e=>window.JuntoApp.confirmBankMovement(e,{name:'Despesa offline Bia',amount:1250,date:new Date().toISOString().slice(0,10),category:'Outros'}),event('f'));

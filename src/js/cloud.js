@@ -34,7 +34,7 @@ function accountAction(feature,icon,title,description,primary=false){return `<bu
 function accountHTML(){
   const profiles=app.getState().users,profile=profiles.find(u=>u.id===checkpoint.slot),name=profile?.name||userName()||'Sua conta',paired=checkpoint.members===2;
   const connection=paired
-    ?`<div class="cloud-connected"><span class="cloud-action-icon">${accountIcon('heart')}</span><div><strong>${profiles.map(u=>esc(u.name)).join(' &amp; ')}</strong><p>Saldo e planos juntos. Cada um organiza suas entradas e gastos.</p></div></div><button class="cloud-disconnect-link" data-feature="cloud-disconnect-open">Desconectar dupla</button>`
+    ?`<div class="cloud-connected"><span class="cloud-action-icon">${accountIcon('heart')}</span><div><strong>${profiles.map(u=>esc(u.name)).join(' &amp; ')}</strong><p>Histórico, saldo e planos juntos. Dicas de economia só para você.</p></div></div><button class="cloud-disconnect-link" data-feature="cloud-disconnect-open">Desconectar dupla</button>`
     :`<p class="cloud-section-description">Escolha como juntar as duas contas.</p><div class="cloud-connect-actions">${checkpoint.slot==='a'?accountAction('cloud-invite','heart','Convidar meu amor','Gerar um código para compartilhar',true)+accountAction('cloud-join-open','code','Já tenho um código','Usar o convite que recebi'):''}</div>`;
   return `<div class="cloud-account-layout">
     <div class="cloud-profile"><span class="cloud-profile-avatar" aria-hidden="true">${esc(Array.from(name.trim())[0]?.toUpperCase()||'J')}</span><div><strong>${esc(name)}</strong><span>${esc(user.email||'Sua conta')}</span></div></div>

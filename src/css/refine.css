@@ -192,3 +192,66 @@ button.tl-row:active{transform:scale(.995)}
 /* Long invitation codes must fit a narrow phone without widening the dialog. */
 .invite-code strong{font-size:clamp(16px,4.6vw,25px);letter-spacing:1.2px;overflow-wrap:anywhere}
 #cloud-invite{font-variant-numeric:tabular-nums;text-transform:uppercase;letter-spacing:.6px}
+
+/* Account actions have one clear order, with backups available on demand. */
+dialog[data-kind="cloud-account"]{width:min(480px,calc(100vw - 24px));border-radius:28px;background:var(--junto-surface)}
+dialog[data-kind="cloud-account"] .modal-head{margin-bottom:18px}
+dialog[data-kind="cloud-account"] .modal-head h2{font-size:23px!important;color:var(--junto-navy)}
+.cloud-account-layout{display:flex;flex-direction:column;gap:20px;color:var(--junto-navy)}
+.cloud-account-layout svg{width:21px;height:21px;flex-shrink:0}
+.cloud-profile{display:flex;align-items:center;gap:12px;padding-bottom:18px;border-bottom:1px solid var(--junto-line)}
+.cloud-profile-avatar{display:grid;place-items:center;flex:0 0 44px;height:44px;border-radius:50%;background:#edf1f6;color:#365276;font-size:18px;font-weight:750}
+.cloud-profile>div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.cloud-profile strong{font-size:16px;line-height:1.4;overflow-wrap:anywhere}
+.cloud-profile>div>span{font-size:12px;line-height:1.5;color:#626d7e;overflow-wrap:anywhere}
+.cloud-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.cloud-account-layout h3{font-size:14px;line-height:1.4;font-weight:750}
+.cloud-membership{flex-shrink:0;padding:4px 8px;border-radius:8px;background:var(--junto-gold-soft);color:#816027;font-size:10px;line-height:1.4;font-weight:750}
+.cloud-membership.is-paired{background:#e7f2ed;color:#265842}
+.cloud-section-description{margin:5px 0 13px;color:#626d7e;font-size:12px;line-height:1.5}
+.cloud-connect-actions{display:flex;flex-direction:column;gap:9px}
+.cloud-action{display:flex;align-items:center;gap:11px;width:100%;min-height:68px;padding:13px 12px;border:1px solid var(--junto-line);border-radius:16px;background:#fff;color:var(--junto-navy);text-align:left;transition:background .16s ease}
+.cloud-action:hover{background:#fbfaf7}
+.cloud-action-primary{border-color:#e2c88e;background:#fcf6e9}
+.cloud-action-primary:hover{background:#f6eddd}
+.cloud-action-icon{display:grid;place-items:center;flex:0 0 34px;height:34px;border-radius:11px;background:#f3f5f8;color:#52657d}
+.cloud-action-primary .cloud-action-icon{background:#f2e4c3;color:#8a6628}
+.cloud-action-copy{display:flex;flex:1;flex-direction:column;gap:3px;min-width:0}
+.cloud-action-copy strong{font-size:14px;line-height:1.4;font-weight:750;overflow-wrap:anywhere}
+.cloud-action-copy small{font-size:11px;line-height:1.5;font-weight:450;color:#626d7e;overflow-wrap:anywhere}
+.cloud-action-chevron{display:flex;flex-shrink:0;color:#8590a0}
+.cloud-action-chevron svg{width:16px;height:16px}
+.cloud-connected{display:flex;align-items:center;gap:12px;margin-top:12px;padding:14px 12px;border-radius:16px;background:#f0f7f3}
+.cloud-connected .cloud-action-icon{background:#e1efe6;color:#39725d}
+.cloud-connected>div{min-width:0}
+.cloud-connected strong{font-size:14px;line-height:1.5;overflow-wrap:anywhere}
+.cloud-connected p{margin-top:3px;font-size:12px;line-height:1.5;color:#52695c}
+.cloud-sync-section{padding:17px 0;border-top:1px solid var(--junto-line);border-bottom:1px solid var(--junto-line)}
+.cloud-sync-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.cloud-sync-row>div{min-width:0;flex:1}
+.cloud-sync-row h3{font-size:12px}
+.cloud-sync-row p{margin-top:4px;font-size:11px;line-height:1.5;color:#626d7e;overflow-wrap:anywhere}
+.cloud-sync-button{display:flex;align-items:center;justify-content:center;gap:6px;flex-shrink:0;min-height:44px;padding:8px 10px;border:1px solid var(--junto-line);border-radius:12px;background:#fff;color:#365276;font-size:11px;font-weight:700}
+.cloud-sync-button svg{width:16px;height:16px}
+.cloud-pending-note{margin-top:10px;padding:10px;border-radius:10px;background:#fff4df;color:#795a25;font-size:11px;line-height:1.6}
+.cloud-backups summary{display:flex;align-items:center;gap:11px;min-height:52px;list-style:none;border-radius:12px}
+.cloud-backups summary::-webkit-details-marker{display:none}
+.cloud-backups summary .cloud-action-chevron{transform:rotate(90deg);transition:transform .16s ease}
+.cloud-backups[open] summary .cloud-action-chevron{transform:rotate(-90deg)}
+.cloud-backup-actions{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.cloud-backup-actions .cloud-action{min-height:62px;background:#fbfaf7}
+.cloud-backup-actions .cloud-action-copy strong{font-size:12px}
+.cloud-account-footer{display:flex;justify-content:center;padding-top:8px;border-top:1px solid var(--junto-line)}
+.cloud-signout-button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:8px 14px;border:0;border-radius:12px;background:transparent;color:#626d7e;font-size:12px;font-weight:600}
+.cloud-signout-button svg{width:17px;height:17px}
+.cloud-signout-button:hover{background:#f5f5f3}
+@media(max-width:520px){
+  dialog[data-kind="cloud-account"]{width:100%;max-width:none;margin:auto 0 0;border-radius:28px 28px 0 0}
+  dialog[data-kind="cloud-account"] .modal-wrap{padding:13px 20px max(16px,var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))!important}
+  .cloud-account-layout{gap:17px}
+}
+@media(max-width:360px){
+  dialog[data-kind="cloud-account"] .modal-wrap{padding-inline:16px!important}
+  .cloud-action{gap:9px;padding:12px 10px}
+  .cloud-action-copy strong{font-size:13px}
+}

@@ -384,54 +384,45 @@
     const available=free(),request=pending()[0],g=state.goals[0],solo=isSolo();
     const now=new Date(),expectedIncome=monthIncome(now.getFullYear(),now.getMonth()),spent=monthSpend();
     const spendPct=expectedIncome?Math.min(100,Math.round(spent/expectedIncome*100)):null;
-    const hasIncome=state.incomes.length>0,cap=hasIncome?Math.max(0,dailyCap()):Math.max(0,available);
-    const capLabel=hasIncome?'Ritmo recomendado hoje':'Livre depois das reservas';
-    const goalPct=g?Math.min(100,Math.round(g.saved/g.target*100)):0;
     let insightTitle,insightBody;
-    if(available<0){insightTitle=solo?'Seu mês pediu um ajuste.':'O mês pediu uma conversa.';insightBody=`Faltam ${cash(-available)} para cobrir contas, planos e valores reservados. Vale rever as prioridades antes do próximo gasto.`;}
-    else if(request&&!solo){insightTitle=request.amount<=available?'Essa vontade cabe no mês.':'Essa vontade pede uma conversa.';insightBody=request.amount<=available?`Se vocês combinarem “${request.title}”, ainda sobram ${cash(available-request.amount)} livres.`:`“${request.title}” passa ${cash(request.amount-available)} do saldo livre. Dá para ajustar o valor ou deixar para depois.`;}
-    else{const tip=tips()[0];if(tip){insightTitle=tip.title;insightBody=tip.body.replace(/<[^>]+>/g,'');}else{insightTitle=solo?'Seu dinheiro está organizado para hoje.':'A dupla está com o mês organizado.';insightBody=`Depois das contas e dos planos, ${solo?'você tem':'vocês têm'} ${cash(Math.max(0,available))} livres. O próximo gasto atualiza essa leitura na hora.`;}}
-    const latest=state.transactions.slice().sort((a,b)=>(b.createdAt||pd(b.date).getTime())-(a.createdAt||pd(a.date).getTime())).slice(0,3);
-    const alerts=radar().slice(0,2);
-    const modeBadge=solo?`${icon('wallet')}Modo solo`:`${icon('heart')}Juntô a dois`;
-    const spendAction=solo?'can-spend':'ask',spendLabel=solo?'Posso gastar?':'Amor, posso gastar?';
-    return `<div class="home-v2">
-      <div class="home-greeting"><div><span class="home-mode-badge">${modeBadge}</span><h2>Oi, ${esc(first(user().name))}! <span aria-hidden="true">👋</span></h2><p>${solo?'Bora manter o foco hoje?':'Bora cuidar do que é de vocês hoje?'}</p></div></div>
+    if(available<0){insightTitle=solo?'Seu mês pediu um ajuste.':'O mês pediu uma conversa.';insightBody=`Faltam ${cash(-available)} para cobrir contas, planos e valores reservados. Vale revisar antes do próximo gasto.`;}
+    else if(request&&!solo){insightTitle=request.amount<=available?'Esse pedido cabe no mês.':'Esse pedido pede uma conversa.';insightBody=request.amount<=available?`Se vocês combinarem “${request.title}”, ainda sobram ${cash(available-request.amount)} livres.`:`“${request.title}” passa ${cash(request.amount-available)} do livre atual.`;}
+    else{const tip=tips()[0];if(tip){insightTitle=tip.title;insightBody=tip.body.replace(/<[^>]+>/g,'');}else{insightTitle=solo?'Seu dinheiro está organizado para hoje.':'O dinheiro de vocês está organizado para hoje.';insightBody=`Depois das contas e dos planos, ${solo?'você tem':'vocês têm'} ${cash(Math.max(0,available))} livres.`;}}
+    const goalPct=g?Math.min(100,Math.round(g.saved/g.target*100)):0;
+    const alerts=radar().slice(0,2),latest=state.transactions.slice().sort((a,b)=>(b.createdAt||pd(b.date).getTime())-(a.createdAt||pd(a.date).getTime())).slice(0,3);
+    const spendAction=solo?'can-spend':'ask',spendLabel=solo?'Posso gastar?':'Amor, posso gastar?',quickCats=quickCategorySuggestions();
+    return `<div class="home-v2 home-v3">
+      <div class="home-greeting home-greeting-v3"><div><span class="home-mode-badge">${solo?`${icon('wallet')}Modo solo`:`${icon('heart')}Juntô a dois`}</span><h2>Oi, ${esc(first(user().name))}.</h2><p>${solo?'Bora cuidar do seu hoje?':'Bora cuidar do nosso hoje?'}</p></div></div>
       ${incoming().length?`<div class="pending-banner">${icon('chat')}<p>${esc(first(user(other()).name))} quer combinar ${incoming().length===1?'um gasto.':`${incoming().length} gastos.`} Bora responder?</p><button data-action="route" data-route="requests">Ver pedido</button></div>`:''}
       ${(()=>{const arr=pendingArrivals();if(!arr.length)return '';const a=arr[0];return `<div class="pending-banner arrival">${icon('coins')}<p><b>${esc(a.inc.name)} de ${esc(first(user(a.inc.person).name))}</b> ${a.date===dateISO()?'cai hoje':`era pra ter caído ${dayMonth(a.date)}`}. Confirma e a previsão se ajusta.${arr.length>1?` (+${arr.length-1})`:''}</p><button data-action="income-arrived" data-id="${a.inc.id}" data-date="${a.date}">Confirmar</button></div>`;})()}
       ${contestBanner()}
-      <section class="home-money-card" aria-label="Resumo financeiro">
-        <div class="home-money-head"><span>${solo?'Seu saldo livre hoje':'Saldo livre da dupla hoje'}</span><button class="icon-btn" data-action="hide" aria-label="${hidden?'Mostrar':'Ocultar'} valores">${icon(hidden?'eyeOff':'eye')}</button></div>
-        <div class="home-money-main"><div><strong class="home-free-value num" id="free-amount">${available<0?'− ':''}${cash(Math.abs(available))}</strong><small>${available<0?'Falta para fechar o mês':'Contas, planos e valores reservados já descontados'}</small></div><button class="home-spend-cta" data-action="${spendAction}">${icon('cart')}<span>${spendLabel}</span></button></div>
-        <div class="home-money-meta"><span>${icon('sparkle')}${capLabel}</span><b class="num">${cashR(cap)}</b></div>
+      <section class="home-money-card home-money-card-v3" aria-label="Resumo financeiro">
+        <div class="home-money-v3-top"><div class="home-money-v3-copy"><span class="home-money-eyebrow">LIVRE PRA CURTIR</span><div class="home-money-v3-value"><strong class="num" id="free-amount">${available<0?'− ':''}${cash(Math.abs(available))}</strong><button class="icon-btn" data-action="hide" aria-label="${hidden?'Mostrar':'Ocultar'} valores">${icon(hidden?'eyeOff':'eye')}</button></div><p>${available<0?'O mês está acima do livre atual.':'Contas e planos já separados.'}</p></div><div class="home-money-people">${state.users.map(u=>`<span class="home-money-person">${avatar(u.id)}<small>${u.id===active?'Você':solo?'Você':u.id==='b'?'Meu amor':esc(first(u.name))}</small></span>`).join('')}</div></div>
+        <button class="home-money-link" data-action="route" data-route="bills">${icon('coins')}<span>${solo?'Ver meu dinheiro':'Ver nosso dinheiro'}</span><b>›</b></button>
+        <span class="sr-only">${solo?'Seu saldo livre hoje':'Saldo livre da dupla hoje'}</span>
       </section>
-      <div class="home-summary-grid">
-        <section class="home-summary-card spend"><span class="home-summary-icon">${icon('wallet')}</span><div><span>Gasto do mês</span><strong class="num">${cash(spent)}</strong>${spendPct!=null?`<small>${spendPct}% da renda prevista</small><div class="home-progress"><span style="width:${spendPct}%"></span></div>`:'<small>Configure as entradas para comparar com a renda.</small>'}</div></section>
-        <section class="home-summary-card dream"><span class="home-summary-icon">${icon(g?.icon||'heart')}</span><div><span>Próximo sonho</span>${g?`<strong>${esc(g.name)}</strong><small>${cash(g.saved)} de ${cash(g.target)} · ${goalPct}%</small><div class="home-progress"><span style="width:${goalPct}%"></span></div>`:`<strong>Escolha um objetivo</strong><small>Seu plano aparece aqui quando você criar a primeira meta.</small>`}</div></section>
+      <div class="home-primary-actions">
+        <button class="home-spend-cta" data-action="${spendAction}">${icon(solo?'sparkle':'chat')}<span>${spendLabel}</span></button>
+        <button class="home-register-cta" data-action="expense">${icon('plus')}<span>Registrar gasto</span></button>
       </div>
-      <button class="home-insight-card" data-action="chat-open"><span class="home-insight-icon">💡</span><span><b>Dica do seu consultor Juntô ✨</b><small><strong>${esc(insightTitle)}</strong> ${esc(insightBody)}</small></span><span class="home-chevron">›</span></button>
-      <section class="home-quick-entry">
-        <div class="home-section-title"><div><span class="home-plus-dot">${icon('plus')}</span><h2>Registrar gasto rápido</h2></div><button class="text-link" data-action="expense">Abrir completo</button></div>
-        <button class="home-smart-input" data-action="expense"><span>${icon('sparkle')}Escreva do seu jeito: “pizza 45”, “uber 18 ontem”…</span><b>R$ 0,00</b></button>
-        <div class="home-category-chips">
-          <button data-action="quick-expense" data-category="Alimentação">${icon('cart')}Alimentação</button>
-          <button data-action="quick-expense" data-category="Transporte">${icon('car')}Transporte</button>
-          <button data-action="quick-expense" data-category="Casa">${icon('house')}Casa</button>
-          <button data-action="quick-expense" data-category="Compras">${icon('bag')}Compras</button>
-          <button data-action="expense">•••</button>
-        </div>
-        <p>O Juntô tenta preencher item, categoria, valor, data e quem pagou. Você continua podendo editar tudo antes de salvar.</p>
+      <section class="home-dream-card-v3">
+        <div class="home-section-title"><h2>${solo?'Meu próximo sonho':'Nosso próximo sonho'}</h2>${g?'<button class="text-link" data-action="route" data-route="goals">Ver plano</button>':''}</div>
+        ${g?`<div class="home-dream-main"><span class="home-dream-icon">${icon(g.icon||'heart')}</span><div><h3>${esc(g.name)}</h3><p>${goalPct>=100?'Já dá pra comemorar.':'Menos “um dia”. Mais “tá chegando”.'}</p></div></div><div class="home-progress dream"><span style="width:${goalPct}%"></span></div><div class="home-dream-progress"><span>${cash(g.saved)} de ${cash(g.target)}</span><b>${goalPct}%</b></div><button class="home-dream-save" data-action="contribute" data-id="${g.id}">${icon('plus')}Guardar um pouquinho</button>`:`<div class="home-empty-dream"><span class="home-dream-icon">${icon('heart')}</span><div><h3>Tem um sonho aí?</h3><p>Dá um nome pra ele e o Juntô ajuda a abrir caminho.</p></div></div><button class="home-dream-save" data-action="new-goal">${icon('plus')}Criar um plano</button>`}
+        <button class="home-soft-insight" data-action="chat-open">${icon('sparkle')}<span><b>${esc(insightTitle)}</b><small>${esc(insightBody)}</small></span><strong>›</strong></button>
       </section>
-      <section class="home-latest">
-        <div class="home-section-title"><h2>Seus últimos lançamentos</h2><button class="text-link" data-action="route" data-route="bills">Ver todos</button></div>
-        ${latest.length?latest.map(t=>{const it=itemOf(t);return `<button class="home-latest-row" data-action="route" data-route="bills"><span class="category-icon ${categoryColor(t.category)}">${icon(it.icon)}</span><span class="home-latest-copy"><b>${esc(t.name)}</b><small>${dateText(t.date)} · ${esc(t.category)}</small></span><strong class="num">− ${cash(t.amount)}</strong><span class="home-chevron">›</span></button>`;}).join(''):`<div class="home-empty-row">${icon('wallet')}<span><b>Nenhum gasto registrado ainda.</b><small>O primeiro lançamento aparece aqui.</small></span><button data-action="expense">Registrar</button></div>`}
-      </section>
-      <details class="home-more">
-        <summary>Ver previsão, plano e alertas do mês <span>＋</span></summary>
+      <details class="home-more home-more-v3">
+        <summary>Mais do meu dia <span>＋</span></summary>
         <div class="home-more-body">
+          <section class="home-quick-entry">
+            <div class="home-section-title"><div><span class="home-plus-dot">${icon('plus')}</span><h2>Registrar mais rápido</h2></div><button class="text-link" data-action="expense">Abrir completo</button></div>
+            <button class="home-smart-input" data-action="expense"><span>${icon('sparkle')}Escreva do seu jeito: “pizza 45”, “uber 18 ontem”…</span><b>Editar</b></button>
+            <div class="home-category-chips">${quickCats.map(c=>`<button data-action="quick-expense" data-category="${esc(c)}">${icon(categoryIcon(c))}${esc(c)}</button>`).join('')}</div>
+            <p>As sugestões mudam com o seu histórico. O Juntô aprende categoria, quem costuma pagar, valor habitual e data quando isso estiver claro — e você confirma antes de salvar.</p>
+          </section>
+          ${spendPct!=null?`<div class="home-mini-stat"><span>Gasto do mês</span><b class="num">${cash(spent)}</b><small>${spendPct}% da renda prevista</small></div>`:''}
+          ${latest.length?`<section class="home-latest"><div class="home-section-title"><h2>Últimos lançamentos</h2><button class="text-link" data-action="route" data-route="bills">Ver todos</button></div>${latest.map(t=>{const it=itemOf(t);return `<button class="home-latest-row" data-action="route" data-route="bills"><span class="category-icon ${categoryColor(t.category)}">${icon(it.icon)}</span><span class="home-latest-copy"><b>${esc(t.name)}</b><small>${dateText(t.date)} · ${esc(t.category)}</small></span><strong class="num">− ${cash(t.amount)}</strong><span class="home-chevron">›</span></button>`;}).join('')}</section>`:''}
           ${forecastStrip()}
           ${challengeStrip()}
-          ${saveFirstPanel()}
           ${alerts.length?`<section class="radar compact"><div class="section-header"><h2>Radar</h2><span class="small muted">O Juntô fica de olho</span></div><div class="radar-list">${alerts.map(x=>`<button class="radar-item ${x.kind}" data-action="route" data-route="${x.route}" ${x.anchor?`data-anchor="${x.anchor}"`:''}>${icon(x.icon)}<span><b>${esc(x.title)}</b><small>${esc(x.body)}</small></span></button>`).join('')}</div></section>`:''}
         </div>
       </details>

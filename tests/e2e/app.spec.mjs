@@ -500,36 +500,15 @@ test('two independent accounts invite, sync offline edits and keep their own pro
     await route.fulfill({json:{}});
   });await page.goto('/');await page.locator('#cloud-email').fill(index?'bia@junto.example':'gui@junto.example');await page.locator('#cloud-password').fill('TestPassword123');await page.locator('[data-feature-form="cloud-auth"] [type="submit"]').click();await expect(page.locator('[data-feature-form="cloud-create"]')).toBeVisible();return{context,page};}
  try{const a=await device(0);await a.page.locator('[data-feature-form="cloud-create"] [type="submit"]').click();await expect(a.page.locator('[data-feature="cloud-invite"]')).toBeVisible();await a.page.locator('[data-feature="cloud-invite"]').click();const invite=await a.page.locator('#real-invite-code').innerText();const b=await device(1);await b.page.locator('#cloud-invite').fill(invite);await b.page.locator('[data-feature-form="cloud-join"] [type="submit"]').click();await expect(b.page.locator('#cloud-live-status')).toBeVisible();await a.page.evaluate(()=>window.JuntoCloud.synchronize());
-  for(const [index,device] of [a,b].entries()){
-    await device.page.evaluate(()=>window.JuntoApp.closeModal());await device.page.evaluate(()=>document.querySelector('[data-action="settings"]').click());await device.page.locator('#modal [data-action="balance"]').click();await device.page.locator('#balance-amount').fill('1.000,00');await device.page.locator('[data-form="balance"] [type="submit"]').click();await device.page.evaluate(()=>window.JuntoCloud.synchronize());
-    const snap=await db.query('select revision,payload from public.junto_snapshots limit 1');
-    console.log('SYNC_BALANCE_PHASE',index,JSON.stringify({
-      local:await device.page.evaluate(()=>({status:document.querySelector('#cloud-account-button')?.textContent,state:window.JuntoApp.getState()})),
-      remote:snap.rows[0]
-    }));
-  }
+  for(const device of[a,b]){await device.page.evaluate(()=>window.JuntoApp.closeModal());await device.page.evaluate(()=>document.querySelector('[data-action="settings"]').click());await device.page.locator('#modal [data-action="balance"]').click();await device.page.locator('#balance-amount').fill('1.000,00');await device.page.locator('[data-form="balance"] [type="submit"]').click();await device.page.evaluate(()=>window.JuntoCloud.synchronize());}
   await a.page.evaluate(()=>window.JuntoCloud.synchronize());await b.page.evaluate(()=>window.JuntoCloud.synchronize());
-  console.log('SYNC_BEFORE_OFFLINE',JSON.stringify({
-    a:await a.page.evaluate(()=>({status:document.querySelector('#cloud-account-button')?.textContent,state:window.JuntoApp.getState()})),
-    b:await b.page.evaluate(()=>({status:document.querySelector('#cloud-account-button')?.textContent,state:window.JuntoApp.getState()})),
-    remote:(await db.query('select revision,payload from public.junto_snapshots limit 1')).rows[0]
-  }));
+  await expect.poll(()=>a.page.evaluate(()=>window.JuntoApp.getState().users.map(u=>u.balance))).toEqual([100000,100000]);
+  await expect.poll(()=>b.page.evaluate(()=>window.JuntoApp.getState().users.map(u=>u.balance))).toEqual([100000,100000]);
+  expect((await db.query('select payload from public.junto_snapshots limit 1')).rows[0].payload.users.map(u=>u.balance)).toEqual([100000,100000]);
+
   await a.context.setOffline(true);await a.page.evaluate(e=>window.JuntoApp.confirmBankMovement(e,{name:'Mercado',amount:2500,date:new Date().toISOString().slice(0,10),category:'Alimentação'}),event('a'));
   await b.page.evaluate(e=>window.JuntoApp.confirmBankMovement(e,{name:'Almoço',amount:2500,date:new Date().toISOString().slice(0,10),category:'Alimentação'}),event('b'));await b.page.evaluate(()=>window.JuntoCloud.synchronize());await a.context.setOffline(false);await a.page.evaluate(()=>window.JuntoCloud.synchronize());
-  await expect.poll(async()=>{
-    await a.page.evaluate(()=>window.JuntoCloud.synchronize());
-    const count=await a.page.evaluate(()=>window.JuntoApp.getState().transactions.length);
-    if(count!==2){
-      const remote=await db.query('select revision,payload from public.junto_snapshots limit 1');
-      console.log('SYNC_DEBUG',JSON.stringify({
-        a:await a.page.evaluate(()=>({online:navigator.onLine,status:document.querySelector('#cloud-account-button')?.textContent,slot:window.JuntoApp.getSlot(),state:window.JuntoApp.getState()})),
-        b:await b.page.evaluate(()=>({online:navigator.onLine,status:document.querySelector('#cloud-account-button')?.textContent,slot:window.JuntoApp.getSlot(),state:window.JuntoApp.getState()})),
-        remote:remote.rows[0],
-        conflicts:await (async()=>{await a.page.evaluate(()=>window.JuntoCloud.open());const out=await a.page.locator('.conflict-choice legend').allTextContents();await a.page.evaluate(()=>window.JuntoApp.closeModal());return out;})()
-      }));
-    }
-    return count;
-  }).toBe(2);await b.page.evaluate(()=>window.JuntoCloud.synchronize());
+  await expect.poll(async()=>{await a.page.evaluate(()=>window.JuntoCloud.synchronize());return a.page.evaluate(()=>window.JuntoApp.getState().transactions.length);}).toBe(2);await b.page.evaluate(()=>window.JuntoCloud.synchronize());
   await expect.poll(()=>b.page.evaluate(()=>window.JuntoApp.getState().transactions.length)).toBe(2);expect(await b.page.evaluate(()=>window.JuntoApp.getState().users.map(u=>u.balance))).toEqual([97500,97500]);await expect(b.page.locator('[data-action="profile-photo-switch"]')).toHaveCount(0);expect(await b.page.evaluate(()=>window.JuntoApp.getActive())).toBe('b');
   // A response that arrives after logout must not resurrect the old account.
   await a.page.evaluate(()=>window.JuntoCloud.synchronize());

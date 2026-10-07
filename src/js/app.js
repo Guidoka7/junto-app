@@ -117,6 +117,13 @@
     if(!inc)return null;const key=incomePeriodKey(inc,date);
     return state.received.find(r=>r.incomeId===incId&&incomePeriodKey(inc,r.date)===key)||null;
   };
+  function adjustedMonthIncome(y,m,id){
+    const f=dateISO(new Date(y,m,1)),t=dateISO(new Date(y,m+1,0));let total=0;
+    state.incomes.filter(i=>!id||i.person===id).forEach(i=>occurrences(i,f,t).filter(d=>d>=(i.since||'0000')).forEach(d=>{
+      const h=handled(i.id,d);if(h?.status==='skipped')return;total+=h?.status==='received'?h.amount:i.amount;
+    }));
+    return total;
+  }
   function pendingArrivals(lookbackDays=45){const T=dateISO(),from=dateISO(addDays(new Date(),-Math.max(1,lookbackDays))),out=[];state.incomes.forEach(i=>occurrences(i,from,T).forEach(d=>{if(d>=(i.since||'0000')&&!handled(i.id,d))out.push({inc:i,date:d});}));return out.sort((a,b)=>a.date.localeCompare(b.date)||b.inc.amount-a.inc.amount);}
   function nextArrivals(days=60){const f=dateISO(addDays(new Date(),1)),t=dateISO(addDays(new Date(),days)),out=[];state.incomes.forEach(i=>occurrences(i,f,t).filter(d=>d>=(i.since||'0000')).forEach(d=>out.push({inc:i,date:d})));return out.sort((a,b)=>a.date.localeCompare(b.date)||b.inc.amount-a.inc.amount);}
   function monthIncome(y,m,id){const f=dateISO(new Date(y,m,1)),t=dateISO(new Date(y,m+1,0));return state.incomes.filter(i=>!id||i.person===id).reduce((s,i)=>s+occurrences(i,f,t).filter(d=>d>=(i.since||'0000')).length*i.amount,0);}
@@ -454,7 +461,7 @@
   function activityRows(items){return items.map(a=>`<div class="activity-row">${avatar(a.actor)}<div><p><b>${esc(first(user(a.actor).name))}</b> ${esc(a.message)}</p><time>${timeText(a.createdAt)}</time></div></div>`).join('');}
   function homeView(){
     const available=free(),request=pending()[0],g=state.goals[0],solo=isSolo();
-    const now=new Date(),expectedIncome=monthIncome(now.getFullYear(),now.getMonth()),spent=monthSpend();
+    const now=new Date(),expectedIncome=adjustedMonthIncome(now.getFullYear(),now.getMonth()),spent=monthSpend();
     const spendPct=expectedIncome?Math.min(100,Math.round(spent/expectedIncome*100)):null;
     let insightTitle,insightBody;
     if(available<0){insightTitle=solo?'Seu mês pediu um ajuste.':'O mês pediu uma conversa.';insightBody=`Faltam ${cash(-available)} para cobrir contas, planos e valores reservados. Vale revisar antes do próximo gasto.`;}
@@ -616,7 +623,7 @@
     return head;
   }
     function incomesView(){
-    const solo=isSolo(),n=new Date(),ym=dateISO().slice(0,7),expected=monthIncome(n.getFullYear(),n.getMonth()),got=state.received.filter(r=>r.status==='received'&&r.date.slice(0,7)===ym).reduce((sum,r)=>sum+r.amount,0),pend=pendingArrivals(),next=nextArrivals(62),M=model();
+    const solo=isSolo(),n=new Date(),ym=dateISO().slice(0,7),expected=adjustedMonthIncome(n.getFullYear(),n.getMonth()),got=state.received.filter(r=>r.status==='received'&&r.date.slice(0,7)===ym).reduce((sum,r)=>sum+r.amount,0),pend=pendingArrivals(),next=nextArrivals(62),M=model();
     const monthFuture=next.filter(x=>x.date.slice(0,7)===ym),rest=Math.max(0,expected-got),nextOne=pend[0]||monthFuture[0]||next[0];
     const groups={};next.forEach(x=>(groups[x.date.slice(0,7)]=groups[x.date.slice(0,7)]||[]).push(x));
     const tabs=`<nav class="income-v3-tabs" aria-label="Entradas"><button class="${incomeTab==='overview'?'active':''}" data-action="topic-tab" data-kind="income" data-value="overview">Resumo</button><button class="${incomeTab==='sources'?'active':''}" data-action="topic-tab" data-kind="income" data-value="sources">Entradas</button><button class="${incomeTab==='calendar'?'active':''}" data-action="topic-tab" data-kind="income" data-value="calendar">Calendário</button><button class="${incomeTab==='base'?'active':''}" data-action="topic-tab" data-kind="income" data-value="base">Ajustes</button></nav>`;

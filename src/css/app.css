@@ -1989,3 +1989,83 @@ body[data-route="home"] .mobile-nav button.active svg{background:#f4ecde;box-sha
   .home-primary-actions{grid-template-columns:1fr}
   .home-register-cta{min-height:49px}
 }
+/* ===== FUTURO V3 · previsão clara e inteligente ===== */
+body[data-route="future"]{background:linear-gradient(180deg,#fffdfa 0%,#fbfaf7 60%,#f7f8fa 100%)}
+.future-v3-head{max-width:760px;margin:0 auto 16px;padding:8px 3px 0}
+.future-v3-head>span{font-size:10px;font-weight:800;letter-spacing:.05em;color:#9a793a}
+.future-v3-head h2{font-size:40px;line-height:1.03;letter-spacing:-1.6px;color:#0b2348;margin-top:8px}
+.future-v3-head p{font-size:20px;color:#777d8d;margin-top:5px}
+.future-v3-tabs{max-width:760px;margin:0 auto 10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding:4px;border:1px solid #ebe6df;border-radius:22px;background:#fff;box-shadow:0 8px 22px #13233c08}
+.future-v3-tabs button{min-height:44px;border-radius:17px;color:#687081;font-size:13px;font-weight:700}
+.future-v3-tabs button.active{background:linear-gradient(135deg,#f8ecd4,#efe0c1);color:#0b2348;box-shadow:0 4px 13px #b48c4218}
+.future-v3-more{max-width:760px;margin:0 auto 12px;display:flex;gap:8px;justify-content:flex-end}
+.future-v3-more button{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:6px 10px;border-radius:999px;color:#7a7f8c;font-size:10px;font-weight:700;background:#fff;border:1px solid #ece8e2}
+.future-v3-more button.active{color:#9a793a;border-color:#e1c48d;background:#fffaf0}
+.future-v3-more svg{width:14px;height:14px}
+.future-v3-surface,.future-v3-empty{max-width:760px;margin:0 auto}
+.future-v3-card{background:#fff;border:1px solid #ece8e2;border-radius:28px;padding:23px;box-shadow:0 14px 34px #13233c0b}
+.future-v3-eyebrow{display:block;font-size:11px;color:#777d8d;font-weight:800;letter-spacing:.04em}
+.future-v3-total{display:block;font-size:45px;line-height:1.05;letter-spacing:-2px;color:#0b2348;margin-top:7px}
+.future-v3-card>p{font-size:14px;color:#6f7583;margin-top:6px}
+.future-v3-chart{margin-top:17px;padding:6px 0 2px;min-height:125px}
+.future-v3-chart .chart-wrap{margin:0}
+.future-v3-cap{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:7px 0 18px;padding:11px 13px;border-radius:15px;background:#f2f8f5;color:#47695e}
+.future-v3-cap span{display:flex;align-items:center;gap:7px;font-size:11px}
+.future-v3-cap svg{width:16px;height:16px}
+.future-v3-cap b{font-size:13px;color:#2e5c4c}
+.future-v3-events{border-top:1px solid #eeeae5;padding-top:18px}
+.future-v3-events .home-section-title h2{font-size:18px;color:#0b2348}
+.future-v3-events .text-link{color:#9a793a}
+.future-v3-event{width:100%;display:grid;grid-template-columns:42px minmax(0,1fr) auto 14px;align-items:center;gap:11px;text-align:left;padding:12px 0;border-bottom:1px solid #f0ede8}
+.future-v3-event:last-child{border-bottom:0}
+.future-v3-event-icon{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#f7f0e3;color:#a27c38}
+.future-v3-event-icon.in{background:#edf7f2;color:#34715d}
+.future-v3-event-icon svg{width:20px;height:20px}
+.future-v3-event>span:nth-child(2){min-width:0}
+.future-v3-event b{display:block;font-size:13px;color:#0b2348}
+.future-v3-event small{display:block;font-size:10.5px;color:#858a95;margin-top:3px}
+.future-v3-event>strong{font-size:13px;color:#0b2348;white-space:nowrap}
+.future-v3-event>strong.pos{color:#3d775f}
+.future-v3-event>em{font-size:20px;font-style:normal;color:#858a95}
+.future-v3-nudge{margin-top:14px;padding:20px;border-radius:26px;background:linear-gradient(135deg,#fff2f4,#fdebef);display:grid;grid-template-columns:55px 1fr;gap:13px;border:1px solid #f5dde3}
+.future-v3-nudge-icon{width:52px;height:52px;border-radius:18px;background:#fff7e7;color:#a07933;display:flex;align-items:center;justify-content:center}
+.future-v3-nudge-icon svg{width:27px;height:27px}
+.future-v3-nudge h3{font-size:18px;color:#0b2348;line-height:1.15}
+.future-v3-nudge p{font-size:12px;color:#6f7480;line-height:1.45;margin-top:4px}
+.future-v3-nudge>button{grid-column:1/-1;min-height:52px;border-radius:18px;background:linear-gradient(135deg,#e5bd69,#cda044);color:#0b2348;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:9px}
+.future-v3-nudge>button svg{width:20px;height:20px}
+.future-v3-sim{background:#fff;border:1px solid #ece8e2;border-radius:28px;padding:22px;box-shadow:0 14px 34px #13233c0a}
+.future-v3-sim-head{display:flex;gap:12px;align-items:flex-start;margin-bottom:16px}
+.future-v3-sim-head>span{width:43px;height:43px;border-radius:15px;background:#f7f0e3;color:#a07933;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.future-v3-sim-head svg{width:22px;height:22px}
+.future-v3-sim-head h2{font-size:19px;color:#0b2348}
+.future-v3-sim-head p{font-size:11.5px;color:#777d89;line-height:1.45;margin-top:4px}
+.future-v3-plan-link{width:100%;min-height:50px;margin-top:14px;border-radius:17px;border:1px solid #e6dfd2;color:#9a793a;background:#fffaf1;font-weight:750;display:flex;align-items:center;justify-content:center;gap:8px}
+.future-v3-empty{padding:32px 24px;text-align:center;border:1px solid #ece8e2;background:#fff;border-radius:26px}
+.future-v3-empty>svg{width:35px;height:35px;color:#c49a48}
+.future-v3-empty h3{font-size:20px;color:#0b2348;margin-top:10px}
+.future-v3-empty p{font-size:12px;color:#777d89;line-height:1.5;max-width:420px;margin:7px auto 17px}
+body[data-route="future"] .mobile-nav button.active{color:#0b2348}
+body[data-route="future"] .mobile-nav button.active svg{background:#f4ecde;box-shadow:0 0 0 6px #f4ecde}
+@media(max-width:760px){
+ .future-v3-head{padding-top:4px;margin-bottom:13px}
+ .future-v3-head h2{font-size:34px}
+ .future-v3-head p{font-size:18px}
+ .future-v3-tabs button{min-height:40px;font-size:12px}
+ .future-v3-card{padding:18px;border-radius:24px}
+ .future-v3-total{font-size:38px}
+ .future-v3-chart{min-height:110px}
+ .future-v3-event{grid-template-columns:38px minmax(0,1fr) auto 12px;gap:8px}
+ .future-v3-event-icon{width:36px;height:36px}
+ .future-v3-nudge{padding:17px;border-radius:23px}
+ .future-v3-sim{padding:18px;border-radius:24px}
+}
+@media(max-width:430px){
+ .future-v3-more{justify-content:flex-start;overflow-x:auto}
+ .future-v3-total{font-size:34px}
+ .future-v3-event>strong{font-size:12px}
+ .future-v3-event small{font-size:9.5px}
+ .future-v3-nudge{grid-template-columns:46px 1fr}
+ .future-v3-nudge-icon{width:44px;height:44px}
+ .future-v3-nudge h3{font-size:16px}
+}

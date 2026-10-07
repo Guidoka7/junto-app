@@ -1222,7 +1222,7 @@ ${JSON.stringify(chatContext())}`;
   function chatStatus(t){const el=document.querySelector('.chat-msg.streaming .chat-status');if(el)el.textContent=t;}
   function renderChat(){
     const log=$('#chat-log');if(!log)return;
-    if(!chatLog.length){chatLog.push({kind:'bot',id:uid(),text:`Oi, ${first(user().name)}. A inteligência do Juntô está ativa e usa **os números atuais do app**, sem completar lacunas no chute. Pode falar do seu jeito — inclusive “gastei pizza 45”, “quem está gastando mais?” ou “se eu cortar delivery, quando chegamos na meta?”.`});}
+    if(!chatLog.length){chatLog.push({kind:'bot',id:uid(),text:`Oi, ${first(user().name)}. ${isSolo()?'Bora cuidar do seu dinheiro sem perder a leveza?':'Bora cuidar do dinheiro sem perder o romance?'} Eu uso **os números atuais do Juntô** — saldo, gastos, contas, entradas e planos — e não completo lacunas no chute. Pode falar do seu jeito: “pizza 45”, “quanto posso gastar?” ou “e se eu cortar delivery?”.`});}
     log.innerHTML=chatLog.map(m=>m.kind==='user'?`<div class="chat-msg user"><p>${esc(m.text)}</p></div>`:m.kind==='card'?cardHTML(m):`<div class="chat-msg bot ${m.streaming?'streaming':''} ${m.error?'err':''}" id="msg-${m.id}">${m.streaming&&!m.text?`<span class="chat-status">Pensando…</span><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>`:fmt(m.text)}${m.streaming&&m.text?'<span class="chat-status"></span>':''}${m.retry?`<button class="text-link" data-action="chat-retry">Tentar de novo</button>`:''}</div>`).join('');
     log.scrollTop=log.scrollHeight;
     const sug=$('#chat-suggest');if(sug)sug.hidden=chatLog.filter(m=>m.kind==='user').length>1;
@@ -1249,13 +1249,28 @@ ${JSON.stringify(chatContext())}`;
   }
   function openChat(){chatOpen=true;const p=$('#chat-panel');if(!p)return;p.hidden=false;document.body.classList.add('chat-on');chatMode();renderChat();setTimeout(()=>$('#chat-input')?.focus(),60);}
   function closeChat(){chatOpen=false;const p=$('#chat-panel');if(p)p.hidden=true;document.body.classList.remove('chat-on');$('#chat-fab')?.focus();}
+  function chatSuggestions(){
+    const ym=dateISO().slice(0,7),sums={};
+    state.transactions.filter(t=>!t.billId&&t.date.slice(0,7)===ym).forEach(t=>sums[t.category]=(sums[t.category]||0)+t.amount);
+    const top=Object.entries(sums).sort((a,b)=>b[1]-a[1])[0]?.[0],g=state.goals[0];
+    const list=[
+      'Quanto posso gastar hoje?',
+      state.incomes.length?'Como fecha o mês?':'O que preciso configurar pra prever o mês?',
+      top?`E se eu cortar ${top.toLowerCase()}?`:'Onde o dinheiro escapa?',
+      g?`Quando chego em ${g.name}?`:'Quanto consigo guardar por mês?',
+      isSolo()?'Qual gasto mais pesa no meu mês?':'Quem está gastando mais?',
+      'Gastei pizza 45'
+    ];
+    return [...new Set(list)].slice(0,6);
+  }
   function chatShell(){
-    const sug=['Quanto posso gastar hoje?','Quanto economizo se parar de fumar?','Como fecha o mês?','Quem está gastando mais?','Onde o dinheiro escapa?','Gastei pizza 45'];
+    const sug=chatSuggestions(),solo=isSolo();
     return `<button class="chat-fab" id="chat-fab" data-action="chat-open" aria-label="Pergunte ao Juntô">${icon('sparkle')}<span>Pergunte ao Juntô</span></button>
-      <aside class="chat-panel" id="chat-panel" hidden aria-label="Conversa com o Juntô"><header class="chat-head"><span class="chat-mark">${icon('sparkle')}</span><div><b>Pergunte ao Juntô</b><small id="chat-mode">Lendo os números de vocês</small></div><button class="icon-btn" data-action="chat-clear" aria-label="Começar nova conversa">${icon('refresh')}</button><button class="icon-btn" data-action="chat-close" aria-label="Fechar conversa">${icon('x')}</button></header>
+      <aside class="chat-panel chat-v3" id="chat-panel" hidden aria-label="Conversa com o Juntô"><header class="chat-head"><span class="chat-mark">${icon('sparkle')}</span><div><b>Pergunte ao Juntô</b><small id="chat-mode">Pode falar do seu jeito.</small></div><button class="icon-btn" data-action="chat-clear" aria-label="Começar nova conversa">${icon('refresh')}</button><button class="icon-btn" data-action="chat-close" aria-label="Fechar conversa">${icon('x')}</button></header>
+      <div class="chat-context"><span>${icon(solo?'wallet':'heart')}</span><p>${solo?'Usando seu saldo, suas contas, entradas e planos.':'Usando os números reais da dupla, sem misturar quem pagou o quê.'}</p></div>
       <div class="chat-log" id="chat-log" role="log" aria-live="polite"></div>
       <div class="chat-suggest" id="chat-suggest">${sug.map(s=>`<button class="chip-btn" data-action="chat-ask" data-q="${esc(s)}">${esc(s)}</button>`).join('')}</div>
-      <form class="chat-form" data-form="chat"><textarea id="chat-input" rows="1" maxlength="400" placeholder="Pergunte ou registre: “pizza 45”" aria-label="Mensagem para o Juntô"></textarea><button type="submit" class="chat-send" id="chat-send" aria-label="Enviar">${icon('send')}</button></form>
+      <form class="chat-form" data-form="chat"><textarea id="chat-input" rows="1" maxlength="400" placeholder="Pergunte ou registre: pizza 45" aria-label="Mensagem para o Juntô"></textarea><button type="submit" class="chat-send" id="chat-send" aria-label="Enviar">${icon('send')}</button></form>
       <div class="chat-foot"><label class="deep"><input type="checkbox" id="chat-deep"> Pensar mais fundo</label><span id="chat-who"></span></div></aside>`;
   }
   function arrangeContextBar(){const root=$('#app-content');if(!root)return;const bar=root.querySelector(':scope > .topic-tabs, :scope > .filters.as-topics');if(bar)root.prepend(bar);}

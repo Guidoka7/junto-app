@@ -374,7 +374,7 @@
     let ok=true;const scan=(value)=>{if(!ok||value===null||typeof value!=='object')return;for(const [k,v] of Object.entries(value)){if(cents.includes(k)&&v!==undefined&&(!Number.isSafeInteger(v)||Math.abs(v)>99999999999)){ok=false;return;}if(v&&typeof v==='object')scan(v);}};
     scan(s);return ok;
   }
-  let state;try{const s=JSON.parse(localStorage.getItem(KEY));state=migrate(valid(s)?s:freshPersonalState());}catch{state=freshPersonalState();}
+  let state;try{const s=JSON.parse(localStorage.getItem(KEY));state=migrate(validBackup(s)?s:freshPersonalState());}catch{state=freshPersonalState();}
   let active='a';try{active=sessionStorage.getItem(PROFILE)==='b'?'b':'a';}catch{}if(state.users.length<2)active='a';
   let route='home',billFilter='all',requestFilter='all',hidden=false,noticesEnabled=true;
   let analysisTab='overview',analysisPerson='both',futureTab='forecast',incomeTab='overview',planTab='goals';

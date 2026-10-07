@@ -64,7 +64,7 @@
       const shell=document.getElementById('authenticated-app'),gate=document.getElementById('auth-gate');
       shell.hidden=!appAccess;shell.inert=!appAccess;gate.hidden=appAccess;
       document.body.dataset.auth=appAccess?'ready':'locked';
-      if(appAccess){if(!wasAllowed){if(rollRecurring())state.updatedAt=Date.now();const result=processAuto();if(result.n)persist();}if(!document.querySelector('#chat-panel')?.firstChild){document.querySelector('#chat-panel')?.remove();document.querySelector('#chat-fab')?.remove();document.body.insertAdjacentHTML('beforeend',chatShell());}render();window.dispatchEvent(new Event('junto:access-ready'));}
+      if(appAccess){gate.replaceChildren();if(!wasAllowed){if(rollRecurring())state.updatedAt=Date.now();const result=processAuto();if(result.n)persist();}if(!document.querySelector('#chat-panel')?.firstChild){document.querySelector('#chat-panel')?.remove();document.querySelector('#chat-fab')?.remove();document.body.insertAdjacentHTML('beforeend',chatShell());}render();window.dispatchEvent(new Event('junto:access-ready'));}
       else{close();closeChat();for(const id of ['app-content','desktop-nav','mobile-nav','peer-rail','side-couple','mobile-user-switch','desktop-user-switch','chat-messages','modal-content']){const el=document.getElementById(id);if(el)el.replaceChildren();}document.getElementById('chat-panel')?.replaceChildren();chatBusy?.abort();chatLog=[];chatTurns=[];route='home';delete document.body.dataset.route;}
     },
     getState:copyState, getActive:()=>active, getCategories:()=>[...categories],

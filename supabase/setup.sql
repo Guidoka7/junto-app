@@ -112,29 +112,56 @@ begin
 end $$;
 
 create or replace function junto_private.join_space(p_code text,p_name text) returns jsonb language plpgsql security definer set search_path='' as $$
-declare uid uuid:=junto_private.require_user(); token text:=upper(regexp_replace(trim(p_code),'[ -]','','g')); inv junto_private.invites%rowtype; data jsonb; partner jsonb; tries integer;
+declare uid uuid:=junto_private.require_user(); token text:=upper(regexp_replace(trim(p_code),'[[:space:]-]','','g')); inv junto_private.invites%rowtype; previous public.junto_members%rowtype; data jsonb; partner jsonb; tries integer;
 begin
   perform 1 from auth.users where id=uid for update;
-  if exists(select 1 from public.junto_members where user_id=uid) then return jsonb_build_object('error','ALREADY_MEMBER'); end if;
+  select * into previous from public.junto_members where user_id=uid;
+  if previous.slot='b' then return jsonb_build_object('error','ALREADY_MEMBER'); end if;
   if p_name is null or length(trim(p_name)) not between 1 and 24 then return jsonb_build_object('error','INVALID_NAME'); end if;
   insert into junto_private.join_attempts(user_id,window_start,attempts) values(uid,now(),1)
   on conflict(user_id) do update set attempts=case when junto_private.join_attempts.window_start<now()-interval '1 hour' then 1 else junto_private.join_attempts.attempts+1 end,
   window_start=case when junto_private.join_attempts.window_start<now()-interval '1 hour' then now() else junto_private.join_attempts.window_start end returning attempts into tries;
   if tries>10 then return jsonb_build_object('error','TOO_MANY_ATTEMPTS'); end if;
   if token is null or token !~ '^[A-F0-9]{16}$' then return jsonb_build_object('error','INVITE_INVALID'); end if;
+  select * into inv from junto_private.invites where token_hash=encode(sha256(convert_to(token,'UTF8')),'hex');
+  if not found or inv.used_at is not null or inv.expires_at<now() then return jsonb_build_object('error','INVITE_INVALID'); end if;
+  if previous.space_id=inv.space_id then return jsonb_build_object('error','INVITE_OWN'); end if;
+  -- Always lock spaces before invitations, in the same order, including when
+  -- two solo owners try to accept one another's invitations simultaneously.
+  perform 1 from junto_private.spaces where id in (inv.space_id,previous.space_id) order by id for update;
   select * into inv from junto_private.invites where token_hash=encode(sha256(convert_to(token,'UTF8')),'hex') for update;
   if not found or inv.used_at is not null or inv.expires_at<now() then return jsonb_build_object('error','INVITE_INVALID'); end if;
-  perform 1 from junto_private.spaces where id=inv.space_id for update;
+  if previous.space_id is not null and (
+    (select count(*) from public.junto_members where space_id=previous.space_id)!=1
+    or not exists(select 1 from junto_private.spaces where id=previous.space_id and owner_id=uid)
+  ) then return jsonb_build_object('error','ALREADY_MEMBER'); end if;
+  if not exists(select 1 from public.junto_members where space_id=inv.space_id and slot='a') then return jsonb_build_object('error','INVITE_INVALID'); end if;
   if (select count(*) from public.junto_members where space_id=inv.space_id)>=2 then return jsonb_build_object('error','COUPLE_FULL'); end if;
+  perform 1 from public.junto_snapshots where space_id in (inv.space_id,previous.space_id) order by space_id for update;
   select payload into data from public.junto_snapshots where space_id=inv.space_id for update;
   select u into partner from jsonb_array_elements(data->'users') u where u->>'id'='b';
   partner:=coalesce(partner,jsonb_build_object('id','b','balance',0,'tone','pink'))||jsonb_build_object('name',trim(p_name));
   data:=jsonb_set(data,'{users}',(select jsonb_agg(u) from jsonb_array_elements(data->'users') u where u->>'id'='a')||jsonb_build_array(partner));
   data:=jsonb_set(data,'{updatedAt}',to_jsonb((extract(epoch from now())*1000)::bigint));
+  if previous.space_id is not null then
+    -- Keep the solo snapshot as an owner-only archive; never erase finances.
+    update junto_private.invites set used_at=now() where space_id=previous.space_id and used_at is null;
+    delete from public.junto_members where user_id=uid and space_id=previous.space_id;
+  end if;
   insert into public.junto_members(space_id,user_id,slot) values(inv.space_id,uid,'b');
   update public.junto_snapshots set payload=data,revision=revision+1,updated_at=now() where space_id=inv.space_id;
   update junto_private.invites set used_at=now() where token_hash=inv.token_hash;
   return junto_private.read_space();
+end $$;
+
+create or replace function junto_private.read_personal_archive() returns jsonb language plpgsql security definer set search_path='' as $$
+declare uid uuid:=junto_private.require_user(); data jsonb;
+begin
+  select snapshot.payload into data
+  from junto_private.spaces space join public.junto_snapshots snapshot on snapshot.space_id=space.id
+  where space.owner_id=uid and not exists(select 1 from public.junto_members member where member.space_id=space.id)
+  order by snapshot.updated_at desc,space.created_at desc limit 1;
+  return data;
 end $$;
 
 create or replace function junto_private.sync_space(p_space_id uuid,p_revision bigint,p_payload jsonb) returns jsonb language plpgsql security definer set search_path='' as $$
@@ -142,8 +169,9 @@ declare uid uuid:=junto_private.require_user(); current public.junto_snapshots%r
 begin
   if not exists(select 1 from public.junto_members where space_id=p_space_id and user_id=uid) then raise exception 'ACCESS_DENIED' using errcode='42501'; end if;
   perform junto_private.validate_payload(p_payload);
-  if exists(select 1 from public.junto_members m where m.space_id=p_space_id and not exists(select 1 from jsonb_array_elements(p_payload->'users') u where u->>'id'=m.slot)) then raise exception 'MISSING_MEMBER_PROFILE'; end if;
   select * into current from public.junto_snapshots where space_id=p_space_id for update;
+  if not exists(select 1 from public.junto_members where space_id=p_space_id and user_id=uid) then raise exception 'ACCESS_DENIED' using errcode='42501'; end if;
+  if exists(select 1 from public.junto_members m where m.space_id=p_space_id and not exists(select 1 from jsonb_array_elements(p_payload->'users') u where u->>'id'=m.slot)) then raise exception 'MISSING_MEMBER_PROFILE'; end if;
   if current.revision!=p_revision then return jsonb_build_object('conflict',true,'revision',current.revision,'payload',current.payload); end if;
   update public.junto_snapshots set payload=p_payload,revision=revision+1,updated_at=now() where space_id=p_space_id returning * into current;
   return jsonb_build_object('conflict',false,'revision',current.revision,'payload',current.payload,'updated_at',current.updated_at);
@@ -153,11 +181,12 @@ create or replace function public.junto_read_space() returns jsonb language sql 
 create or replace function public.junto_create_space(p_name text,p_payload jsonb) returns jsonb language sql security invoker set search_path='' as $$ select junto_private.create_space(p_name,p_payload) $$;
 create or replace function public.junto_make_invite(p_space_id uuid) returns jsonb language sql security invoker set search_path='' as $$ select junto_private.make_invite(p_space_id) $$;
 create or replace function public.junto_join_space(p_code text,p_name text) returns jsonb language sql security invoker set search_path='' as $$ select junto_private.join_space(p_code,p_name) $$;
+create or replace function public.junto_read_personal_archive() returns jsonb language sql security invoker set search_path='' as $$ select junto_private.read_personal_archive() $$;
 create or replace function public.junto_sync_space(p_space_id uuid,p_revision bigint,p_payload jsonb) returns jsonb language sql security invoker set search_path='' as $$ select junto_private.sync_space(p_space_id,p_revision,p_payload) $$;
 revoke all on all functions in schema junto_private from public,anon;
 grant execute on all functions in schema junto_private to authenticated;
-revoke all on function public.junto_read_space(),public.junto_create_space(text,jsonb),public.junto_make_invite(uuid),public.junto_join_space(text,text),public.junto_sync_space(uuid,bigint,jsonb) from public,anon;
-grant execute on function public.junto_read_space(),public.junto_create_space(text,jsonb),public.junto_make_invite(uuid),public.junto_join_space(text,text),public.junto_sync_space(uuid,bigint,jsonb) to authenticated;
+revoke all on function public.junto_read_space(),public.junto_create_space(text,jsonb),public.junto_make_invite(uuid),public.junto_join_space(text,text),public.junto_read_personal_archive(),public.junto_sync_space(uuid,bigint,jsonb) from public,anon;
+grant execute on function public.junto_read_space(),public.junto_create_space(text,jsonb),public.junto_make_invite(uuid),public.junto_join_space(text,text),public.junto_read_personal_archive(),public.junto_sync_space(uuid,bigint,jsonb) to authenticated;
 do $$ begin
   if exists(select 1 from pg_publication where pubname='supabase_realtime') and not exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='junto_snapshots') then
     alter publication supabase_realtime add table public.junto_snapshots;

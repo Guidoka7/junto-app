@@ -189,3 +189,6 @@ button.tl-row:active{transform:scale(.995)}
 .personal-budget{margin:16px 0;min-width:0}
 .personal-budget-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--line,#e7e2da)}
 .personal-budget-row span{min-width:0}.personal-budget-row small{display:block;color:var(--muted,#6b7280);margin-top:4px;line-height:1.4}.personal-budget-row strong{white-space:nowrap}.personal-budget>.small{line-height:1.5;margin:12px 0}
+/* Long invitation codes must fit a narrow phone without widening the dialog. */
+.invite-code strong{font-size:clamp(16px,4.6vw,25px);letter-spacing:1.2px;overflow-wrap:anywhere}
+#cloud-invite{font-variant-numeric:tabular-nums;text-transform:uppercase;letter-spacing:.6px}

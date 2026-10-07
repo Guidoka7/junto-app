@@ -1034,8 +1034,9 @@
     const amounts=matches.map(b=>b.amount).filter(Number.isSafeInteger).sort((a,b)=>a-b),amount=amounts.length?amounts[Math.floor(amounts.length/2)]:null;
     const days=matches.map(b=>pd(b.due).getDate()),dueDay=Number(mode(b=>String(pd(b.due).getDate())));
     let date=null;if(dueDay){const now=new Date(),today=dateISO(now),y=now.getFullYear(),m=now.getMonth(),cur=new Date(y,m,Math.min(dueDay,daysInMonth(y,m)));date=dateISO(cur);if(date<today){const nx=new Date(y,m+1,1);date=dateISO(new Date(nx.getFullYear(),nx.getMonth(),Math.min(dueDay,daysInMonth(nx.getFullYear(),nx.getMonth()))));}}
-    const open=matches.find(b=>b.status==='open'&&(!p.amount||b.amount===p.amount));
-    return {category,payer,amount,date,kind:recurring?'fixed':'bill',count:matches.length,openId:open?.id||null};
+    const openMatches=matches.filter(b=>b.status==='open'&&(!p.amount||b.amount===p.amount));
+    const openId=openMatches.length===1?openMatches[0].id:null;
+    return {category,payer,amount,date,kind:recurring?'fixed':'bill',count:matches.length,openId};
   }
   function smartRead(prefix){
     const input=$('#'+prefix+'-title');if(!input)return;

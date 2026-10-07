@@ -107,7 +107,16 @@
     return s;
   }
   // ===== Entradas =====
-  const handled=(incId,date)=>state.received.find(r=>r.incomeId===incId&&r.date===date);
+  function incomePeriodKey(inc,date){
+    if(!inc)return date;
+    if(inc.rule!=='weekly')return date.slice(0,7);
+    const d=pd(date),monday=addDays(d,-((d.getDay()+6)%7));return dateISO(monday);
+  }
+  const handled=(incId,date)=>{
+    const inc=state.incomes.find(i=>i.id===incId),exact=state.received.find(r=>r.incomeId===incId&&r.date===date);if(exact)return exact;
+    if(!inc)return null;const key=incomePeriodKey(inc,date);
+    return state.received.find(r=>r.incomeId===incId&&incomePeriodKey(inc,r.date)===key)||null;
+  };
   function pendingArrivals(lookbackDays=45){const T=dateISO(),from=dateISO(addDays(new Date(),-Math.max(1,lookbackDays))),out=[];state.incomes.forEach(i=>occurrences(i,from,T).forEach(d=>{if(d>=(i.since||'0000')&&!handled(i.id,d))out.push({inc:i,date:d});}));return out.sort((a,b)=>a.date.localeCompare(b.date)||b.inc.amount-a.inc.amount);}
   function nextArrivals(days=60){const f=dateISO(addDays(new Date(),1)),t=dateISO(addDays(new Date(),days)),out=[];state.incomes.forEach(i=>occurrences(i,f,t).filter(d=>d>=(i.since||'0000')).forEach(d=>out.push({inc:i,date:d})));return out.sort((a,b)=>a.date.localeCompare(b.date)||b.inc.amount-a.inc.amount);}
   function monthIncome(y,m,id){const f=dateISO(new Date(y,m,1)),t=dateISO(new Date(y,m+1,0));return state.incomes.filter(i=>!id||i.person===id).reduce((s,i)=>s+occurrences(i,f,t).filter(d=>d>=(i.since||'0000')).length*i.amount,0);}

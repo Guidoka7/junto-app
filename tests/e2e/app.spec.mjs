@@ -26,8 +26,16 @@ test('mobile app renders, navigates and preserves the fixed bottom bar',async({p
  const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/');await expect(page.locator('#app-content')).not.toBeEmpty();
  if(process.env.JUNTO_CHROME){try{execFileSync('node_modules/.bin/agent-browser',['--executable-path',process.env.JUNTO_CHROME,'--session','junto-smoke','open','http://127.0.0.1:5173'],{stdio:'pipe',timeout:20000});execFileSync('node_modules/.bin/agent-browser',['--session','junto-smoke','snapshot','-i'],{stdio:'pipe',timeout:10000});execFileSync('node_modules/.bin/agent-browser',['--session','junto-smoke','close'],{stdio:'pipe',timeout:10000});}catch{console.log('agent-browser unavailable; browser verification continues with Playwright.');}}
  const nav=page.locator('#mobile-nav');expect((await nav.boundingBox()).y+(await nav.boundingBox()).height).toBeLessThanOrEqual(845);
- for(const route of ['future','analysis','bills','goals','home']){await page.locator(`#mobile-nav [data-route="${route}"]`).click();await expect(page.locator('body')).toHaveAttribute('data-route',route);}
- expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(errors).toEqual([]);await page.screenshot({path:'test-results/mobile.png'});
+ for(const route of ['future','analysis','bills','goals','home']){
+  await page.locator(`#mobile-nav [data-route="${route}"]`).click();
+  await expect(page.locator('body')).toHaveAttribute('data-route',route);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`overflow horizontal em ${route}`).toBe(true);
+  const unlabeled=await page.locator('button:visible').evaluateAll(nodes=>nodes.filter(el=>!(el.getAttribute('aria-label')||el.getAttribute('title')||el.textContent?.trim())).map(el=>el.outerHTML.slice(0,180)));
+  expect(unlabeled,`botões sem nome acessível em ${route}`).toEqual([]);
+ }
+ expect(await page.evaluate(()=>[...document.styleSheets].some(x=>x.href?.endsWith('/css/refine.css')))).toBe(true);
+ expect(await page.locator('.mobile-nav').evaluate(el=>getComputedStyle(el).position)).toBe('fixed');
+ expect(errors).toEqual([]);await page.screenshot({path:'test-results/mobile.png'});
 });
 test('new Home stays functional in solo and couple modes',async({page})=>{
  await page.goto('/');await personal(page,250000);
@@ -212,10 +220,230 @@ test('couple request flow reserves then charges only when purchase is confirmed'
  expect(state.users[0].balance).toBe(98000);expect(state.users[1].balance).toBe(98000);
 });
 
+
+test('income automation persists and income forecast respects start date',async({page})=>{
+ await page.goto('/');await personal(page,100000);
+ await page.locator('#mobile-nav [data-route="future"]').click();
+ await page.locator('.future-v3-tabs [data-route="incomes"]').click();
+ await page.locator('[data-action="income-new"]').click();
+ await page.locator('#income-name').fill('Semanal');
+ await page.locator('#income-amount').fill('250');
+ await page.locator('input[name="income-rule"][value="weekly"]').check();
+ await page.locator('input[name="income-auto"]').check();
+ await page.locator('[data-form="income"] [type="submit"]').click();
+ let state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.incomes[0].auto).toBe(true);
+
+ await page.evaluate(()=>{
+   const s=window.JuntoApp.getState(),d=new Date(),future=new Date(d.getFullYear(),d.getMonth()+1,15);
+   const iso=x=>String(x.getFullYear())+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
+   s.incomes=[{id:'future-source',name:'Renda futura',person:'a',amount:90000,rule:'monthly',day:1,since:iso(future),auto:false}];
+   window.JuntoApp.applyState(s);
+ });
+ await page.locator('#mobile-nav [data-route="future"]').click();
+ await page.locator('.future-v3-tabs [data-route="incomes"]').click();
+ await expect(page.locator('.income-v3-total strong')).toContainText('R$ 0');
+});
+
+test('same-name recurring bills stay separate and stopping one series does not stop the other',async({page})=>{
+ await page.goto('/');await personal(page,500000);
+ await page.evaluate(()=>{
+   const s=window.JuntoApp.getState(),today=new Date(),iso=x=>String(x.getFullYear())+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
+   const prev=new Date(today.getFullYear(),today.getMonth()-1,10),cur=new Date(today.getFullYear(),today.getMonth(),10);
+   s.bills=[
+     {id:'a-prev',recurringKey:'series-a',name:'Internet',amount:10000,category:'Assinaturas',payer:'a',due:iso(prev),recurring:true,status:'paid'},
+     {id:'a-cur',recurringKey:'series-a',name:'Internet',amount:10000,category:'Assinaturas',payer:'a',due:iso(cur),recurring:true,status:'open'},
+     {id:'b-cur',recurringKey:'series-b',name:'Internet',amount:20000,category:'Assinaturas',payer:'a',due:iso(cur),recurring:true,status:'open'}
+   ];
+   window.JuntoApp.applyState(s);
+ });
+ await page.locator('#mobile-nav [data-route="analysis"]').click();
+ await page.locator('[data-action="topic-tab"][data-kind="analysis"][data-value="fixed"]').click();
+ await expect(page.locator('.fixed-card')).toHaveCount(2);
+
+ await page.locator('#mobile-nav [data-route="bills"]').click();
+ await page.locator('[data-action="bill-filter"][data-value="fixed"]').click();
+ await page.locator('[data-action="bill-detail"][data-id="a-cur"]').click();
+ await page.locator('[data-action="edit-bill"]').click();
+ await page.locator('input[name="edit-bill-recurring"]').uncheck();
+ await page.locator('[data-form="edit-bill"] [type="submit"]').click();
+ const state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.bills.filter(b=>b.recurringKey==='series-a').every(b=>b.recurring===false)).toBe(true);
+ expect(state.bills.find(b=>b.id==='b-cur').recurring).toBe(true);
+});
+
+test('editing and reopening a bank-linked paid bill restores the exact balance',async({page})=>{
+ await fakeNative(page,[event('9','pix')]);await page.goto('/');await personal(page,10000);
+ await page.evaluate(()=>{
+   const s=window.JuntoApp.getState(),date=new Date().toISOString().slice(0,10);
+   s.bills=[{id:'bill-1',recurringKey:'net-series',name:'Internet',amount:2500,category:'Assinaturas',payer:'a',due:date,recurring:true,status:'open'}];
+   window.JuntoApp.applyState(s);
+ });
+ await page.locator('#bank-inbox-button').click();
+ await page.locator('[data-feature="bank-review"]').click();
+ await expect(page.locator('#bank-bill')).toHaveValue('bill-1');
+ await page.locator('[data-feature-form="bank-confirm"] [type="submit"]').click();
+ let state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.users[0].balance).toBe(7500);
+ expect(state.transactions[0].recurringKey).toBe('net-series');
+
+ await page.locator('#modal [data-action="close"]').click().catch(()=>{});
+ await page.locator('#mobile-nav [data-route="bills"]').click();
+ await page.locator('[data-action="bill-filter"][data-value="paid"]').click();
+ await page.locator('[data-action="bill-detail"][data-id="bill-1"]').click();
+ await page.locator('[data-action="edit-bill"]').click();
+ await page.locator('#edit-bill-amount').fill('30,00');
+ await page.locator('[data-form="edit-bill"] [type="submit"]').click();
+ state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.users[0].balance).toBe(7000);
+ expect(state.transactions[0].balanceDelta).toBe(-3000);
+
+ await page.locator('[data-action="bill-detail"][data-id="bill-1"]').click();
+ await page.locator('[data-action="reopen-bill"]').click();
+ await page.locator('[data-form="reopen-bill"] [type="submit"]').click();
+ state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.users[0].balance).toBe(10000);
+ expect(state.transactions).toHaveLength(0);
+ expect(state.bills[0].status).toBe('open');
+});
+
+test('contextual transaction rows open details without losing the current flow',async({page})=>{
+ await page.goto('/');await personal(page,50000);
+ await page.evaluate(()=>{
+   const s=window.JuntoApp.getState(),date=new Date().toISOString().slice(0,10);
+   s.transactions=[{id:'tx-context',name:'Mercado',item:'Mercado',icon:'cart',amount:3200,category:'Alimentação',payer:'a',by:'a',date,createdAt:Date.now()}];
+   window.JuntoApp.applyState(s);
+ });
+ await page.locator('#mobile-nav [data-route="home"]').click();
+ await page.locator('.home-more-v3>summary').click();
+ await page.locator('.home-latest-row').click();
+ await expect(page.locator('dialog[data-kind="ledger-detail"]')).toBeVisible();
+ await expect(page.locator('.ledger-detail-hero')).toContainText('R$ 32');
+});
+
+
+test('manual backup restore validates, confirms and preserves a pre-restore copy',async({page})=>{
+ await page.goto('/');await personal(page,10000);
+ const backup=await page.evaluate(()=>{
+   const s=window.JuntoApp.getState(),date=new Date().toISOString().slice(0,10);
+   s.users[0].balance=123400;
+   s.transactions=[{id:'restored-tx',name:'Mercado',item:'Mercado',icon:'cart',amount:2300,category:'Alimentação',payer:'a',by:'a',date,createdAt:Date.now()}];
+   return JSON.stringify(s);
+ });
+ await page.locator('#settings-button').click();
+ await page.locator('[data-action="backup-import"]').click();
+ await page.locator('#backup-import-input').setInputFiles({name:'Junto-backup.json',mimeType:'application/json',buffer:Buffer.from(backup)});
+ await expect(page.locator('dialog[data-kind="restore-backup"]')).toBeVisible();
+ await expect(page.locator('#modal')).toContainText('1 gastos');
+ await page.locator('[data-form="restore-backup"] [type="submit"]').click();
+ const state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.users[0].balance).toBe(123400);
+ expect(state.transactions[0].id).toBe('restored-tx');
+ expect(await page.evaluate(()=>Boolean(localStorage.getItem('junto-before-restore-v1')))).toBe(true);
+});
+
+
+test('goals open details, can be edited and safely stop an attached saving plan',async({page})=>{
+ await page.goto('/');await personal(page,100000);
+ await page.locator('#mobile-nav [data-route="goals"]').click();
+ await page.locator('[data-action="new-goal"]').first().click();
+ await page.locator('#goal-title').fill('Viagem');
+ await page.locator('#goal-target').fill('1000');
+ await page.locator('[data-form="goal"] [type="submit"]').click();
+
+ let state=await page.evaluate(()=>window.JuntoApp.getState());
+ const goalId=state.goals[0].id;
+ await page.evaluate(id=>{const s=window.JuntoApp.getState();s.plan={key:'leve',name:'Leve',monthly:10000,goalId:id,cut:.1,auto:true,startedAt:Date.now()};window.JuntoApp.applyState(s);},goalId);
+
+ await page.locator('[data-action="goal-detail"]').first().click();
+ await expect(page.locator('dialog[data-kind="goal-detail"]')).toBeVisible();
+ await page.locator('[data-action="edit-goal"]').click();
+ await page.locator('#edit-goal-title').fill('Viagem 2027');
+ await page.locator('#edit-goal-target').fill('1500');
+ await page.locator('[data-form="edit-goal"] [type="submit"]').click();
+ state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.goals[0].name).toBe('Viagem 2027');
+ expect(state.goals[0].target).toBe(150000);
+
+ await page.locator('[data-action="goal-detail"]').first().click();
+ await page.locator('[data-action="release-goal"]').click();
+ await page.locator('[data-form="release-goal"] [type="submit"]').click();
+ state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.goals).toHaveLength(0);
+ expect(state.plan).toBeNull();
+});
+
+
+test('automatic income and recurring maintenance run again when the app resumes',async({page})=>{
+ await page.goto('/');await personal(page,10000);
+ await page.evaluate(()=>{
+   const s=window.JuntoApp.getState(),d=new Date(),iso=x=>String(x.getFullYear())+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
+   s.incomes=[{id:'auto-today',name:'Semanal',person:'a',amount:2500,rule:'monthly',day:d.getDate(),since:iso(d),auto:true}];
+   s.received=[];
+   window.JuntoApp.applyState(s);
+ });
+ await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+ await expect.poll(()=>page.evaluate(()=>window.JuntoApp.getState().received.length)).toBe(1);
+ const state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.users[0].balance).toBe(12500);
+ expect(state.received[0].auto).toBe(true);
+});
+
+
+test('editing a recurring income schedule does not create a duplicate confirmation in the same period',async({page})=>{
+ await page.goto('/');await personal(page,10000);
+ await page.evaluate(()=>{
+   const s=window.JuntoApp.getState(),d=new Date(),ym=String(d.getFullYear())+'-'+String(d.getMonth()+1).padStart(2,'0');
+   const oldDay=Math.max(1,d.getDate()-2),newDay=Math.max(1,d.getDate()-1);
+   s.incomes=[{id:'salary-edit',name:'Salário',person:'a',amount:50000,rule:'monthly',day:oldDay,since:ym+'-01',auto:false}];
+   s.received=[{id:'salary-received',incomeId:'salary-edit',person:'a',date:ym+'-'+String(oldDay).padStart(2,'0'),amount:50000,status:'received',at:Date.now(),balanceDelta:50000}];
+   window.JuntoApp.applyState(s);
+ });
+ await page.locator('#mobile-nav [data-route="future"]').click();
+ await page.locator('.future-v3-tabs [data-route="incomes"]').click();
+ await page.locator('[data-action="income-edit"]').first().click();
+ const today=await page.evaluate(()=>new Date().getDate());
+ await page.locator('input[name="income-rule"][value="monthly"]').check();
+ await page.locator('#income-day').fill(String(Math.max(1,today-1)));
+ await page.locator('[data-form="income"] [type="submit"]').click();
+ await page.locator('#mobile-nav [data-route="home"]').click();
+ await expect(page.locator('.pending-banner.arrival')).toHaveCount(0);
+});
+
+
+test('monthly income summary uses actual receipts and removes skipped occurrences',async({page})=>{
+ await page.goto('/');await personal(page,10000);
+ await page.evaluate(()=>{
+   const s=window.JuntoApp.getState(),d=new Date(),iso=x=>String(x.getFullYear())+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'),ym=iso(d).slice(0,7);
+   s.incomes=[
+     {id:'actual-inc',name:'Salário',person:'a',amount:50000,rule:'monthly',day:Math.max(1,d.getDate()-2),since:ym+'-01',auto:false},
+     {id:'skip-inc',name:'Extra',person:'a',amount:30000,rule:'monthly',day:Math.max(1,d.getDate()-1),since:ym+'-01',auto:false}
+   ];
+   s.received=[
+     {id:'actual-receipt',incomeId:'actual-inc',person:'a',date:ym+'-'+String(Math.max(1,d.getDate()-2)).padStart(2,'0'),amount:60000,status:'received',at:Date.now(),balanceDelta:60000},
+     {id:'skip-receipt',incomeId:'skip-inc',person:'a',date:ym+'-'+String(Math.max(1,d.getDate()-1)).padStart(2,'0'),amount:0,status:'skipped',at:Date.now()}
+   ];
+   window.JuntoApp.applyState(s);
+ });
+ await page.locator('#mobile-nav [data-route="future"]').click();
+ await page.locator('.future-v3-tabs [data-route="incomes"]').click();
+ await expect(page.locator('.income-v3-total strong')).toContainText('R$ 600');
+ await expect(page.locator('.income-v3-insight')).toContainText('já foram confirmadas');
+});
+
 test.describe('offline PWA',()=>{
  test.use({serviceWorkers:'allow'});
  test('PWA reloads offline with its bundled fonts and scripts',async({page,context})=>{
- await page.goto('/');await page.evaluate(()=>navigator.serviceWorker.ready);await page.reload();await context.setOffline(true);await page.reload();await expect(page.locator('#app-content')).not.toBeEmpty();await expect(page.locator('#mobile-nav')).toBeVisible();
+ await page.goto('/');
+ await page.evaluate(async()=>{
+   await navigator.serviceWorker.ready;
+   if(!navigator.serviceWorker.controller)await new Promise(resolve=>navigator.serviceWorker.addEventListener('controllerchange',resolve,{once:true}));
+ });
+ await page.waitForLoadState('domcontentloaded');
+ await context.setOffline(true);
+ await page.goto('/',{waitUntil:'domcontentloaded'});
+ await expect(page.locator('#app-content')).not.toBeEmpty();
+ await expect(page.locator('#mobile-nav')).toBeVisible();
  });
 });
 test('Android back closes a dialog, chat, navigation, then exits',async({page})=>{
@@ -274,8 +502,13 @@ test('two independent accounts invite, sync offline edits and keep their own pro
  try{const a=await device(0);await a.page.locator('[data-feature-form="cloud-create"] [type="submit"]').click();await expect(a.page.locator('[data-feature="cloud-invite"]')).toBeVisible();await a.page.locator('[data-feature="cloud-invite"]').click();const invite=await a.page.locator('#real-invite-code').innerText();const b=await device(1);await b.page.locator('#cloud-invite').fill(invite);await b.page.locator('[data-feature-form="cloud-join"] [type="submit"]').click();await expect(b.page.locator('#cloud-live-status')).toBeVisible();await a.page.evaluate(()=>window.JuntoCloud.synchronize());
   for(const device of[a,b]){await device.page.evaluate(()=>window.JuntoApp.closeModal());await device.page.evaluate(()=>document.querySelector('[data-action="settings"]').click());await device.page.locator('#modal [data-action="balance"]').click();await device.page.locator('#balance-amount').fill('1.000,00');await device.page.locator('[data-form="balance"] [type="submit"]').click();await device.page.evaluate(()=>window.JuntoCloud.synchronize());}
   await a.page.evaluate(()=>window.JuntoCloud.synchronize());await b.page.evaluate(()=>window.JuntoCloud.synchronize());
+  await expect.poll(()=>a.page.evaluate(()=>window.JuntoApp.getState().users.map(u=>u.balance))).toEqual([100000,100000]);
+  await expect.poll(()=>b.page.evaluate(()=>window.JuntoApp.getState().users.map(u=>u.balance))).toEqual([100000,100000]);
+  expect((await db.query('select payload from public.junto_snapshots limit 1')).rows[0].payload.users.map(u=>u.balance)).toEqual([100000,100000]);
+
   await a.context.setOffline(true);await a.page.evaluate(e=>window.JuntoApp.confirmBankMovement(e,{name:'Mercado',amount:2500,date:new Date().toISOString().slice(0,10),category:'Alimentação'}),event('a'));
-  await b.page.evaluate(e=>window.JuntoApp.confirmBankMovement(e,{name:'Almoço',amount:2500,date:new Date().toISOString().slice(0,10),category:'Alimentação'}),event('b'));await b.page.evaluate(()=>window.JuntoCloud.synchronize());await a.context.setOffline(false);await a.page.evaluate(()=>window.JuntoCloud.synchronize());await expect.poll(async()=>{await a.page.evaluate(()=>window.JuntoCloud.synchronize());return a.page.evaluate(()=>window.JuntoApp.getState().transactions.length);}).toBe(2);await b.page.evaluate(()=>window.JuntoCloud.synchronize());
+  await b.page.evaluate(e=>window.JuntoApp.confirmBankMovement(e,{name:'Almoço',amount:2500,date:new Date().toISOString().slice(0,10),category:'Alimentação'}),event('b'));await b.page.evaluate(()=>window.JuntoCloud.synchronize());await a.context.setOffline(false);await a.page.evaluate(()=>window.JuntoCloud.synchronize());
+  await expect.poll(async()=>{await a.page.evaluate(()=>window.JuntoCloud.synchronize());return a.page.evaluate(()=>window.JuntoApp.getState().transactions.length);}).toBe(2);await b.page.evaluate(()=>window.JuntoCloud.synchronize());
   await expect.poll(()=>b.page.evaluate(()=>window.JuntoApp.getState().transactions.length)).toBe(2);expect(await b.page.evaluate(()=>window.JuntoApp.getState().users.map(u=>u.balance))).toEqual([97500,97500]);await expect(b.page.locator('[data-action="profile-photo-switch"]')).toHaveCount(0);expect(await b.page.evaluate(()=>window.JuntoApp.getActive())).toBe('b');
   // A response that arrives after logout must not resurrect the old account.
   await a.page.evaluate(()=>window.JuntoCloud.synchronize());

@@ -1,0 +1,166 @@
+/* Final refinement layer.
+   Keep this file small: it standardizes the current V3 screens without reviving
+   the legacy visual variants that still exist in app.css for compatibility. */
+:root{
+  --junto-navy:#0b2348;
+  --junto-gold:#cda044;
+  --junto-gold-soft:#f6eddd;
+  --junto-canvas:#fbfaf7;
+  --junto-surface:#fff;
+  --junto-line:#ebe7e0;
+  --junto-muted:#747b88;
+  --junto-success:#39725d;
+  --junto-danger:#a53c45;
+  --junto-radius-lg:24px;
+  --junto-radius-md:17px;
+  --junto-shadow:0 12px 32px rgba(19,35,60,.075);
+  --junto-focus:0 0 0 3px rgba(205,160,68,.24);
+}
+html{scroll-behavior:smooth}
+body{background:var(--junto-canvas);color:var(--junto-navy);text-rendering:optimizeLegibility}
+button,input,select,textarea{font:inherit}
+button{touch-action:manipulation}
+button:not(:disabled),[role="button"]:not([aria-disabled="true"]),summary,label[for]{cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{
+  outline:0;
+  box-shadow:var(--junto-focus);
+}
+button:disabled,input:disabled,select:disabled,textarea:disabled{cursor:not-allowed;opacity:.55}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+
+/* One visual hierarchy across the primary routes. */
+:is(.home-greeting-v3,.future-v3-head,.income-v3-head,.analysis-v3-head,.bills-v3-head,.plans-v3-head) h2{
+  color:var(--junto-navy);
+  font-weight:760;
+}
+:is(.home-greeting-v3,.future-v3-head,.income-v3-head,.analysis-v3-head,.bills-v3-head,.plans-v3-head)>span,
+.home-mode-badge{
+  color:#95733a;
+  letter-spacing:.055em;
+}
+:is(.home-money-card-v3,.home-dream-card-v3,.future-v3-card,.income-v3-total,.income-v3-list,.analysis-v3-card,.analysis-v3-latest,.bills-v3-summary,.bills-v3-list,.plans-v3-dream,.plans-v3-other){
+  border-color:var(--junto-line);
+  box-shadow:var(--junto-shadow);
+}
+:is(.future-v3-tabs,.income-v3-tabs,.analysis-v3-people,.bills-v3-tabs,.plans-v3-tabs){
+  border-color:var(--junto-line);
+  box-shadow:0 6px 20px rgba(19,35,60,.055);
+}
+:is(.future-v3-tabs,.income-v3-tabs,.analysis-v3-people,.bills-v3-tabs,.plans-v3-tabs) button{
+  transition:background .18s ease,color .18s ease,transform .18s ease;
+}
+:is(.future-v3-tabs,.income-v3-tabs,.analysis-v3-people,.bills-v3-tabs,.plans-v3-tabs) button:active{transform:scale(.985)}
+
+.text-link{min-height:36px;padding:6px 3px;text-underline-offset:3px}
+.home-section-title{gap:10px}
+.home-section-title h2{min-width:0}
+.home-empty-row{min-height:70px}
+
+/* Lists should feel interactive, not like static report rows. */
+:is(.home-latest-row,.analysis-v3-latest-row,.future-v3-event,.income-v3-row,button.bills-v3-row,.plans-v3-other>button){
+  min-height:54px;
+  border-radius:14px;
+  transition:background .16s ease,transform .16s ease;
+}
+:is(.home-latest-row,.analysis-v3-latest-row,.future-v3-event,.income-v3-row,button.bills-v3-row,.plans-v3-other>button):hover{background:#fffaf2}
+:is(.home-latest-row,.analysis-v3-latest-row,.future-v3-event,.income-v3-row,button.bills-v3-row,.plans-v3-other>button):active{transform:scale(.995)}
+:is(.home-latest-copy,.bills-v3-copy,.income-v3-row>span:nth-child(2),.future-v3-event>span:nth-child(2)){min-width:0}
+
+/* Forms and sheets use the same rhythm and avoid accidental zoom on mobile. */
+.field input,.field select,.field textarea,.money-input{
+  border-color:#ddd9d2;
+  background:#fff;
+  border-radius:14px;
+}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:#cfa858}
+.form{gap:14px}
+.form-note{border-radius:15px}
+dialog{overscroll-behavior:contain}
+dialog .modal-head{gap:12px}
+dialog .modal-head .icon-btn{min-width:44px;min-height:44px}
+.ledger-action{min-height:58px}
+.ledger-action:active{transform:scale(.995)}
+.smart-category-picks button{min-height:36px}
+
+/* Activity is secondary information: compact, readable, not another giant card. */
+.activity-v3{padding:8px 18px}
+.activity-v3 .activity-row{padding:12px 0}
+.activity-v3 .activity-row+ .activity-row{border-top:1px solid #f0ede8}
+
+/* Status and feedback stay legible without screaming. */
+.toast{border-color:var(--junto-line);box-shadow:0 16px 42px rgba(19,35,60,.14)}
+.form-error,.feature-error{font-weight:600}
+.bad,.neg{color:var(--junto-danger)}
+.pos{color:var(--junto-success)}
+
+/* Respect motion preferences; the app should still feel polished without motion. */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+
+@media(max-width:760px){
+  body{background:linear-gradient(180deg,#fffdfa 0%,var(--junto-canvas) 56%,#f6f7f9 100%)}
+  .workspace{max-width:100%;overflow-x:clip}
+  :is(.home-greeting-v3,.future-v3-head,.income-v3-head,.analysis-v3-head,.bills-v3-head,.plans-v3-head) h2{
+    font-size:32px;
+    line-height:1.06;
+    letter-spacing:-1.25px;
+  }
+  :is(.home-greeting-v3,.future-v3-head,.income-v3-head,.analysis-v3-head,.bills-v3-head,.plans-v3-head) p{
+    font-size:16px;
+    line-height:1.35;
+  }
+  :is(.home-money-card-v3,.home-dream-card-v3,.future-v3-card,.income-v3-total,.income-v3-list,.analysis-v3-card,.analysis-v3-latest,.bills-v3-summary,.bills-v3-list,.plans-v3-dream,.plans-v3-other){
+    border-radius:22px;
+  }
+  .mobile-nav{
+    max-width:560px;
+    margin-inline:auto;
+    contain:layout paint;
+  }
+  .mobile-nav button{min-height:50px}
+  dialog{
+    max-height:calc(94dvh - var(--safe-area-inset-top,env(safe-area-inset-top,0px)));
+    overscroll-behavior:contain;
+  }
+  dialog .modal-wrap{padding-bottom:max(22px,var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))}
+  .field input,.field select,.field textarea{font-size:16px}
+  .toast-zone{
+    left:14px;
+    right:14px;
+    bottom:calc(86px + var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)));
+    width:auto;
+  }
+  .toast{padding:13px 14px;border-radius:16px}
+}
+
+@media(max-width:380px){
+  :is(.home-greeting-v3,.future-v3-head,.income-v3-head,.analysis-v3-head,.bills-v3-head,.plans-v3-head) h2{font-size:29px}
+  .home-primary-actions{grid-template-columns:1fr}
+  .ledger-detail-grid{grid-template-columns:1fr}
+}
+
+/* Backup and settings actions stay compact on narrow screens. */
+.settings-row-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.settings-row-actions .btn{min-width:92px}
+.backup-row{align-items:center}
+@media(max-width:520px){.backup-row{align-items:flex-start}.backup-row .settings-row-actions{width:100%;justify-content:flex-start}.backup-row .settings-row-actions .btn{flex:1 1 120px}}
+
+/* Goal detail sheet uses the same interaction grammar as bills and expenses. */
+.goal-detail-v3{display:flex;flex-direction:column;gap:16px}
+.goal-detail-hero{display:grid;grid-template-columns:58px minmax(0,1fr);gap:14px;align-items:center;padding:15px;border:1px solid var(--junto-line);border-radius:21px;background:linear-gradient(135deg,#fffaf0,#fffdf9)}
+.goal-detail-icon{display:grid;place-items:center;width:54px;height:54px;border-radius:18px;background:var(--junto-gold-soft);color:#9a793a}
+.goal-detail-icon svg{width:27px;height:27px}
+.goal-detail-hero>div>span{font-size:9px;font-weight:800;letter-spacing:.08em;color:#92733b}
+.goal-detail-hero strong{display:block;margin-top:4px;font-size:27px;line-height:1.05;color:var(--junto-navy)}
+.goal-detail-hero p{margin-top:4px;font-size:11px;color:var(--junto-muted)}
+.plans-v3-detail-link{width:100%;min-height:40px;margin-top:4px;border:0;background:transparent;color:#8d6b2f;font-weight:750;text-align:center}
+dialog[data-kind="goal-detail"],dialog[data-kind="goal-edit"]{width:min(560px,calc(100vw - 22px));border-radius:28px}
+@media(max-width:520px){dialog[data-kind="goal-detail"],dialog[data-kind="goal-edit"]{width:100%;max-width:none;margin:auto 0 0;border-radius:28px 28px 0 0}}
+
+button.tl-row{width:100%;border:0;background:transparent;color:inherit;text-align:left;border-radius:12px;transition:background .16s ease,transform .16s ease}
+button.tl-row>span{min-width:0;flex:1;display:flex;flex-direction:column}
+button.tl-row>span small{font-size:10px;color:var(--junto-muted)}
+button.tl-row:hover{background:#fffaf2}
+button.tl-row:active{transform:scale(.995)}

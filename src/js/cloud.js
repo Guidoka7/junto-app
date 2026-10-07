@@ -77,21 +77,60 @@ async function handleSession(session){
 }
 function subscribe(){if(subscription)client.removeChannel(subscription);subscription=client.channel(`junto:${checkpoint.spaceId}`).on('postgres_changes',{event:'UPDATE',schema:'public',table:'junto_snapshots',filter:`space_id=eq.${checkpoint.spaceId}`},()=>syncSoon()).subscribe();}
 function syncSoon(){clearTimeout(syncTimer);syncTimer=setTimeout(()=>synchronize(),500);}
-async function synchronize(){
-  if(!client||!user||!sessionReady||!checkpoint||syncRunning||conflict)return;if(navigator.onLine===false){setMessage('Sem conexão · mudanças no aparelho');return;}
+async function synchronize(force=false){
+  if(!client||!user||!sessionReady||!checkpoint||syncRunning||conflict)return;
+  if(!force&&navigator.onLine===false){setMessage('Sem conexão · mudanças no aparelho');return;}
   const currentCheckpoint=checkpoint,currentUserID=user.id;
-  syncRunning=true;try{
-    if(checkpoint.dirty){const sent=app.getState();validateState(sent);setMessage('Sincronizando…');const response=await rpc('junto_sync_space',{p_space_id:checkpoint.spaceId,p_revision:checkpoint.revision,p_payload:sent});
+  syncRunning=true;
+  try{
+    // One explicit sync should converge clean, non-conflicting edits from both
+    // devices. Retrying here avoids depending on a later timer after a revision
+    // conflict or after state changed while a request was in flight.
+    for(let pass=0;pass<4;pass++){
       if(checkpoint!==currentCheckpoint||user?.id!==currentUserID)return;
-      if(response.conflict){const local=app.getState(),oldBase=clone(checkpoint.base),result=mergeStates(oldBase,local,response.payload);if(result.conflicts.length){conflict={base:oldBase,local,remote:clone(response.payload),revision:response.revision,conflicts:result.conflicts};setMessage('Alterações para conferir');saveCheckpoint();return;}
-        checkpoint.base=clone(response.payload);checkpoint.revision=response.revision;checkpoint.pending=result.state;checkpoint.dirty=!equal(result.state,response.payload);app.applyState(result.state);
-      }else{checkpoint.base=clone(sent);checkpoint.revision=response.revision;checkpoint.pending=app.getState();checkpoint.dirty=!equal(checkpoint.pending,sent);lastSync=Date.now();}
-    }else{const remote=await rpc('junto_read_space');if(checkpoint!==currentCheckpoint||user?.id!==currentUserID)return;if(!remote)throw new Error('ACCESS_DENIED');checkpoint.members=remote.members;if(remote.revision!==checkpoint.revision){const local=app.getState(),oldBase=clone(checkpoint.base),result=mergeStates(oldBase,local,remote.payload);
-        if(result.conflicts.length){conflict={base:oldBase,local,remote:clone(remote.payload),revision:remote.revision,conflicts:result.conflicts};setMessage('Alterações para conferir');return;}
-        checkpoint.base=clone(remote.payload);checkpoint.revision=remote.revision;checkpoint.pending=result.state;checkpoint.dirty=!equal(result.state,remote.payload);app.applyState(result.state);
-      }lastSync=Date.now();}
-    saveCheckpoint();setMessage(checkpoint.dirty?'Mudanças aguardando sincronização':`Sincronizado${lastSync?' · '+new Date(lastSync).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):''}`);if(checkpoint.dirty)syncSoon();
-  }catch(e){setMessage(errorMessage(e));try{saveCheckpoint();}catch{setMessage('Não foi possível salvar a fila. Exporte um backup.');}}finally{syncRunning=false;}
+      if(checkpoint.dirty){
+        const sent=app.getState();validateState(sent);setMessage('Sincronizando…');
+        const response=await rpc('junto_sync_space',{p_space_id:checkpoint.spaceId,p_revision:checkpoint.revision,p_payload:sent});
+        if(checkpoint!==currentCheckpoint||user?.id!==currentUserID)return;
+        if(response.conflict){
+          const local=app.getState(),oldBase=clone(checkpoint.base),result=mergeStates(oldBase,local,response.payload);
+          if(result.conflicts.length){
+            conflict={base:oldBase,local,remote:clone(response.payload),revision:response.revision,conflicts:result.conflicts};
+            checkpoint.pending=clone(local);checkpoint.dirty=true;setMessage('Alterações para conferir');saveCheckpoint();return;
+          }
+          checkpoint.base=clone(response.payload);checkpoint.revision=response.revision;checkpoint.pending=result.state;
+          checkpoint.dirty=!equal(result.state,response.payload);app.applyState(result.state);
+          if(checkpoint.dirty)continue;
+          lastSync=Date.now();break;
+        }
+        checkpoint.base=clone(sent);checkpoint.revision=response.revision;checkpoint.pending=app.getState();
+        checkpoint.dirty=!equal(checkpoint.pending,sent);lastSync=Date.now();
+        if(checkpoint.dirty)continue;
+        break;
+      }
+
+      const remote=await rpc('junto_read_space');
+      if(checkpoint!==currentCheckpoint||user?.id!==currentUserID)return;
+      if(!remote)throw new Error('ACCESS_DENIED');
+      checkpoint.members=remote.members;
+      if(remote.revision!==checkpoint.revision){
+        const local=app.getState(),oldBase=clone(checkpoint.base),result=mergeStates(oldBase,local,remote.payload);
+        if(result.conflicts.length){
+          conflict={base:oldBase,local,remote:clone(remote.payload),revision:remote.revision,conflicts:result.conflicts};
+          checkpoint.pending=clone(local);checkpoint.dirty=true;setMessage('Alterações para conferir');saveCheckpoint();return;
+        }
+        checkpoint.base=clone(remote.payload);checkpoint.revision=remote.revision;checkpoint.pending=result.state;
+        checkpoint.dirty=!equal(result.state,remote.payload);app.applyState(result.state);
+        if(checkpoint.dirty)continue;
+      }
+      lastSync=Date.now();break;
+    }
+    saveCheckpoint();
+    setMessage(checkpoint.dirty?'Mudanças aguardando sincronização':`Sincronizado${lastSync?' · '+new Date(lastSync).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):''}`);
+    if(checkpoint.dirty&&!conflict)syncSoon();
+  }catch(e){
+    setMessage(errorMessage(e));try{saveCheckpoint();}catch{setMessage('Não foi possível salvar a fila. Exporte um backup.');}
+  }finally{syncRunning=false;}
 }
 function open(){
   if(conflict)return showConflicts();
@@ -114,7 +153,7 @@ document.addEventListener('click',async event=>{const button=event.target.closes
   if(action==='cloud-resend'){button.disabled=true;try{const{error}=await client.auth.resend({type:'signup',email:pendingEmail,options:{emailRedirectTo:redirectURL()}});if(error)throw error;authNotice='Solicitação enviada. Confira sua caixa de entrada e a pasta de spam.';}catch(e){authNotice=errorMessage(e);}finally{button.disabled=false;}return open();}
   if(action==='cloud-auth-login'){authView='login';return open();}
   if(action==='cloud-forgot'){app.openModal('Recuperar minha senha','<form class="form" data-feature-form="cloud-forgot"><div class="field"><label for="recover-email">Seu e-mail</label><input name="email" id="recover-email" type="email" required autocomplete="email"></div><p class="feature-error" role="alert"></p><button class="btn primary wide" type="submit">Enviar recuperação</button></form>','cloud-forgot');return;}
-  if(action==='cloud-sync'){await synchronize();return open();}
+  if(action==='cloud-sync'){await synchronize(true);return open();}
   if(action==='cloud-invite'){await synchronize();if(checkpoint.dirty||conflict)throw new Error('Sincronize as alterações antes de convidar.');const invite=await rpc('junto_make_invite',{p_space_id:checkpoint.spaceId}),code=invite.code.match(/.{1,4}/g).join('-');app.openModal('Convide seu amor',`<p class="modal-sub">A outra pessoa cria a própria conta e entra com este código. Ele vale por 48 horas e só pode ser usado uma vez.</p><div class="invite-code"><strong id="real-invite-code">${esc(code)}</strong><p>Válido até ${new Date(invite.expires_at).toLocaleString('pt-BR')}</p></div><button class="btn primary wide" data-feature="cloud-copy-invite" data-code="${esc(code)}">Copiar código</button>`,'cloud-invite');return;}
   if(action==='cloud-copy-invite'){try{await navigator.clipboard.writeText(button.dataset.code);app.toast('Código copiado.');}catch{app.toast('Selecione e copie o código exibido.');}return;}
   if(action==='cloud-signout'){if(checkpoint?.dirty){app.openModal('Alterações ainda neste aparelho','<p class="modal-sub">Sincronize ou exporte uma cópia antes de sair. Assim, seus últimos registros ficam protegidos.</p><button class="btn primary wide" data-feature="cloud-sync">Sincronizar agora</button><button class="btn secondary wide" data-feature="cloud-export">Exportar registros</button><button class="btn ghost wide" data-feature="cloud-signout-confirm">Sair mantendo a fila neste aparelho</button>','cloud-signout');return;}return signOut();}
@@ -134,7 +173,7 @@ document.addEventListener('submit',async event=>{const form=event.target.closest
 async function adopt(remote,generation,uid){if(generation!==authGeneration||!user||user.id!==uid||!sessionReady||Date.now()>=sessionExpiresAt)throw new Error('LOGIN_REQUIRED');validateState(remote.payload);checkpoint={spaceId:remote.space_id,slot:remote.slot,revision:remote.revision,base:clone(remote.payload),pending:clone(remote.payload),dirty:false,members:remote.members};app.applyState(remote.payload);app.setSlot(remote.slot);saveCheckpoint();subscribe();app.setAccess(true);setMessage('Dupla conectada');}
 const handledURLs=new Set();async function authURL(url){if(!client||handledURLs.has(url))return;const parsed=new URL(url);if(parsed.protocol!=='junto:'||parsed.hostname!=='auth-callback')return;const code=parsed.searchParams.get('code');if(!code)return;handledURLs.add(url);const{data,error}=await client.auth.exchangeCodeForSession(code);if(error){confirmationFallback();return;}if(parsed.searchParams.get('type')==='recovery')passwordRecovery=true;await handleSession(data.session);open();}
 window.addEventListener('junto:auth-url',event=>authURL(event.detail).catch(e=>app.toast('Não foi possível entrar.',errorMessage(e))));
-window.addEventListener('online',syncSoon);document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncSoon();});setInterval(()=>{if(!document.hidden)syncSoon();},30000);
+window.addEventListener('online',()=>synchronize(true));document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncSoon();});setInterval(()=>{if(!document.hidden)syncSoon();},30000);
 async function getAccessToken(){if(!client)return null;const{data,error}=await client.auth.getSession();if(error||!data?.session)return null;return data.session.access_token||null;}
-window.JuntoCloud={open,synchronize,settingsHTML,getAccessToken};window.JuntoFeatures={settingsHTML:()=>settingsHTML()+(window.JuntoBank?.settingsHTML()||'')};
+window.JuntoCloud={open,synchronize:()=>synchronize(true),settingsHTML,getAccessToken};window.JuntoFeatures={settingsHTML:()=>settingsHTML()+(window.JuntoBank?.settingsHTML()||'')};
 updateStatus();startClient().then(()=>{if(window.JuntoAuthURL)authURL(window.JuntoAuthURL);}).catch(accessError);

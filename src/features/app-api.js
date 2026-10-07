@@ -2,7 +2,7 @@
 // Keep all financial mutations in the existing model rather than a second ledger.
   let cloudSlot = null, appAccess = false;
   try{const slot=localStorage.getItem("junto-cloud-slot");if(["a","b"].includes(slot))cloudSlot=slot;}catch{}
-  const copyState = () => structuredClone(state);
+  const copyState = () => JSON.parse(JSON.stringify(state));
   const publishChange = () => window.dispatchEvent(new CustomEvent('junto:state-changed', {detail: copyState()}));
   function freshPersonalState(name = 'Você') {
     return migrate({schema:1, updatedAt:Date.now(), users:[{id:'a',name:String(name).slice(0,24),balance:0,tone:'blue'}],
@@ -41,8 +41,8 @@
           if (fields.billId && (!bill||bill.amount!==amount)) throw new Error('A conta vinculada precisa estar aberta e ter o mesmo valor.');
           if (fields.subtractBalance !== false) user(who).balance -= amount;
           state.transactions.push({id,name,amount,category,payer:who,by:who,date,createdAt:Date.now(),
-            bankSource:source,balanceDelta:fields.subtractBalance===false?0:-amount,...(bill?{billId:bill.id}:{})});
-          if (bill) { bill.status='paid'; bill.paidAt=Date.now(); bill.bankSource=source; }
+            bankSource:source,balanceDelta:fields.subtractBalance===false?0:-amount,...(bill?{billId:bill.id,...(bill.recurringKey?{recurringKey:bill.recurringKey}:{})}:{})});
+          if (bill) { bill.status='paid'; bill.paidAt=Date.now(); bill.payer=who; bill.bankSource=source; }
           log(who,`confirmou ${name}: ${money(amount)} pelo ${source.bank}.`); kind = 'expense';
         }
       } else throw new Error('Tipo de movimento desconhecido.');
@@ -83,7 +83,7 @@
     },
     freshState:freshPersonalState,
     applyState(data) {
-      if (!valid(data)) throw new Error('O arquivo de finanças é inválido.');
+      if (!validBackup(data)) throw new Error('O arquivo de finanças é inválido.');
       const next=migrate(structuredClone(data)); localStorage.setItem(KEY,JSON.stringify(next));
       incomingSync(next); render();
     },

@@ -16,10 +16,19 @@ export function validateState(state){
   if(JSON.stringify(state).length>8*1024*1024)throw new Error('O arquivo é grande demais. Reduza a foto da dupla.');
   return state;
 }
-const rowKey=(row,collection)=>collection==='received'&&row.incomeId?`income:${row.incomeId}:${row.date}`:collection==='saves'&&row.source==='auto'&&row.incomeId?`save:${row.goalId}:${row.incomeId}:${row.date}`:row.id;
+function weekKey(iso){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(iso||'')))return String(iso||'');
+  const d=new Date(iso+'T12:00:00Z'),offset=(d.getUTCDay()+6)%7;d.setUTCDate(d.getUTCDate()-offset);return d.toISOString().slice(0,10);
+}
+function incomePeriod(state,row){
+  const inc=(state?.incomes||[]).find(i=>i.id===row.incomeId);
+  if(!inc||!row.date)return row.date||'';
+  return inc.rule==='weekly'?weekKey(row.date):String(row.date).slice(0,7);
+}
+const rowKey=(row,collection,state)=>collection==='received'&&row.incomeId?`income:${row.incomeId}:${incomePeriod(state,row)}`:collection==='saves'&&row.source==='auto'&&row.incomeId?`save:${row.goalId}:${row.incomeId}:${incomePeriod(state,row)}`:row.id;
 function monetaryEffect(state,person){
   let sum=0;for(const t of state.transactions||[]){if(t.payer===person)sum+=Number.isSafeInteger(t.balanceDelta)?t.balanceDelta:-t.amount;else if(['half','prop'].includes(t.payer)){const part=t.split?.find(s=>s.id===person);if(part)sum-=part.amount;}}
-  const seen=new Set();for(const r of state.received||[]){if(r.status!=='received')continue;const k=rowKey(r,'received');if(seen.has(k))continue;seen.add(k);const owner=r.person||(state.incomes||[]).find(i=>i.id===r.incomeId)?.person;if(owner===person)sum+=Number.isSafeInteger(r.balanceDelta)?r.balanceDelta:r.amount;}
+  const seen=new Set();for(const r of state.received||[]){if(r.status!=='received')continue;const k=rowKey(r,'received',state);if(seen.has(k))continue;seen.add(k);const owner=r.person||(state.incomes||[]).find(i=>i.id===r.incomeId)?.person;if(owner===person)sum+=Number.isSafeInteger(r.balanceDelta)?r.balanceDelta:r.amount;}
   return sum;
 }
 function savedEffect(state,id){return(state.saves||[]).filter(s=>s.goalId===id).reduce((n,s)=>n+s.amount,0);}
@@ -37,11 +46,14 @@ export function mergeStates(base,local,remote,choices={}){
       }return out;
     }
     if(keyed(l)&&keyed(r)&&(keyed(b)||b===undefined)){
-      const collection=path[0],maps=[b||[],l,r].map(rows=>new Map(rows.map(row=>[rowKey(row,collection),row])));
+      const collection=path[0],states=[base,local,remote],maps=[b||[],l,r].map((rows,i)=>new Map(rows.map(row=>[rowKey(row,collection,states[i]),row])));
       const out=[];for(const id of new Set([...maps[0].keys(),...maps[1].keys(),...maps[2].keys()])){
         const [old,left,right]=maps.map(m=>m.get(id));
         // The same scheduled income acknowledged on two devices is one receipt.
         if(!old&&left&&right&&collection==='received'&&left.incomeId&&left.amount===right.amount&&left.status===right.status&&left.person===right.person){out.push(clone(left.bankSource?left:right));continue;}
+        // Automatic saves produced by the same scheduled income are also one event,
+        // even when two devices computed it from slightly different expected dates.
+        if(!old&&left&&right&&collection==='saves'&&left.source==='auto'&&right.source==='auto'&&left.incomeId===right.incomeId&&left.goalId===right.goalId&&left.amount===right.amount){out.push(clone(left));continue;}
         const value=merge(old,left,right,[...path,id]);if(value!==undefined)out.push(value);
       }return out;
     }

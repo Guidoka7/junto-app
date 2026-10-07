@@ -83,7 +83,7 @@
     },
     freshState:freshPersonalState,
     applyState(data) {
-      if (!valid(data)) throw new Error('O arquivo de finanças é inválido.');
+      if (!validBackup(data)) throw new Error('O arquivo de finanças é inválido.');
       const next=migrate(structuredClone(data)); localStorage.setItem(KEY,JSON.stringify(next));
       incomingSync(next); render();
     },

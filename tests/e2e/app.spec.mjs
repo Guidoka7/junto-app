@@ -503,7 +503,20 @@ test('two independent accounts invite, sync offline edits and keep their own pro
   for(const device of[a,b]){await device.page.evaluate(()=>window.JuntoApp.closeModal());await device.page.evaluate(()=>document.querySelector('[data-action="settings"]').click());await device.page.locator('#modal [data-action="balance"]').click();await device.page.locator('#balance-amount').fill('1.000,00');await device.page.locator('[data-form="balance"] [type="submit"]').click();await device.page.evaluate(()=>window.JuntoCloud.synchronize());}
   await a.page.evaluate(()=>window.JuntoCloud.synchronize());await b.page.evaluate(()=>window.JuntoCloud.synchronize());
   await a.context.setOffline(true);await a.page.evaluate(e=>window.JuntoApp.confirmBankMovement(e,{name:'Mercado',amount:2500,date:new Date().toISOString().slice(0,10),category:'Alimentação'}),event('a'));
-  await b.page.evaluate(e=>window.JuntoApp.confirmBankMovement(e,{name:'Almoço',amount:2500,date:new Date().toISOString().slice(0,10),category:'Alimentação'}),event('b'));await b.page.evaluate(()=>window.JuntoCloud.synchronize());await a.context.setOffline(false);await a.page.evaluate(()=>window.JuntoCloud.synchronize());await expect.poll(async()=>{await a.page.evaluate(()=>window.JuntoCloud.synchronize());return a.page.evaluate(()=>window.JuntoApp.getState().transactions.length);}).toBe(2);await b.page.evaluate(()=>window.JuntoCloud.synchronize());
+  await b.page.evaluate(e=>window.JuntoApp.confirmBankMovement(e,{name:'Almoço',amount:2500,date:new Date().toISOString().slice(0,10),category:'Alimentação'}),event('b'));await b.page.evaluate(()=>window.JuntoCloud.synchronize());await a.context.setOffline(false);await a.page.evaluate(()=>window.JuntoCloud.synchronize());
+  await expect.poll(async()=>{
+    await a.page.evaluate(()=>window.JuntoCloud.synchronize());
+    const count=await a.page.evaluate(()=>window.JuntoApp.getState().transactions.length);
+    if(count!==2){
+      const remote=await db.query('select revision,payload from public.junto_snapshots limit 1');
+      console.log('SYNC_DEBUG',JSON.stringify({
+        a:await a.page.evaluate(()=>({online:navigator.onLine,status:document.querySelector('#cloud-account-button')?.textContent,slot:window.JuntoApp.getSlot(),state:window.JuntoApp.getState()})),
+        b:await b.page.evaluate(()=>({online:navigator.onLine,status:document.querySelector('#cloud-account-button')?.textContent,slot:window.JuntoApp.getSlot(),state:window.JuntoApp.getState()})),
+        remote:remote.rows[0]
+      }));
+    }
+    return count;
+  }).toBe(2);await b.page.evaluate(()=>window.JuntoCloud.synchronize());
   await expect.poll(()=>b.page.evaluate(()=>window.JuntoApp.getState().transactions.length)).toBe(2);expect(await b.page.evaluate(()=>window.JuntoApp.getState().users.map(u=>u.balance))).toEqual([97500,97500]);await expect(b.page.locator('[data-action="profile-photo-switch"]')).toHaveCount(0);expect(await b.page.evaluate(()=>window.JuntoApp.getActive())).toBe('b');
   // A response that arrives after logout must not resurrect the old account.
   await a.page.evaluate(()=>window.JuntoCloud.synchronize());

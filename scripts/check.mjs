@@ -18,7 +18,7 @@ for (const f of await readdir(join(root, 'src/js'))) {
 try {
   const app = await readFile(join(root, 'src/js/app.js'), 'utf8');
   const unique = xs => [...new Set(xs)].sort();
-  const actions = unique([...app.matchAll(/data-action=["'`]([^"'\`$<>{}\\s]+)["'`]/g)].map(m => m[1]));
+  const actions = unique([...app.matchAll(/data-action=["'`]([^"'`$<>{}\s]+)["'`]/g)].map(m => m[1]));
   const actionHandlers = unique([...app.matchAll(/action===['"]([^'"]+)['"]/g)].map(m => m[1]));
   const missingActions = actions.filter(a => !actionHandlers.includes(a));
   if (missingActions.length) {
@@ -28,7 +28,7 @@ try {
     console.log(`✓ ${actions.length} ações estáticas têm handler`);
   }
 
-  const forms = unique([...app.matchAll(/data-form=["'`]([^"'\`$<>{}\\s]+)["'`]/g)].map(m => m[1]));
+  const forms = unique([...app.matchAll(/data-form=["'`]([^"'`$<>{}\s]+)["'`]/g)].map(m => m[1]));
   const formHandlers = unique([...app.matchAll(/type===['"]([^'"]+)['"]/g)].map(m => m[1]));
   const missingForms = forms.filter(name => !formHandlers.includes(name));
   if (missingForms.length) {

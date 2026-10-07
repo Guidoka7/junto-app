@@ -1881,6 +1881,13 @@ ${JSON.stringify(chatContext())}`;
 
   });
   document.addEventListener('toggle',(event)=>{const d=event.target;if(d.matches?.('details.cat')){if(d.open)openCats.add(d.dataset.cat);else openCats.delete(d.dataset.cat);}},true);
+  function refreshScheduledState(){
+    if(!window.JuntoApp?.hasAccess?.())return;
+    const recurringChanged=rollRecurring(),auto=processAuto();
+    if(recurringChanged||auto.n)persist();
+  }
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshScheduledState();});
+  window.addEventListener('focus',refreshScheduledState);
   function chartTip(event){
     const r=event.target.closest?.('rect.hit');document.querySelectorAll('.ch-tip:not([hidden])').forEach(t=>{if(!r||t.id!==r.dataset.chart+'t'){t.hidden=true;document.getElementById(t.id.slice(0,-1)+'g')?.setAttribute('visibility','hidden');}});
     if(!r)return;const id=r.dataset.chart,p=chartStore[id]?.[r.dataset.i];if(!p)return;const tip=document.getElementById(id+'t'),g=document.getElementById(id+'g'),svg=r.ownerSVGElement;if(!tip||!svg)return;

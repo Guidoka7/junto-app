@@ -41,8 +41,8 @@
           if (fields.billId && (!bill||bill.amount!==amount)) throw new Error('A conta vinculada precisa estar aberta e ter o mesmo valor.');
           if (fields.subtractBalance !== false) user(who).balance -= amount;
           state.transactions.push({id,name,amount,category,payer:who,by:who,date,createdAt:Date.now(),
-            bankSource:source,balanceDelta:fields.subtractBalance===false?0:-amount,...(bill?{billId:bill.id}:{})});
-          if (bill) { bill.status='paid'; bill.paidAt=Date.now(); bill.bankSource=source; }
+            bankSource:source,balanceDelta:fields.subtractBalance===false?0:-amount,...(bill?{billId:bill.id,...(bill.recurringKey?{recurringKey:bill.recurringKey}:{})}:{})});
+          if (bill) { bill.status='paid'; bill.paidAt=Date.now(); bill.payer=who; bill.bankSource=source; }
           log(who,`confirmou ${name}: ${money(amount)} pelo ${source.bank}.`); kind = 'expense';
         }
       } else throw new Error('Tipo de movimento desconhecido.');

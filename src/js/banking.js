@@ -116,8 +116,9 @@ document.addEventListener('click',async event=>{const button=event.target.closes
 }catch(e){api.toast('Não foi possível concluir.',e.message||'Tente novamente.');}});
 document.addEventListener('submit',async event=>{const form=event.target.closest('[data-feature-form]');if(!form?.dataset.featureForm.startsWith('bank-'))return;event.preventDefault();const error=form.querySelector('.feature-error'),button=form.querySelector('[type=submit]');if(button.disabled)return;button.disabled=true;error.textContent='';const data=new FormData(form);
   try{if(form.dataset.featureForm==='bank-settings'){await plugin.setEnabled({enabled:true,consent:data.get('consent')==='on',packages:data.getAll('packages')});await plugin.requestPrompts();if(!status.accessGranted)await plugin.openNotificationSettings();await openSettings();}
-    else {const result=api.confirmBankMovement(selected,{name:data.get('name'),amount:parseCents(data.get('amount')),date:data.get('date'),category:data.get('category'),payment:data.get('payment'),due:data.get('due'),billId:data.get('billId'),incomeId:data.get('incomeId'),expectedDate:data.get('expectedDate'),subtractBalance:data.get('adjustBalance')==='on'});
+    else if(form.dataset.featureForm==='bank-confirm'){const result=api.confirmBankMovement(selected,{name:data.get('name'),amount:parseCents(data.get('amount')),date:data.get('date'),category:data.get('category'),payment:data.get('payment'),due:data.get('due'),billId:data.get('billId'),incomeId:data.get('incomeId'),expectedDate:data.get('expectedDate'),subtractBalance:data.get('adjustBalance')==='on'});
       await plugin.acknowledge({id:selected.id});selected=null;api.toast(result.duplicate?'Esse movimento já estava registrado.':result.kind==='bill'?'Compra no cartão planejada.':'Movimento confirmado.');await inbox();}
+    else throw new Error('Fluxo bancário desconhecido.');
   }catch(e){error.textContent=e.message||'Não foi possível salvar.';}finally{button.disabled=false;}
 });
 window.JuntoBank={settingsHTML,openSettings,refresh};

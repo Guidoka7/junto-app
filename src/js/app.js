@@ -431,7 +431,7 @@
   }
   function persist(){state.updatedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(state));}catch{toast("Não foi possível salvar no aparelho.","Exporte uma cópia dos dados e confira o armazenamento.");}try{channel?.postMessage(state);}catch{}render();publishChange();}
   function log(actor,message){state.activity.unshift({id:uid(),actor,message,createdAt:Date.now()});state.activity=state.activity.slice(0,100);}
-  function notify(to,title,body,kind='info',requestId){if(isSolo())return;state.notifications.unshift({id:uid(),to,title,body,kind,requestId,read:false,createdAt:Date.now()});state.notifications=state.notifications.slice(0,100);}
+  function notify(to,title,body,kind='info',requestId){if(isSolo())return;state.notifications.unshift({id:uid(),to,title,body,kind,...(requestId?{requestId}:{}),read:false,createdAt:Date.now()});state.notifications=state.notifications.slice(0,100);}
   function toast(title,body='',name='circleCheck'){
     title=soloStr(title);body=soloStr(body);
     if(!noticesEnabled)return;const el=document.createElement('div');el.className='toast';el.innerHTML=`${icon(name)}<div><strong>${esc(title)}</strong><p>${esc(body)}</p></div>`;$('#toast-zone').append(el);setTimeout(()=>el.remove(),6500);

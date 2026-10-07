@@ -26,8 +26,13 @@ test('mobile app renders, navigates and preserves the fixed bottom bar',async({p
  const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/');await expect(page.locator('#app-content')).not.toBeEmpty();
  if(process.env.JUNTO_CHROME){try{execFileSync('node_modules/.bin/agent-browser',['--executable-path',process.env.JUNTO_CHROME,'--session','junto-smoke','open','http://127.0.0.1:5173'],{stdio:'pipe',timeout:20000});execFileSync('node_modules/.bin/agent-browser',['--session','junto-smoke','snapshot','-i'],{stdio:'pipe',timeout:10000});execFileSync('node_modules/.bin/agent-browser',['--session','junto-smoke','close'],{stdio:'pipe',timeout:10000});}catch{console.log('agent-browser unavailable; browser verification continues with Playwright.');}}
  const nav=page.locator('#mobile-nav');expect((await nav.boundingBox()).y+(await nav.boundingBox()).height).toBeLessThanOrEqual(845);
- for(const route of ['future','analysis','bills','goals','home']){await page.locator(`#mobile-nav [data-route="${route}"]`).click();await expect(page.locator('body')).toHaveAttribute('data-route',route);}
- expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ for(const route of ['future','analysis','bills','goals','home']){
+  await page.locator(`#mobile-nav [data-route="${route}"]`).click();
+  await expect(page.locator('body')).toHaveAttribute('data-route',route);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`overflow horizontal em ${route}`).toBe(true);
+  const unlabeled=await page.locator('button:visible').evaluateAll(nodes=>nodes.filter(el=>!(el.getAttribute('aria-label')||el.getAttribute('title')||el.textContent?.trim())).map(el=>el.outerHTML.slice(0,180)));
+  expect(unlabeled,`botões sem nome acessível em ${route}`).toEqual([]);
+ }
  expect(await page.evaluate(()=>[...document.styleSheets].some(x=>x.href?.endsWith('/css/refine.css')))).toBe(true);
  expect(await page.locator('.mobile-nav').evaluate(el=>getComputedStyle(el).position)).toBe('fixed');
  expect(errors).toEqual([]);await page.screenshot({path:'test-results/mobile.png'});

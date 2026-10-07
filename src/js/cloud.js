@@ -78,20 +78,59 @@ async function handleSession(session){
 function subscribe(){if(subscription)client.removeChannel(subscription);subscription=client.channel(`junto:${checkpoint.spaceId}`).on('postgres_changes',{event:'UPDATE',schema:'public',table:'junto_snapshots',filter:`space_id=eq.${checkpoint.spaceId}`},()=>syncSoon()).subscribe();}
 function syncSoon(){clearTimeout(syncTimer);syncTimer=setTimeout(()=>synchronize(),500);}
 async function synchronize(){
-  if(!client||!user||!sessionReady||!checkpoint||syncRunning||conflict)return;if(navigator.onLine===false){setMessage('Sem conexão · mudanças no aparelho');return;}
+  if(!client||!user||!sessionReady||!checkpoint||syncRunning||conflict)return;
+  if(navigator.onLine===false){setMessage('Sem conexão · mudanças no aparelho');return;}
   const currentCheckpoint=checkpoint,currentUserID=user.id;
-  syncRunning=true;try{
-    if(checkpoint.dirty){const sent=app.getState();validateState(sent);setMessage('Sincronizando…');const response=await rpc('junto_sync_space',{p_space_id:checkpoint.spaceId,p_revision:checkpoint.revision,p_payload:sent});
+  syncRunning=true;
+  try{
+    // One explicit sync should converge clean, non-conflicting edits from both
+    // devices. Retrying here avoids depending on a later timer after a revision
+    // conflict or after state changed while a request was in flight.
+    for(let pass=0;pass<4;pass++){
       if(checkpoint!==currentCheckpoint||user?.id!==currentUserID)return;
-      if(response.conflict){const local=app.getState(),oldBase=clone(checkpoint.base),result=mergeStates(oldBase,local,response.payload);if(result.conflicts.length){conflict={base:oldBase,local,remote:clone(response.payload),revision:response.revision,conflicts:result.conflicts};setMessage('Alterações para conferir');saveCheckpoint();return;}
-        checkpoint.base=clone(response.payload);checkpoint.revision=response.revision;checkpoint.pending=result.state;checkpoint.dirty=!equal(result.state,response.payload);app.applyState(result.state);
-      }else{checkpoint.base=clone(sent);checkpoint.revision=response.revision;checkpoint.pending=app.getState();checkpoint.dirty=!equal(checkpoint.pending,sent);lastSync=Date.now();}
-    }else{const remote=await rpc('junto_read_space');if(checkpoint!==currentCheckpoint||user?.id!==currentUserID)return;if(!remote)throw new Error('ACCESS_DENIED');checkpoint.members=remote.members;if(remote.revision!==checkpoint.revision){const local=app.getState(),oldBase=clone(checkpoint.base),result=mergeStates(oldBase,local,remote.payload);
-        if(result.conflicts.length){conflict={base:oldBase,local,remote:clone(remote.payload),revision:remote.revision,conflicts:result.conflicts};setMessage('Alterações para conferir');return;}
-        checkpoint.base=clone(remote.payload);checkpoint.revision=remote.revision;checkpoint.pending=result.state;checkpoint.dirty=!equal(result.state,remote.payload);app.applyState(result.state);
-      }lastSync=Date.now();}
-    saveCheckpoint();setMessage(checkpoint.dirty?'Mudanças aguardando sincronização':`Sincronizado${lastSync?' · '+new Date(lastSync).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):''}`);if(checkpoint.dirty)syncSoon();
-  }catch(e){setMessage(errorMessage(e));try{saveCheckpoint();}catch{setMessage('Não foi possível salvar a fila. Exporte um backup.');}}finally{syncRunning=false;}
+      if(checkpoint.dirty){
+        const sent=app.getState();validateState(sent);setMessage('Sincronizando…');
+        const response=await rpc('junto_sync_space',{p_space_id:checkpoint.spaceId,p_revision:checkpoint.revision,p_payload:sent});
+        if(checkpoint!==currentCheckpoint||user?.id!==currentUserID)return;
+        if(response.conflict){
+          const local=app.getState(),oldBase=clone(checkpoint.base),result=mergeStates(oldBase,local,response.payload);
+          if(result.conflicts.length){
+            conflict={base:oldBase,local,remote:clone(response.payload),revision:response.revision,conflicts:result.conflicts};
+            checkpoint.pending=clone(local);checkpoint.dirty=true;setMessage('Alterações para conferir');saveCheckpoint();return;
+          }
+          checkpoint.base=clone(response.payload);checkpoint.revision=response.revision;checkpoint.pending=result.state;
+          checkpoint.dirty=!equal(result.state,response.payload);app.applyState(result.state);
+          if(checkpoint.dirty)continue;
+          lastSync=Date.now();break;
+        }
+        checkpoint.base=clone(sent);checkpoint.revision=response.revision;checkpoint.pending=app.getState();
+        checkpoint.dirty=!equal(checkpoint.pending,sent);lastSync=Date.now();
+        if(checkpoint.dirty)continue;
+        break;
+      }
+
+      const remote=await rpc('junto_read_space');
+      if(checkpoint!==currentCheckpoint||user?.id!==currentUserID)return;
+      if(!remote)throw new Error('ACCESS_DENIED');
+      checkpoint.members=remote.members;
+      if(remote.revision!==checkpoint.revision){
+        const local=app.getState(),oldBase=clone(checkpoint.base),result=mergeStates(oldBase,local,remote.payload);
+        if(result.conflicts.length){
+          conflict={base:oldBase,local,remote:clone(remote.payload),revision:remote.revision,conflicts:result.conflicts};
+          checkpoint.pending=clone(local);checkpoint.dirty=true;setMessage('Alterações para conferir');saveCheckpoint();return;
+        }
+        checkpoint.base=clone(remote.payload);checkpoint.revision=remote.revision;checkpoint.pending=result.state;
+        checkpoint.dirty=!equal(result.state,remote.payload);app.applyState(result.state);
+        if(checkpoint.dirty)continue;
+      }
+      lastSync=Date.now();break;
+    }
+    saveCheckpoint();
+    setMessage(checkpoint.dirty?'Mudanças aguardando sincronização':`Sincronizado${lastSync?' · '+new Date(lastSync).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):''}`);
+    if(checkpoint.dirty&&!conflict)syncSoon();
+  }catch(e){
+    setMessage(errorMessage(e));try{saveCheckpoint();}catch{setMessage('Não foi possível salvar a fila. Exporte um backup.');}
+  }finally{syncRunning=false;}
 }
 function open(){
   if(conflict)return showConflicts();

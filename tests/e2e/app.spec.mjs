@@ -59,6 +59,66 @@ test('new Home stays functional in solo and couple modes',async({page})=>{
  await expect(page.locator('.home-spend-cta')).toContainText('Amor, posso gastar?');
  await expect(page.locator('#couple-cta .couple-top-cta')).toHaveCount(0);
 });
+
+test('critical money flow stays coherent: spend, edit, delete, bill, pay and reopen',async({page})=>{
+ await page.goto('/');await personal(page,10000);
+ await page.locator('#mobile-nav [data-route="bills"]').click();
+
+ // Gastos do mês: CTA deve registrar gasto e nunca oferecer divisão inválida no modo solo.
+ await page.locator('[data-action="bill-filter"][data-value="month"]').click();
+ await expect(page.locator('.bills-v3-add')).toContainText('Registrar gasto');
+ await page.locator('.bills-v3-add').click();
+ await expect(page.locator('input[name="expense-type"][value="spent"]')).toBeChecked();
+ await expect(page.locator('#expense-payer option')).toHaveCount(1);
+ await page.locator('#expense-title').fill('pizza');
+ await page.locator('#expense-amount').fill('10,00');
+ await expect(page.locator('#expense-category')).toHaveValue('Delivery');
+ await page.locator('[data-form="expense"] [type="submit"]').click();
+ await expect(page.locator('[data-action="tx-detail"]')).toHaveCount(1);
+ let state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.users[0].balance).toBe(9000);expect(state.transactions).toHaveLength(1);
+
+ // Editar recalcula saldo sem duplicar o lançamento.
+ await page.locator('[data-action="tx-detail"]').click();
+ await expect(page.locator('[data-action="edit-tx"]')).toBeVisible();
+ await page.locator('[data-action="edit-tx"]').click();
+ await page.locator('#edit-tx-amount').fill('12,00');
+ await page.locator('[data-form="edit-tx"] [type="submit"]').click();
+ state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.users[0].balance).toBe(8800);expect(state.transactions[0].amount).toBe(1200);
+
+ // Excluir estorna exatamente o que foi lançado.
+ await page.locator('[data-action="tx-detail"]').click();
+ await page.locator('[data-action="delete-tx"]').click();
+ await page.locator('[data-form="delete-tx"] [type="submit"]').click();
+ state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.users[0].balance).toBe(10000);expect(state.transactions).toHaveLength(0);
+
+ // A CTA principal de Contas deve abrir uma conta a pagar, não um gasto já realizado.
+ await page.locator('[data-action="bill-filter"][data-value="open"]').click();
+ await expect(page.locator('.bills-v3-add')).toContainText('Adicionar conta');
+ await page.locator('.bills-v3-add').click();
+ await expect(page.locator('input[name="expense-type"][value="bill"]')).toBeChecked();
+ await page.locator('#expense-title').fill('internet');
+ await page.locator('#expense-amount').fill('20,00');
+ await page.locator('[data-form="expense"] [type="submit"]').click();
+ state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.users[0].balance).toBe(10000);expect(state.bills).toHaveLength(1);expect(state.bills[0].status).toBe('open');
+
+ // Pagar reduz o saldo; reabrir estorna e devolve ao fluxo A pagar.
+ await page.locator('[data-action="bill-detail"]').click();
+ await page.locator('[data-action="pay-bill"]').click();
+ await page.locator('[data-form="pay-bill"] [type="submit"]').click();
+ state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.users[0].balance).toBe(8000);expect(state.bills[0].status).toBe('paid');expect(state.transactions).toHaveLength(1);
+ await expect(page.locator('[data-action="bill-filter"][data-value="paid"]')).toHaveClass(/active/);
+ await page.locator('[data-action="bill-detail"]').click();
+ await page.locator('[data-action="reopen-bill"]').click();
+ await page.locator('[data-form="reopen-bill"] [type="submit"]').click();
+ state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.users[0].balance).toBe(10000);expect(state.bills[0].status).toBe('open');expect(state.transactions).toHaveLength(0);
+});
+
 test.describe('offline PWA',()=>{
  test.use({serviceWorkers:'allow'});
  test('PWA reloads offline with its bundled fonts and scripts',async({page,context})=>{

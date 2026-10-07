@@ -335,10 +335,21 @@
   const unread=(id=active)=>state.notifications.filter(n=>n.to===id&&!n.read).length;
   const dateText=(d)=>new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}).replace('.','');
   const timeText=(t)=>{const age=Date.now()-t;if(age<60000)return 'agora';if(age<3600000)return `${Math.max(1,Math.floor(age/60000))} min atrás`;if(age<86400000)return `${Math.floor(age/3600000)} h atrás`;return new Date(t).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});};
-  const categories=['Casa','Alimentação','Delivery','Lanches','Transporte','Lazer','Compras','Saúde','Assinaturas','Hábitos','Educação','Pets','Beleza','Viagem','Presentes','Outros'];
-  const categoryIcon=(cat)=>({Hábitos:'sparkle',Casa:'house',Alimentação:'cart',Delivery:'moto',Lanches:'coffee',Transporte:'car',Lazer:'heart',Compras:'bag',Saúde:'pulse',Assinaturas:'wifi',Educação:'scan',Pets:'heart',Beleza:'sparkle',Viagem:'plane',Presentes:'gift',Outros:'wallet'}[cat]||'wallet');
-  const categoryColor=(cat)=>({Hábitos:'orange',Casa:'',Alimentação:'orange',Delivery:'orange',Lanches:'orange',Transporte:'blue',Lazer:'lilac',Compras:'lilac',Saúde:'blue',Assinaturas:'blue',Educação:'blue',Pets:'lilac',Beleza:'lilac',Viagem:'blue',Presentes:'orange'}[cat]||'');
+  const categories=['Casa','Alimentação','Restaurantes','Delivery','Lanches','Transporte','Lazer','Compras','Saúde','Assinaturas','Hábitos','Educação','Pets','Beleza','Viagem','Presentes','Tecnologia','Trabalho','Impostos','Outros'];
+  const categoryIcon=(cat)=>({Hábitos:'sparkle',Casa:'house',Alimentação:'cart',Restaurantes:'coffee',Delivery:'moto',Lanches:'coffee',Transporte:'car',Lazer:'heart',Compras:'bag',Saúde:'pulse',Assinaturas:'wifi',Educação:'scan',Pets:'heart',Beleza:'sparkle',Viagem:'plane',Presentes:'gift',Tecnologia:'phone',Trabalho:'scan',Impostos:'wallet',Outros:'wallet'}[cat]||'wallet');
+  const categoryColor=(cat)=>({Hábitos:'orange',Casa:'',Alimentação:'orange',Restaurantes:'orange',Delivery:'orange',Lanches:'orange',Transporte:'blue',Lazer:'lilac',Compras:'lilac',Saúde:'blue',Assinaturas:'blue',Educação:'blue',Pets:'lilac',Beleza:'lilac',Viagem:'blue',Presentes:'orange',Tecnologia:'blue',Trabalho:'blue',Impostos:'orange'}[cat]||'');
   const monthSpend=()=>state.transactions.filter(t=>t.date.slice(0,7)===dateISO().slice(0,7)).reduce((sum,t)=>sum+t.amount,0);
+  function quickCategorySuggestions(limit=5){
+    const score={};
+    state.transactions.slice().reverse().slice(0,100).forEach((t,i)=>{
+      if(!categories.includes(t.category))return;
+      let weight=Math.max(.25,1-i/120);
+      if(!isSolo())weight*=shareOf(t,active)>0?1.7:.65;
+      score[t.category]=(score[t.category]||0)+weight;
+    });
+    const defaults=isSolo()?['Alimentação','Transporte','Casa','Compras','Delivery']:['Alimentação','Delivery','Transporte','Casa','Lazer'];
+    return [...new Set([...Object.entries(score).sort((a,b)=>b[1]-a[1]).map(([c])=>c),...defaults])].filter(c=>categories.includes(c)).slice(0,limit);
+  }
   function persist(){state.updatedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(state));}catch{toast("Não foi possível salvar no aparelho.","Exporte uma cópia dos dados e confira o armazenamento.");}try{channel?.postMessage(state);}catch{}render();publishChange();}
   function log(actor,message){state.activity.unshift({id:uid(),actor,message,createdAt:Date.now()});state.activity=state.activity.slice(0,100);}
   function notify(to,title,body,kind='info',requestId){if(isSolo())return;state.notifications.unshift({id:uid(),to,title,body,kind,requestId,read:false,createdAt:Date.now()});state.notifications=state.notifications.slice(0,100);}
@@ -777,11 +788,11 @@
     [/padaria|\bpao\b|\bpaes\b/,'Padaria','Alimentação','bread'],
     [/hortifruti|\bfeira\b|fruta|verdura|legume|sacolao/,'Hortifruti','Alimentação','apple'],
     [/mercado|supermercado|atacad|assai|carrefour|compras do mes|acougue/,'Mercado','Alimentação','cart'],
-    [/restaurante|almoco|\bjanta\b|jantar|rodizio|churrasc|self.?service/,'Restaurante','Lazer','dish'],
+    [/restaurante|almoco|\bjanta\b|jantar|rodizio|churrasc|self.?service|bistro/,'Restaurante','Restaurantes','dish'],
     [/\buber\b|^99$|\b99 ?pop\b|corrida|\btaxi\b|indriver|cabify/,'Corrida de app','Transporte','ride'],
     [/passagem|onibus|\bmetro\b|\bbrt\b|bilhete unico|vale.?transporte|\btrem\b|circular/,'Passagem','Transporte','bus'],
     [/gasolina|\bposto\b|combust|etanol|alcool|diesel|abastec/,'Combustível','Transporte','fuel'],
-    [/estacion|pedagio|lava.?jato|oficina|mecanic|pneu|oleo do carro|ipva|seguro do carro/,'Carro','Transporte','car'],
+    [/estacion|pedagio|lava.?jato|oficina|mecanic|pneu|oleo do carro|seguro do carro/,'Carro','Transporte','car'],
     [/farmacia|remedio|drogaria|vitamina|drogasil/,'Farmácia','Saúde','pill'],
     [/medic|consulta|exame|dentista|psic|terapia|hospital|clinica/,'Consulta','Saúde','pulse'],
     [/academia|\bgym\b|crossfit|suplemento|whey|creatina|smart ?fit/,'Academia','Saúde','dumbbell'],
@@ -792,7 +803,10 @@
     [/netflix|spotify|streaming|prime video|disney|youtube|globoplay|\bhbo\b|\bmax\b|deezer/,'Streaming','Assinaturas','play'],
     [/internet|wi.?fi|fibra/,'Internet','Assinaturas','wifi'],
     [/celular|recarga|\bchip\b|telefone/,'Celular','Assinaturas','phone'],
-    [/icloud|google one|assinatura|mensalidade/,'Assinatura','Assinaturas','repeat'],
+        [/notebook|computador|mouse|teclado|monitor|iphone|smartphone|tablet|carregador|fone bluetooth/,'Tecnologia','Tecnologia','phone'],
+        [/coworking|material de trabalho|uniforme|ferramenta de trabalho|software de trabalho|despesa profissional/,'Trabalho','Trabalho','scan'],
+        [/imposto|iptu|ipva|darf|detran|multa|taxa bancaria|tarifa bancaria|tributo/,'Impostos e taxas','Impostos','wallet'],
+        [/icloud|google one|assinatura|mensalidade/,'Assinatura','Assinaturas','repeat'],
     [/aluguel/,'Aluguel','Casa','house'],[/condominio/,'Condomínio','Casa','building'],[/\bluz\b|energia|neoenergia|\benel\b|cemig/,'Luz','Casa','bolt'],[/\bagua\b|caesb|sabesp/,'Água','Casa','drop'],[/\bgas\b|botij/,'Gás','Casa','flame'],
     [/faxina|diarista|limpeza|detergente|sabao/,'Limpeza','Casa','sparkle'],
     [/coisas de casa|utensilio|\bmove(l|is)\b|decoracao|panela/,'Coisas de casa','Casa','house'],
@@ -803,7 +817,7 @@
     [/\bpet\b|racao|veterin|petshop/,'Pet','Pets','heart'],
     [/curso|livro|faculdade|escola|apostila|material escolar/,'Estudo','Educação','scan']
   ];
-  const CAT_GROUP={Delivery:'Alimentação',Lanches:'Alimentação'};
+  const CAT_GROUP={Restaurantes:'Alimentação',Delivery:'Alimentação',Lanches:'Alimentação'};
   const catPath=(c)=>CAT_GROUP[c]?`${CAT_GROUP[c]} › ${c.toLowerCase()}`:c;
   const firstWord=(n)=>n.split(/\s+/).filter(x=>x&&!/^\d/.test(x))[0]||n;
   function recognize(text){

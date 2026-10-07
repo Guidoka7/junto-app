@@ -15,7 +15,7 @@
 .forecast-details .confidence { color: var(--muted); }
 @media (max-width: 760px) {
   .workspace {
-    padding: calc(12px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px))) 16px
+    padding: max(36px, calc(12px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))) 16px
       calc(96px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))) !important;
   }
   .mobile-brand { min-height: 44px !important; margin: 0 0 10px !important; }

@@ -494,6 +494,11 @@
   }
   function renderPeer(){
     if(isSolo()){$('#peer-rail').innerHTML=connectCard(false);return;}
+    if(cloudSlot){
+      const waiting=state.requests.filter(r=>r.status==='pending'&&r.recipient===other()).length;
+      $('#peer-rail').innerHTML=`<div class="peer-heading"><h2>Do outro lado</h2><span class="badge">${icon('link')}Sincronizado</span></div><div class="peer-live-card">${avatar(other(),'large')}<div><h3>${esc(first(user(other()).name))} está na própria conta</h3><p>${waiting?`${waiting} ${waiting===1?'pedido está esperando resposta':'pedidos estão esperando resposta'}.`:'Quando você mandar um pedido, ele aparece no Juntô da outra pessoa.'}</p><small>Por segurança, você não responde no lugar dela. A resposta sincroniza automaticamente quando ela usar a conta dela.</small></div></div>`;
+      return;
+    }
     $('#peer-rail').innerHTML=`<div class="peer-heading"><h2>Do outro lado</h2><span class="badge">${icon('phone')}${esc(first(user(other()).name))}</span></div>${peerHTML()}<p class="peer-caption">Envie um pedido e responda aqui.<br><strong>O combinado atualiza nas duas telas.</strong></p><div class="sync-line">${icon('link')}Celulares simulados nesta demonstração</div>`;
     if($('#modal').open&&$('#modal').dataset.kind==='peer')$('#modal-content').innerHTML=modalHead(`Celular de ${first(user(other()).name)}`)+peerHTML()+'<p class="peer-caption">A outra pessoa pode responder por aqui.<br>Esta é uma simulação no mesmo navegador.</p>';
   }
@@ -1700,7 +1705,7 @@ ${JSON.stringify(chatContext())}`;
     if(action==='notifications')return notificationsModal();
     if(action==='settings')return settingsModal();
     if(action==='about')return aboutModal();
-    if(action==='peer'){openModal(`Celular de ${first(user(other()).name)}`,peerHTML()+'<p class="peer-caption">Responda como a outra pessoa.<br>As duas telas são simuladas neste navegador.</p>','peer');return;}
+    if(action==='peer'){if(cloudSlot)return openModal('Juntô sincronizado',`<div class="peer-live-card">${avatar(other(),'large')}<div><h3>${esc(first(user(other()).name))} responde na própria conta</h3><p>Os pedidos, respostas e compras sincronizam entre os dois perfis. Você não responde no lugar da outra pessoa.</p></div></div>`,'peer-info');openModal(`Celular de ${first(user(other()).name)}`,peerHTML()+'<p class="peer-caption">Responda como a outra pessoa.<br>As duas telas são simuladas neste navegador.</p>','peer');return;}
     if(action==='onboard'){onboardDraft={};onboard(0);return;}
     if(action==='onboard-back')return onboard(Math.max(1,onboardStep-1));
     if(action==='onboard-finish'){

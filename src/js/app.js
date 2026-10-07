@@ -1020,7 +1020,7 @@
   }
   function smartRead(prefix){
     const input=$('#'+prefix+'-title');if(!input)return;
-    const p=parseQuick(input.value),r=recognizeP(p),hist=prefix==='expense'?historyPrefill(input.value):null,billHist=prefix==='expense'?billHistoryPrefill(input.value):null,sel=$('#'+prefix+'-category'),tile=$('#'+prefix+'-icon'),read=$('#'+prefix+'-read'),amt=$('#'+prefix+'-amount');
+    const p=parseQuick(input.value),r=recognizeP(p),hist=['expense','request'].includes(prefix)?historyPrefill(input.value):null,billHist=prefix==='expense'?billHistoryPrefill(input.value):null,sel=$('#'+prefix+'-category'),tile=$('#'+prefix+'-icon'),read=$('#'+prefix+'-read'),amt=$('#'+prefix+'-amount');
     const suggestedCategory=r?.category||hist?.category||billHist?.category;
     if(suggestedCategory&&sel&&sel.dataset.touched!=='1'&&categories.includes(suggestedCategory))sel.value=suggestedCategory;
     const cat=sel?.value||'Outros',ic=r?r.icon:input.value.trim()?categoryIcon(cat):'sparkle';

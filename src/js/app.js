@@ -335,9 +335,9 @@
   const unread=(id=active)=>state.notifications.filter(n=>n.to===id&&!n.read).length;
   const dateText=(d)=>new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}).replace('.','');
   const timeText=(t)=>{const age=Date.now()-t;if(age<60000)return 'agora';if(age<3600000)return `${Math.max(1,Math.floor(age/60000))} min atrás`;if(age<86400000)return `${Math.floor(age/3600000)} h atrás`;return new Date(t).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});};
-  const categories=['Casa','Alimentação','Delivery','Lanches','Transporte','Lazer','Compras','Saúde','Assinaturas','Hábitos','Educação','Pets','Beleza','Viagem','Presentes','Outros'];
-  const categoryIcon=(cat)=>({Hábitos:'sparkle',Casa:'house',Alimentação:'cart',Delivery:'moto',Lanches:'coffee',Transporte:'car',Lazer:'heart',Compras:'bag',Saúde:'pulse',Assinaturas:'wifi',Educação:'scan',Pets:'heart',Beleza:'sparkle',Viagem:'plane',Presentes:'gift',Outros:'wallet'}[cat]||'wallet');
-  const categoryColor=(cat)=>({Hábitos:'orange',Casa:'',Alimentação:'orange',Delivery:'orange',Lanches:'orange',Transporte:'blue',Lazer:'lilac',Compras:'lilac',Saúde:'blue',Assinaturas:'blue',Educação:'blue',Pets:'lilac',Beleza:'lilac',Viagem:'blue',Presentes:'orange'}[cat]||'');
+  const categories=['Casa','Alimentação','Delivery','Lanches','Transporte','Lazer','Compras','Saúde','Assinaturas','Hábitos','Outros'];
+  const categoryIcon=(cat)=>({Hábitos:'flame',Casa:'house',Alimentação:'cart',Delivery:'moto',Lanches:'coffee',Transporte:'car',Lazer:'heart',Compras:'bag',Saúde:'pulse',Assinaturas:'wifi',Outros:'wallet'}[cat]||'wallet');
+  const categoryColor=(cat)=>({Hábitos:'orange',Casa:'',Alimentação:'orange',Delivery:'orange',Lanches:'orange',Transporte:'blue',Lazer:'lilac',Compras:'lilac',Saúde:'blue',Assinaturas:'blue'}[cat]||'');
   const monthSpend=()=>state.transactions.filter(t=>t.date.slice(0,7)===dateISO().slice(0,7)).reduce((sum,t)=>sum+t.amount,0);
   function persist(){state.updatedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(state));}catch{toast("Não foi possível salvar no aparelho.","Exporte uma cópia dos dados e confira o armazenamento.");}try{channel?.postMessage(state);}catch{}render();publishChange();}
   function log(actor,message){state.activity.unshift({id:uid(),actor,message,createdAt:Date.now()});state.activity=state.activity.slice(0,100);}
@@ -355,7 +355,6 @@
     $('#main-title').textContent=title;$('#couple-label').textContent=isSolo()?`${user('a').name} · modo individual`:`${user('a').name} & ${user('b').name}`;{const sc=$('.side-caption');if(sc)sc.textContent=isSolo()?'Meu espaço':'Nosso espaço';const sn=$('.side-note p'),ss=$('.side-note span');if(sn)sn.innerHTML=isSolo()?'Organizar sozinho é o primeiro passo.<br>A dois, fica ainda melhor.':'Amor não paga boleto.<br>Mas uma dupla organizada, sim.';if(ss)ss.textContent=isSolo()?'Um gasto de cada vez.':'Um combinado de cada vez.';const dx=$('.extra-demo-text');if(dx)dx.textContent=isSolo()?'Modo individual. Seu controle financeiro completo.':'Dois perfis. Uma mesma vida financeira.';const ob=document.querySelector('.demo-strip [data-action="onboard"]');if(ob)ob.textContent=isSolo()?'Criar minha conta':'Criar nossa dupla';}
     $('#month-label').innerHTML=icon('calendar')+' '+esc(new Date().toLocaleDateString('pt-BR',{month:'long',year:'numeric'}));
     $('#desktop-user-switch').innerHTML=switcher();$('#mobile-user-switch').innerHTML=switcher();
-    const coupleCTA=$('#couple-cta');if(coupleCTA)coupleCTA.innerHTML=isSolo()?`<button class="couple-top-cta" data-action="connect" aria-label="Conectar no Juntô a dois">${icon('heart')}<span>Juntô a dois</span></button>`:'';
     $('#notification-button').innerHTML=icon('bell')+(unread()?`<span class="dot-count">${Math.min(9,unread())}</span>`:'');
     $('#settings-button').innerHTML=icon('settings');
     $('#side-couple').innerHTML=isSolo()?`<div class="av-stack">${avatar('a')}</div><div><strong>${esc(first(user('a').name))}</strong><small>Modo individual</small></div><button class="icon-btn" data-action="settings" aria-label="Ajustes">${icon('settings')}</button>`:`<div class="av-stack">${avatar('a')}${avatar('b')}</div><div><strong>${esc(first(user('a').name))} & ${esc(first(user('b').name))}</strong><small>Nossa dupla</small></div><button class="icon-btn" data-action="settings" aria-label="Personalizar a dupla">${icon('settings')}</button>`;
@@ -370,61 +369,24 @@
   }
   function activityRows(items){return items.map(a=>`<div class="activity-row">${avatar(a.actor)}<div><p><b>${esc(first(user(a.actor).name))}</b> ${esc(a.message)}</p><time>${timeText(a.createdAt)}</time></div></div>`).join('');}
   function homeView(){
-    const available=free(),request=pending()[0],g=state.goals[0],solo=isSolo();
-    const now=new Date(),expectedIncome=monthIncome(now.getFullYear(),now.getMonth()),spent=monthSpend();
-    const spendPct=expectedIncome?Math.min(100,Math.round(spent/expectedIncome*100)):null;
-    const hasIncome=state.incomes.length>0,cap=hasIncome?Math.max(0,dailyCap()):Math.max(0,available);
-    const capLabel=hasIncome?'Ritmo recomendado hoje':'Livre depois das reservas';
-    const goalPct=g?Math.min(100,Math.round(g.saved/g.target*100)):0;
+    const available=free(),request=pending()[0],g=state.goals[0];
     let insightTitle,insightBody;
-    if(available<0){insightTitle=solo?'Seu mês pediu um ajuste.':'O mês pediu uma conversa.';insightBody=`Faltam ${cash(-available)} para cobrir contas, planos e valores reservados. Vale rever as prioridades antes do próximo gasto.`;}
-    else if(request&&!solo){insightTitle=request.amount<=available?'Essa vontade cabe no mês.':'Essa vontade pede uma conversa.';insightBody=request.amount<=available?`Se vocês combinarem “${request.title}”, ainda sobram ${cash(available-request.amount)} livres.`:`“${request.title}” passa ${cash(request.amount-available)} do saldo livre. Dá para ajustar o valor ou deixar para depois.`;}
-    else{const tip=tips()[0];if(tip){insightTitle=tip.title;insightBody=tip.body.replace(/<[^>]+>/g,'');}else{insightTitle=solo?'Seu dinheiro está organizado para hoje.':'A dupla está com o mês organizado.';insightBody=`Depois das contas e dos planos, ${solo?'você tem':'vocês têm'} ${cash(Math.max(0,available))} livres. O próximo gasto atualiza essa leitura na hora.`;}}
-    const latest=state.transactions.slice().sort((a,b)=>(b.createdAt||pd(b.date).getTime())-(a.createdAt||pd(a.date).getTime())).slice(0,3);
-    const alerts=radar().slice(0,2);
-    const modeBadge=solo?`${icon('wallet')}Modo solo`:`${icon('heart')}Juntô a dois`;
-    const spendAction=solo?'can-spend':'ask',spendLabel=solo?'Posso gastar?':'Amor, posso gastar?';
-    return `<div class="home-v2">
-      <div class="home-greeting"><div><span class="home-mode-badge">${modeBadge}</span><h2>Oi, ${esc(first(user().name))}! <span aria-hidden="true">👋</span></h2><p>${solo?'Bora manter o foco hoje?':'Bora cuidar do que é de vocês hoje?'}</p></div></div>
+    if(available<0){insightTitle='O mês pediu uma reunião da dupla.';insightBody=`Faltam ${cash(-available)} para cobrir contas, planos e combinados. Vale rever as prioridades juntos.`;}
+    else if(request){insightTitle=request.amount<=available?'Essa vontade cabe no mês.':'Essa vontade pede uma conversa.';insightBody=request.amount<=available?`Se vocês combinarem “${request.title}”, ainda sobram ${cash(available-request.amount)} livres. O plano de vocês continua protegido.`:`“${request.title}” passa ${cash(request.amount-available)} do saldo livre. Vocês podem ajustar o valor ou deixar para depois.`;}
+    else{const tip=tips()[0];if(tip){insightTitle=tip.title;insightBody=tip.body.replace(/<[^>]+>/g,'');}else{insightTitle='Tem espaço pra viver e pra planejar.';insightBody=`Depois das contas e dos planos, vocês têm ${cash(available)} livres. Registrem os próximos gastos para manter a conta redonda.`;}}
+    const openBills=state.bills.filter(b=>b.status==='open').sort((a,b)=>a.due.localeCompare(b.due)).slice(0,3);
+    return `<div class="hello-line"><p>Oi, <b>${esc(first(user().name))}</b>. Olha a nossa dupla.</p><span class="badge">${icon('heart')}No mesmo time</span></div>
       ${incoming().length?`<div class="pending-banner">${icon('chat')}<p>${esc(first(user(other()).name))} quer combinar ${incoming().length===1?'um gasto.':`${incoming().length} gastos.`} Bora responder?</p><button data-action="route" data-route="requests">Ver pedido</button></div>`:''}
-      ${(()=>{const arr=pendingArrivals();if(!arr.length)return '';const a=arr[0];return `<div class="pending-banner arrival">${icon('coins')}<p><b>${esc(a.inc.name)} de ${esc(first(user(a.inc.person).name))}</b> ${a.date===dateISO()?'cai hoje':`era pra ter caído ${dayMonth(a.date)}`}. Confirma e a previsão se ajusta.${arr.length>1?` (+${arr.length-1})`:''}</p><button data-action="income-arrived" data-id="${a.inc.id}" data-date="${a.date}">Confirmar</button></div>`;})()}
-      ${contestBanner()}
-      <section class="home-money-card" aria-label="Resumo financeiro">
-        <div class="home-money-head"><span>${solo?'Seu saldo livre hoje':'Saldo livre da dupla hoje'}</span><button class="icon-btn" data-action="hide" aria-label="${hidden?'Mostrar':'Ocultar'} valores">${icon(hidden?'eyeOff':'eye')}</button></div>
-        <div class="home-money-main"><div><strong class="home-free-value num" id="free-amount">${available<0?'− ':''}${cash(Math.abs(available))}</strong><small>${available<0?'Falta para fechar o mês':'Contas, planos e valores reservados já descontados'}</small></div><button class="home-spend-cta" data-action="${spendAction}">${icon('cart')}<span>${spendLabel}</span></button></div>
-        <div class="home-money-meta"><span>${icon('sparkle')}${capLabel}</span><b class="num">${cashR(cap)}</b></div>
-      </section>
-      <div class="home-summary-grid">
-        <section class="home-summary-card spend"><span class="home-summary-icon">${icon('wallet')}</span><div><span>Gasto do mês</span><strong class="num">${cash(spent)}</strong>${spendPct!=null?`<small>${spendPct}% da renda prevista</small><div class="home-progress"><span style="width:${spendPct}%"></span></div>`:'<small>Configure as entradas para comparar com a renda.</small>'}</div></section>
-        <section class="home-summary-card dream"><span class="home-summary-icon">${icon(g?.icon||'heart')}</span><div><span>Próximo sonho</span>${g?`<strong>${esc(g.name)}</strong><small>${cash(g.saved)} de ${cash(g.target)} · ${goalPct}%</small><div class="home-progress"><span style="width:${goalPct}%"></span></div>`:`<strong>Escolha um objetivo</strong><small>Seu plano aparece aqui quando você criar a primeira meta.</small>`}</div></section>
-      </div>
-      <button class="home-insight-card" data-action="chat-open"><span class="home-insight-icon">💡</span><span><b>Dica do seu consultor Juntô ✨</b><small><strong>${esc(insightTitle)}</strong> ${esc(insightBody)}</small></span><span class="home-chevron">›</span></button>
-      <section class="home-quick-entry">
-        <div class="home-section-title"><div><span class="home-plus-dot">${icon('plus')}</span><h2>Registrar gasto rápido</h2></div><button class="text-link" data-action="expense">Abrir completo</button></div>
-        <button class="home-smart-input" data-action="expense"><span>${icon('sparkle')}Escreva do seu jeito: “pizza 45”, “uber 18 ontem”…</span><b>R$ 0,00</b></button>
-        <div class="home-category-chips">
-          <button data-action="quick-expense" data-category="Alimentação">${icon('cart')}Alimentação</button>
-          <button data-action="quick-expense" data-category="Transporte">${icon('car')}Transporte</button>
-          <button data-action="quick-expense" data-category="Casa">${icon('house')}Casa</button>
-          <button data-action="quick-expense" data-category="Compras">${icon('bag')}Compras</button>
-          <button data-action="expense">•••</button>
-        </div>
-        <p>O Juntô tenta preencher item, categoria, valor, data e quem pagou. Você continua podendo editar tudo antes de salvar.</p>
-      </section>
-      <section class="home-latest">
-        <div class="home-section-title"><h2>Seus últimos lançamentos</h2><button class="text-link" data-action="route" data-route="bills">Ver todos</button></div>
-        ${latest.length?latest.map(t=>{const it=itemOf(t);return `<button class="home-latest-row" data-action="route" data-route="bills"><span class="category-icon ${categoryColor(t.category)}">${icon(it.icon)}</span><span class="home-latest-copy"><b>${esc(t.name)}</b><small>${dateText(t.date)} · ${esc(t.category)}</small></span><strong class="num">− ${cash(t.amount)}</strong><span class="home-chevron">›</span></button>`;}).join(''):`<div class="home-empty-row">${icon('wallet')}<span><b>Nenhum gasto registrado ainda.</b><small>O primeiro lançamento aparece aqui.</small></span><button data-action="expense">Registrar</button></div>`}
-      </section>
-      <details class="home-more">
-        <summary>Ver previsão, plano e alertas do mês <span>＋</span></summary>
-        <div class="home-more-body">
-          ${forecastStrip()}
-          ${challengeStrip()}
-          ${saveFirstPanel()}
-          ${alerts.length?`<section class="radar compact"><div class="section-header"><h2>Radar</h2><span class="small muted">O Juntô fica de olho</span></div><div class="radar-list">${alerts.map(x=>`<button class="radar-item ${x.kind}" data-action="route" data-route="${x.route}" ${x.anchor?`data-anchor="${x.anchor}"`:''}>${icon(x.icon)}<span><b>${esc(x.title)}</b><small>${esc(x.body)}</small></span></button>`).join('')}</div></section>`:''}
-        </div>
-      </details>
-    </div>`;
+      ${(()=>{const arr=pendingArrivals();if(!arr.length)return '';const a=arr[0];return `<div class="pending-banner arrival">${icon('coins')}<p><b>${esc(a.inc.name)} de ${esc(first(user(a.inc.person).name))}</b> ${a.date===dateISO()?'cai hoje':`era pra ter caído ${dayMonth(a.date)}`}. Confirma e já guarda primeiro.${arr.length>1?` (+${arr.length-1})`:''}</p><button data-action="income-arrived" data-id="${a.inc.id}" data-date="${a.date}">Confirmar</button></div>`;})()}
+      ${contestBanner()}<section class="balance-card" aria-label="Resumo financeiro"><div class="balance-heading"><span>Saldo da dupla</span><button class="icon-btn" data-action="hide" aria-label="${hidden?'Mostrar':'Ocultar'} valores">${icon(hidden?'eyeOff':'eye')}</button></div><div class="balance-number num">${hidden?'••••••':`<span class="currency">R$</span>${moneyNumber(total())}`}</div><div class="people-balances">${state.users.map(u=>`<button data-action="balance" data-user="${u.id}" aria-label="Atualizar saldo de ${esc(u.name)}">${avatar(u.id)}<span class="person-data"><span>${esc(first(u.name))}</span><strong class="num">${cash(u.balance)}</strong></span></button>`).join('')}</div><div class="balance-divider"></div><div class="free-line"><span class="free-label">${icon('sparkle')}${available<0?'Falta para fechar':'Livre pra curtir'}</span><strong class="free-number num" id="free-amount">${cash(available<0?-available:available)}</strong></div><div class="money-breakdown"><div><span>Contas a pagar</span><b class="num">${cash(billsTotal())}</b></div><div><span>Planos protegidos</span><b class="num">${cash(protectedTotal())}</b></div><div><span>Gastos combinados</span><b class="num">${cash(approvedTotal())}</b></div></div><div class="balance-foot">${icon(available>=0?'shield':'info')}<span>${available>=0?'Contas e planos descontados do livre. O resto é vida.':'O saldo livre ficou negativo. Vamos ajustar juntos.'}</span></div></section>
+      ${forecastStrip()}
+      <div class="quick-actions">${isSolo()?`<button class="btn ask-button" data-action="can-spend">${icon('sparkle')}Posso gastar?</button>`:`<button class="btn ask-button" data-action="ask">${icon('chat')}Amor, posso gastar?</button>`}<button class="btn secondary" data-action="expense">${icon('plus')}Registrar gasto</button></div>
+      ${challengeStrip()}
+      <div class="insight-card"><div class="insight-icon">${icon('sparkle')}</div><div><h3>Toque do Juntô <span class="tiny-badge">De olho no mês</span></h3><p><b>${esc(insightTitle)}</b> ${esc(insightBody)}</p></div></div>
+      ${(()=>{const items=radar();return items.length?`<section class="radar"><div class="section-header"><h2>Radar</h2><span class="small muted">O Juntô fica de olho por vocês</span></div><div class="radar-list">${items.map(x=>`<button class="radar-item ${x.kind}" data-action="route" data-route="${x.route}" ${x.anchor?`data-anchor="${x.anchor}"`:''}>${icon(x.icon)}<span><b>${esc(x.title)}</b><small>${esc(x.body)}</small></span></button>`).join('')}</div></section>`:'';})()}
+      ${saveFirstPanel()}
+      <div class="dash-bottom"><section class="panel"><div class="section-header"><h2>Contas chegando</h2><button class="text-link" data-action="route" data-route="bills">Ver todas</button></div>${openBills.length?openBills.map(b=>`<div class="bill-preview"><div class="category-icon ${categoryColor(b.category)}">${icon((recognize(b.name)||{icon:categoryIcon(b.category)}).icon)}</div><div class="bill-data"><strong>${esc(b.name)}</strong><span>${esc(payerLabel(b.payer))} · ${b.recurring?'todo mês':'este mês'}</span></div><div class="bill-value"><strong class="num">${cash(b.amount)}</strong><span>${dateText(b.due)}</span></div></div>`).join(''):`<div class="empty" style="margin:0;padding:20px 10px">${icon('circleCheck')}<p>Nenhuma conta pendente.<br>A dupla agradece.</p><button class="btn secondary" data-action="expense">Adicionar conta</button></div>`}</section>${goalPreview(g)}</div>
+      ${isSolo()?connectCard(false):''}<section class="activity-peek"><div class="section-header"><h2 style="font-size:16px">A dupla em movimento</h2><button class="text-link" data-action="route" data-route="activity">Ver tudo</button></div>${state.activity.length?activityRows(state.activity.slice(0,2)):`<p class="small muted">O primeiro combinado de vocês aparece aqui.</p>`}</section>`;
   }
   function requestCard(r){
     const mine=r.author===active,statusLabel={pending:'Em conversa',approved:'Combinado 💚',declined:'Fica pra depois',purchased:'Já comprou',cancelled:'Cancelado'}[r.status];
@@ -787,7 +749,7 @@
     [/academia|\bgym\b|crossfit|suplemento|whey|creatina|smart ?fit/,'Academia','Saúde','dumbbell'],
     [/cinema|filme|ingresso|\bshow\b|teatro|festa|balada|pipoca/,'Cinema e eventos','Lazer','ticket'],
     [/\bbar\b|barzinho|happy ?hour|boteco|\bpub\b/,'Barzinho','Lazer','beer'],
-    [/passeio|viagem|hotel|pousada|airbnb|\bparque\b|praia/,'Viagem','Viagem','plane'],
+    [/passeio|viagem|hotel|pousada|airbnb|\bparque\b|praia/,'Passeio','Lazer','map'],
     [/\bjogos?\b|\bgames?\b|steam|playstation|xbox|\bpsn\b|\bskin\b/,'Games','Lazer','game'],
     [/netflix|spotify|streaming|prime video|disney|youtube|globoplay|\bhbo\b|\bmax\b|deezer/,'Streaming','Assinaturas','play'],
     [/internet|wi.?fi|fibra/,'Internet','Assinaturas','wifi'],
@@ -797,11 +759,11 @@
     [/faxina|diarista|limpeza|detergente|sabao/,'Limpeza','Casa','sparkle'],
     [/coisas de casa|utensilio|\bmove(l|is)\b|decoracao|panela/,'Coisas de casa','Casa','house'],
     [/roupa|camisa|camiseta|\bcalca\b|vestido|tenis|sapato|shein|renner|riachuelo/,'Roupa','Compras','shirt'],
-    [/presente|aniversario/,'Presente','Presentes','gift'],
-    [/perfume|maquiagem|cosmetic|skincare|\bcreme\b|boticario|natura/,'Beleza','Beleza','sparkle'],
-    [/cabelo|salao|barbeir|\bunhas?\b|manicure|sobrancelha/,'Cabelo e beleza','Beleza','sparkle'],
-    [/\bpet\b|racao|veterin|petshop/,'Pet','Pets','heart'],
-    [/curso|livro|faculdade|escola|apostila|material escolar/,'Estudo','Educação','scan']
+    [/presente|aniversario/,'Presente','Compras','gift'],
+    [/perfume|maquiagem|cosmetic|skincare|\bcreme\b|boticario|natura/,'Beleza','Compras','sparkle'],
+    [/cabelo|salao|barbeir|\bunhas?\b|manicure|sobrancelha/,'Cabelo e beleza','Compras','scissors'],
+    [/\bpet\b|racao|veterin|petshop/,'Pet','Outros','paw'],
+    [/curso|livro|faculdade|escola|apostila|material escolar/,'Estudo','Outros','book']
   ];
   const CAT_GROUP={Delivery:'Alimentação',Lanches:'Alimentação'};
   const catPath=(c)=>CAT_GROUP[c]?`${CAT_GROUP[c]} › ${c.toLowerCase()}`:c;
@@ -872,10 +834,8 @@
   function askModal(){
     openModal('Amor, posso gastar?',`<p class="modal-sub">Manda a vontade para ${esc(first(user(other()).name))}. O Juntô faz a conta, vocês fazem o combinado.</p><form class="form" data-form="ask">${smartEntry('request','O que tá namorando?')}<div class="field-pair">${field('request-amount','Quanto custa?','0,00','',true)}<div class="field cat-wrap" id="request-cat-wrap" hidden><label for="request-category">Categoria</label><select id="request-category" name="request-category">${optionCategories('Lazer')}</select></div></div><div class="field"><label for="request-note">Defende teu caso 😌 <span>opcional</span></label><textarea id="request-note" name="request-note" maxlength="180" placeholder="Ex.: prometo que esse tênis corre sozinho"></textarea></div><div class="form-note" id="request-impact"><strong>Antes de mandar, olha o impacto.</strong>Hoje vocês têm ${cash(free())} livres depois das contas e dos planos.</div><div class="form-note" id="request-cat" hidden></div>${formEnd(`${icon('chat')}Mandar para ${esc(first(user(other()).name))}`)}<p class="fine-print">O pedido aparece imediatamente no outro celular simulado.</p></form>`,'ask');
   }
-  function expenseModal(presetCategory=''){
-    const preset=categories.includes(presetCategory)?presetCategory:'';
-    openModal('Mais um gasto, menos um mistério.',`<p class="modal-sub">Se já pagou, entra no saldo. Se vai pagar, entra nas contas.</p><form class="form" data-form="expense"><div class="segmented" aria-label="Tipo de gasto"><label><input type="radio" name="expense-type" value="spent" checked>Já gastei</label><label><input type="radio" name="expense-type" value="bill">Vou pagar</label><label><input type="radio" name="expense-type" value="fixed">Conta fixa</label></div>${smartEntry('expense','O que foi?')}<div class="field cat-wrap" id="expense-cat-wrap" ${preset?'':'hidden'}><label for="expense-category">Categoria</label><select id="expense-category" name="expense-category">${optionCategories(preset||'Outros')}</select></div><div class="field-pair">${field('expense-amount','Valor','0,00','',true)}<div class="field"><label for="expense-payer">Quem paga?</label><select name="expense-payer" id="expense-payer" data-split>${optionPayers()}</select></div></div><p class="split-preview" id="split-preview"></p><div class="field"><label for="expense-date" id="expense-date-label">Data do gasto</label><input type="date" id="expense-date" name="expense-date" value="${dateISO()}" required></div><div class="form-note" id="budget-note" hidden></div><div class="form-note" id="expense-note">O valor sai do saldo de quem pagou e aparece no histórico ${isSolo()?'do seu controle':'da dupla'}.</div>${formEnd(isSolo()?'Registrar no meu controle':'Registrar na nossa conta')}</form>`,'expense');
-    if(preset){const sel=$('#expense-category');if(sel)sel.dataset.touched='1';smartRead('expense');}
+  function expenseModal(){
+    openModal('Mais um gasto, menos um mistério.',`<p class="modal-sub">Se já pagou, entra no saldo. Se vai pagar, entra nas contas.</p><form class="form" data-form="expense"><div class="segmented" aria-label="Tipo de gasto"><label><input type="radio" name="expense-type" value="spent" checked>Já gastei</label><label><input type="radio" name="expense-type" value="bill">Vou pagar</label><label><input type="radio" name="expense-type" value="fixed">Conta fixa</label></div>${smartEntry('expense','O que foi?')}<div class="field cat-wrap" id="expense-cat-wrap" hidden><label for="expense-category">Categoria</label><select id="expense-category" name="expense-category">${optionCategories()}</select></div><div class="field-pair">${field('expense-amount','Valor','0,00','',true)}<div class="field"><label for="expense-payer">Quem paga?</label><select name="expense-payer" id="expense-payer" data-split>${optionPayers()}</select></div></div><p class="split-preview" id="split-preview"></p><div class="field"><label for="expense-date" id="expense-date-label">Data do gasto</label><input type="date" id="expense-date" name="expense-date" value="${dateISO()}" required></div><div class="form-note" id="budget-note" hidden></div><div class="form-note" id="expense-note">O valor sai do saldo de quem pagou e aparece no histórico da dupla.</div>${formEnd('Registrar na nossa conta')}</form>`,'expense');
   }
   // ===== Contestar gastos =====
   const CONTEST_REASONS=['Não foi combinado','Valor alto demais','Não precisava','Dava pra esperar','Outro motivo'];
@@ -1457,7 +1417,6 @@ ${JSON.stringify(chatContext())}`;
     if(action==='hide'){hidden=!hidden;render();return;}
     if(action==='ask')return isSolo()?canSpendModal():askModal();
     if(action==='expense')return expenseModal();
-    if(action==='quick-expense')return expenseModal(el.dataset.category||'');
     if(action==='balance')return balanceModal(el.dataset.user||active);
     if(action==='new-goal')return newGoalModal();
     if(action==='contribute')return contributeModal(id);

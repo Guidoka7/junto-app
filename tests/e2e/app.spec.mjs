@@ -180,6 +180,38 @@ test('income goal and solo spending flows stay connected',async({page})=>{
  state=await page.evaluate(()=>window.JuntoApp.getState());
  expect(state.transactions).toHaveLength(1);expect(state.users[0].balance).toBe(495500);
 });
+
+test('couple request flow reserves then charges only when purchase is confirmed',async({page})=>{
+ await page.goto('/');await personal(page,100000);
+ await page.evaluate(()=>{const s=window.JuntoApp.getState();s.users.push({id:'b',name:'Bia',balance:100000,tone:'pink'});window.JuntoApp.applyState(s);});
+ await page.locator('#mobile-nav [data-route="home"]').click();
+ await page.locator('.home-spend-cta').click();
+ await page.locator('#request-title').fill('pizza 40 meio a meio');
+ await expect(page.locator('#request-amount')).toHaveValue('40,00');
+ await expect(page.locator('#request-payer')).toHaveValue('half');
+ await page.locator('[data-form="ask"] [type="submit"]').click();
+ let state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.requests).toHaveLength(1);expect(state.requests[0].status).toBe('pending');
+ expect(state.users[0].balance).toBe(100000);expect(state.users[1].balance).toBe(100000);
+
+ await page.locator('#mobile-user-switch [data-action="profile-photo-switch"]').click();
+ await page.locator('#mobile-nav [data-route="requests"]').click();
+ await page.locator('[data-action="approve"]').click();
+ state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.requests[0].status).toBe('approved');
+ expect(state.users[0].balance).toBe(100000);expect(state.users[1].balance).toBe(100000);
+
+ await page.locator('#mobile-user-switch [data-action="profile-photo-switch"]').click();
+ await page.locator('#mobile-nav [data-route="requests"]').click();
+ await page.locator('[data-action="purchase"]').click();
+ await expect(page.locator('#purchase-payer')).toHaveValue('half');
+ await page.locator('[data-form="purchase"] [type="submit"]').click();
+ state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.requests[0].status).toBe('purchased');
+ expect(state.transactions).toHaveLength(1);
+ expect(state.users[0].balance).toBe(98000);expect(state.users[1].balance).toBe(98000);
+});
+
 test.describe('offline PWA',()=>{
  test.use({serviceWorkers:'allow'});
  test('PWA reloads offline with its bundled fonts and scripts',async({page,context})=>{

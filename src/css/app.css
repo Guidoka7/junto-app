@@ -2347,3 +2347,30 @@ body[data-route="goals"] .mobile-nav button.active svg{background:#f4ecde;box-sh
  .plans-v3-create{grid-template-columns:38px minmax(0,1fr);gap:9px}
  .plans-v3-create strong{grid-column:2;white-space:normal}
 }
+/* ===== MODAL POSSO GASTAR V3 ===== */
+dialog[data-kind="ask"]{width:min(720px,calc(100vw - 18px));border-radius:30px}
+dialog[data-kind="ask"] .modal-wrap{padding:24px 25px 22px;background:#fffdfa}
+dialog[data-kind="ask"] .modal-head{align-items:flex-start;margin-bottom:2px}
+dialog[data-kind="ask"] .modal-head h2{font-size:31px;line-height:1.05;letter-spacing:-1px;color:#0b2348}
+.ask-v3-intro{display:flex;align-items:center;gap:12px;margin:2px 0 18px}
+.ask-v3-intro>span{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#f7edda;color:#a07933;flex:0 0 auto}
+.ask-v3-intro>span svg{width:22px;height:22px}
+.ask-v3-intro b{display:block;font-size:12px;color:#0b2348}
+.ask-v3-intro small{display:block;font-size:10.5px;color:#777d89;margin-top:3px}
+.ask-v3-form{gap:13px}
+.ask-v3-form .smart-entry{margin-bottom:0}
+.ask-v3-form .smart-read{margin-top:-5px}
+.ask-v3-form .field label{color:#636b79;font-size:10.5px;font-weight:750}
+.ask-v3-form .field input,.ask-v3-form .field select,.ask-v3-form .field textarea,.ask-v3-form .money-input{border-color:#e5e1dc;background:#fff;border-radius:16px}
+.ask-v3-form #request-amount{font-size:25px;font-weight:760;color:#0b2348}
+.ask-v3-impact{border:0!important;border-radius:18px!important;background:linear-gradient(110deg,#edf8f4,#f4fbf8)!important;color:#416b5d!important;padding:14px 16px!important}
+.ask-v3-impact strong{display:block;color:#2f5e4e!important;font-size:11px!important;margin-bottom:3px}
+dialog[data-kind="ask"] .form>button[type="submit"]{min-height:55px;border-radius:18px;background:linear-gradient(135deg,#e5bd69,#cda044);color:#0b2348;box-shadow:0 12px 25px #b78a3520}
+.ask-v3-later{width:100%;min-height:38px;color:#707786;font-size:11px;font-weight:700}
+@media(max-width:620px){
+ dialog[data-kind="ask"]{width:100%;max-width:none;margin:auto 0 0;border-radius:28px 28px 0 0}
+ dialog[data-kind="ask"] .modal-wrap{padding:20px 18px calc(18px + env(safe-area-inset-bottom,0px))}
+ dialog[data-kind="ask"] .modal-head h2{font-size:27px}
+ .ask-v3-intro{margin-bottom:14px}
+ .ask-v3-form .field-pair{grid-template-columns:1fr}
+}

@@ -51,6 +51,9 @@ export function mergeStates(base,local,remote,choices={}){
         const [old,left,right]=maps.map(m=>m.get(id));
         // The same scheduled income acknowledged on two devices is one receipt.
         if(!old&&left&&right&&collection==='received'&&left.incomeId&&left.amount===right.amount&&left.status===right.status&&left.person===right.person){out.push(clone(left.bankSource?left:right));continue;}
+        // Automatic saves produced by the same scheduled income are also one event,
+        // even when two devices computed it from slightly different expected dates.
+        if(!old&&left&&right&&collection==='saves'&&left.source==='auto'&&right.source==='auto'&&left.incomeId===right.incomeId&&left.goalId===right.goalId&&left.amount===right.amount){out.push(clone(left));continue;}
         const value=merge(old,left,right,[...path,id]);if(value!==undefined)out.push(value);
       }return out;
     }

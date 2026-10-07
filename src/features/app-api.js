@@ -2,7 +2,7 @@
 // Keep all financial mutations in the existing model rather than a second ledger.
   let cloudSlot = null, appAccess = false;
   try{const slot=localStorage.getItem("junto-cloud-slot");if(["a","b"].includes(slot))cloudSlot=slot;}catch{}
-  const copyState = () => structuredClone(state);
+  const copyState = () => JSON.parse(JSON.stringify(state));
   const publishChange = () => window.dispatchEvent(new CustomEvent('junto:state-changed', {detail: copyState()}));
   function freshPersonalState(name = 'Você') {
     return migrate({schema:1, updatedAt:Date.now(), users:[{id:'a',name:String(name).slice(0,24),balance:0,tone:'blue'}],

@@ -136,6 +136,7 @@
   }
   function applyBalanceShares(shares,direction){shares.forEach(x=>{const u=state.users.find(u=>u.id===x.id);if(u)u.balance+=direction*x.amount;});}
   function reallocateTransaction(t,amount,payer){
+    if(t?.balanceDelta===0)return {shares:[]};
     const oldShares=transactionShares(t);applyBalanceShares(oldShares,1);
     const nextShares=splitShares(amount,payer),short=nextShares.find(x=>x.amount>user(x.id).balance);
     if(short){applyBalanceShares(oldShares,-1);return {error:`O saldo de ${first(user(short.id).name)} não cobre ${money(short.amount)}. Atualize o saldo ou escolha outra divisão.`};}

@@ -1,5 +1,11 @@
 const json=(res,status,body)=>{res.statusCode=status;res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify(body));};
 
+async function fetchTimed(url,options={},ms=15000){
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),ms);
+  try{return await fetch(url,{...options,signal:controller.signal});}
+  finally{clearTimeout(timer);}
+}
+
 function allowOrigin(origin){
   if(!origin)return null;
   try{
@@ -24,7 +30,7 @@ async function verifyUser(token){
   const url=String(process.env.SUPABASE_URL||'').replace(/\/+$/,'');
   const key=String(process.env.SUPABASE_PUBLISHABLE_KEY||'');
   if(!url||!key)throw Object.assign(new Error('Configuração de autenticação ausente no servidor.'),{status:503,code:'server_config'});
-  const response=await fetch(url+'/auth/v1/user',{headers:{Authorization:'Bearer '+token,apikey:key}});
+  const response=await fetchTimed(url+'/auth/v1/user',{headers:{Authorization:'Bearer '+token,apikey:key}},8000);
   if(!response.ok)throw Object.assign(new Error('Sessão inválida ou expirada.'),{status:401,code:'unauthorized'});
   return response.json();
 }
@@ -50,6 +56,9 @@ export default async function handler(req,res){
   if(!body||typeof body!=='object'||!Array.isArray(body.contents))return json(res,400,{code:'bad_request',message:'Solicitação inválida.'});
 
   const generationConfig={...(body.generationConfig||{})};
+  generationConfig.maxOutputTokens=Math.min(4096,Math.max(256,Number(generationConfig.maxOutputTokens)||2048));
+  if(generationConfig.temperature!==undefined)generationConfig.temperature=Math.min(1,Math.max(0,Number(generationConfig.temperature)||0));
+  if(generationConfig.topP!==undefined)generationConfig.topP=Math.min(1,Math.max(0,Number(generationConfig.topP)||0));
   if(model.startsWith('gemini-3')){
     delete generationConfig.temperature;
     delete generationConfig.topP;
@@ -72,11 +81,11 @@ export default async function handler(req,res){
 
   try{
     await verifyUser(token);
-    const upstream=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent',{
+    const upstream=await fetchTimed('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-goog-api-key':apiKey},
       body:encoded
-    });
+    },30000);
     let data={};try{data=await upstream.json();}catch{}
     if(!upstream.ok){
       let code='upstream_error';
@@ -92,6 +101,7 @@ export default async function handler(req,res){
     }
     return json(res,200,data);
   }catch(error){
+    if(error?.name==='AbortError')return json(res,504,{code:'timeout',message:'A inteligência demorou mais do que o esperado. Tente novamente.'});
     const status=Number(error?.status)||500,code=error?.code||'server_error';
     return json(res,status,{code,message:status===401?'Sua sessão expirou. Entre novamente no Juntô.':'Não foi possível concluir a solicitação agora.'});
   }

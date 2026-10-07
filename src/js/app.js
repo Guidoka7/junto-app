@@ -113,6 +113,18 @@
   function splitShares(amount,mode){if(mode==='a'||mode==='b')return [{id:mode,amount}];const r=mode==='prop'?incomeShare():.5,a=Math.round(amount*r);return [{id:'a',amount:a},{id:'b',amount:amount-a}].filter(s=>s.amount>0);}
   function splitPreview(amount,mode){if(!Number.isFinite(amount)||amount<=0)return mode==='prop'?`Divide pela renda prevista do mês: ${pct(incomeShare())} para ${first(user('a').name)}, ${pct(1-incomeShare())} para ${first(user('b').name)}.`:mode==='half'?'Cada um paga a metade, da própria conta.':'';const s=splitShares(amount,mode);if(s.length<2)return `Sai tudo da conta de ${first(user(s[0].id).name)}.`;return s.map(x=>`${first(user(x.id).name)} paga ${money(x.amount)}`).join(' · ')+(mode==='prop'?` (renda prevista: ${pct(incomeShare())} / ${pct(1-incomeShare())})`:'');}
   function charge(amount,mode){const shares=splitShares(amount,mode),short=shares.find(s=>s.amount>user(s.id).balance);if(short)return {error:`O saldo de ${first(user(short.id).name)} não cobre ${money(short.amount)}. Atualize o saldo ou escolha outra divisão.`};shares.forEach(s=>user(s.id).balance-=s.amount);return {shares};}
+  function transactionShares(t){
+    if(Array.isArray(t?.split)&&t.split.length)return t.split.map(x=>({id:x.id,amount:x.amount})).filter(x=>user(x.id)&&Number.isSafeInteger(x.amount));
+    return t&&user(t.payer)?[{id:t.payer,amount:t.amount}]:[];
+  }
+  function applyBalanceShares(shares,direction){shares.forEach(x=>{if(user(x.id))user(x.id).balance+=direction*x.amount;});}
+  function reallocateTransaction(t,amount,payer){
+    const oldShares=transactionShares(t);applyBalanceShares(oldShares,1);
+    const nextShares=splitShares(amount,payer),short=nextShares.find(x=>x.amount>user(x.id).balance);
+    if(short){applyBalanceShares(oldShares,-1);return {error:`O saldo de ${first(user(short.id).name)} não cobre ${money(short.amount)}. Atualize o saldo ou escolha outra divisão.`};}
+    applyBalanceShares(nextShares,-1);return {shares:nextShares};
+  }
+  function refundTransaction(t){applyBalanceShares(transactionShares(t),1);}
   const optionPayers=(selected=active)=>state.users.map(u=>`<option value="${u.id}" ${u.id===selected?'selected':''}>${esc(u.name)}</option>`).join('')+`<option value="half" ${selected==='half'?'selected':''}>Meio a meio</option><option value="prop" ${selected==='prop'?'selected':''}>Proporcional à renda</option>`;
   function rollRecurring(){
     const now=new Date(),cm=dateISO().slice(0,7),names=new Set(state.bills.filter(b=>b.due.slice(0,7)===cm).map(b=>b.name.toLowerCase())),latest={};let changed=false;
@@ -978,8 +990,8 @@
     const txs=billFilter==='month'?state.transactions.filter(t=>t.date.slice(0,7)===ym&&!t.billId):[];
     const openTotal=openBills.reduce((sum,b)=>sum+b.amount,0),shared=openBills.filter(b=>['half','prop'].includes(b.payer));
     const parts=shared.reduce((acc,b)=>{splitShares(b.amount,b.payer).forEach(x=>acc[x.id]=(acc[x.id]||0)+x.amount);return acc;},{a:0,b:0});
-    const billRow=(b)=>{const it=recognize(b.name)||{icon:categoryIcon(b.category)};const shares=splitShares(b.amount,b.payer);return `<article class="bills-v3-row ${b.contest?'has-contest':''}"><span class="bills-v3-icon ${categoryColor(b.category)}">${icon(it.icon)}</span><span class="bills-v3-copy"><b>${esc(b.name)}</b><small>${dateText(b.due)} · ${esc(payerLabel(b.payer))}${b.recurring?' · mensal':''}</small>${shares.length>1?`<span class="bills-v3-avatars">${shares.map(x=>avatar(x.id)).join('')}</span>`:''}</span><strong class="num">${cash(b.amount)}</strong>${b.status==='open'?`<button class="bills-v3-arrow" data-action="pay-bill" data-id="${b.id}" aria-label="Pagar ${esc(b.name)}">›</button>`:`<span class="bills-v3-paid">${icon('check')}</span>`}${b.contest?contestBlock(b.contest,'bill',b.id):''}</article>`;};
-    const txRow=(t)=>{const it=itemOf(t);return `<article class="bills-v3-row"><span class="bills-v3-icon ${categoryColor(t.category)}">${icon(it.icon)}</span><span class="bills-v3-copy"><b>${esc(t.name)}</b><small>${dateText(t.date)} · ${esc(t.category)} · ${esc(payerLabel(t.payer))}</small></span><strong class="num">− ${cash(t.amount)}</strong><span class="bills-v3-paid">›</span></article>`;};
+    const billRow=(b)=>{const it=recognize(b.name)||{icon:categoryIcon(b.category)};const shares=splitShares(b.amount,b.payer);return `<div class="bills-v3-row-wrap"><button class="bills-v3-row ${b.contest?'has-contest':''}" data-action="bill-detail" data-id="${b.id}" aria-label="Ver detalhes de ${esc(b.name)}"><span class="bills-v3-icon ${categoryColor(b.category)}">${icon(it.icon)}</span><span class="bills-v3-copy"><b>${esc(b.name)}</b><small>${dateText(b.due)} · ${esc(payerLabel(b.payer))}${b.recurring?' · mensal':''}</small>${shares.length>1?`<span class="bills-v3-avatars">${shares.map(x=>avatar(x.id)).join('')}</span>`:''}</span><strong class="num">${cash(b.amount)}</strong><span class="bills-v3-chevron">${b.status==='paid'?icon('check'):'›'}</span></button>${b.contest?`<div class="bills-v3-contest-wrap">${contestBlock(b.contest,'bill',b.id)}</div>`:''}</div>`;};
+    const txRow=(t)=>{const it=itemOf(t);return `<button class="bills-v3-row" data-action="tx-detail" data-id="${t.id}" aria-label="Ver detalhes de ${esc(t.name)}"><span class="bills-v3-icon ${categoryColor(t.category)}">${icon(it.icon)}</span><span class="bills-v3-copy"><b>${esc(t.name)}</b><small>${dateText(t.date)} · ${esc(t.category)} · ${esc(payerLabel(t.payer))}</small></span><strong class="num">− ${cash(t.amount)}</strong><span class="bills-v3-chevron">›</span></button>`;};
     return `<div class="bills-v3-head"><span>${solo?'MINHAS CONTAS':'NOSSAS CONTAS'}</span><h2>${solo?'Minhas contas':'Nossas contas'}</h2><p>${solo?'Tudo em dia. Cabeça em paz.':'Tudo em dia. Amor em paz.'}</p></div><div class="bills-v3-surface"><section class="bills-v3-summary"><div><span>A PAGAR ESTE MÊS</span><strong class="num">${cash(openTotal)}</strong><p>${openBills.length} ${openBills.length===1?'conta aberta':'contas abertas'}</p></div><button data-feature="bank-settings">${icon('wallet')}<span>Bancos ›</span></button><button class="bills-v3-income" data-action="route" data-route="incomes">${icon('trend')}<span>Entradas do mês</span><b>›</b></button></section><nav class="bills-v3-tabs"><button class="${billFilter==='open'?'active':''}" data-action="bill-filter" data-value="open">A pagar</button><button class="${billFilter==='paid'?'active':''}" data-action="bill-filter" data-value="paid">Pagas</button><button class="${billFilter==='all'?'active':''}" data-action="bill-filter" data-value="all">Todas</button></nav><div class="bills-v3-more"><button class="${billFilter==='fixed'?'active':''}" data-action="bill-filter" data-value="fixed">Fixas</button><button class="${billFilter==='month'?'active':''}" data-action="bill-filter" data-value="month">Gastos do mês</button><button class="${billFilter==='contested'?'active':''}" data-action="bill-filter" data-value="contested">Revisões${nOpen?` (${nOpen})`:''}</button></div><section class="bills-v3-list">${billFilter==='month'?txs.slice().reverse().map(txRow).join(''):bills.sort((a,b)=>a.due.localeCompare(b.due)).map(billRow).join('')}${billFilter!=='month'&&!bills.length?`<div class="home-empty-row">${icon(billFilter==='contested'?'flag':'wallet')}<span><b>${billFilter==='contested'?'Nenhuma revisão em aberto.':'Nada por aqui.'}</b><small>${billFilter==='open'?'As próximas contas aparecem assim que forem cadastradas.':'Troque o filtro ou adicione uma conta.'}</small></span></div>`:''}${billFilter==='month'&&!txs.length?`<div class="home-empty-row">${icon('wallet')}<span><b>Nenhum gasto neste mês.</b><small>O primeiro lançamento aparece aqui.</small></span></div>`:''}${shared.length&&!solo&&billFilter==='open'?`<div class="bills-v3-split"><span>${icon('half')}</span><div><b>Cada um com sua parte</b><small>Você ${cash(parts[active]||0)} · Meu amor ${cash(parts[other()]||0)}</small></div></div>`:''}</section><button class="bills-v3-add" data-action="expense">${icon('plus')}Adicionar conta</button></div>`;
   }
     // ===== Cortar o que não precisa =====
@@ -1494,6 +1506,32 @@ ${JSON.stringify(chatContext())}`;
     const b=state.bills.find(b=>b.id===id);if(!b||b.status!=='open')return;
     openModal('Boleto pago. Dupla aliviada.',`<p class="modal-sub">${esc(b.name)} · <b>${cash(b.amount)}</b></p><form class="form" data-form="pay-bill" data-id="${id}"><div class="field"><label for="bill-payer">Quem pagou?</label><select id="bill-payer" name="bill-payer" data-split data-amount="${b.amount}">${optionPayers(b.payer)}</select></div><p class="split-preview" id="split-preview">${esc(splitPreview(b.amount,b.payer))}</p><div class="form-note">Meio a meio ou proporcional: cada parte sai da conta de cada um. A conta deixa de aparecer nas pendências.</div>${formEnd('Confirmar pagamento')}</form>`,'pay-bill');
   }
+  function ledgerMeta(label,value){return `<div class="ledger-detail-meta"><span>${esc(label)}</span><b>${esc(value)}</b></div>`;}
+  function billDetailModal(id){
+    const b=state.bills.find(x=>x.id===id);if(!b)return;const paidTx=state.transactions.find(t=>t.billId===b.id);
+    const status=b.status==='paid'?'Paga':'A pagar',when=b.status==='paid'&&paidTx?`Pago em ${dateText(paidTx.date)}`:`Vence ${dateText(b.due)}`;
+    const actions=[`<button class="ledger-action" data-action="edit-bill" data-id="${b.id}">${icon('edit')}<span><b>Editar</b><small>Nome, valor, categoria, data e divisão</small></span></button>`];
+    if(b.status==='open')actions.push(`<button class="ledger-action primary" data-action="pay-bill" data-id="${b.id}">${icon('check')}<span><b>Marcar como paga</b><small>Registra o pagamento e atualiza o saldo</small></span></button>`);
+    if(b.status==='paid')actions.push(`<button class="ledger-action" data-action="reopen-bill" data-id="${b.id}">${icon('refresh')}<span><b>Reabrir conta</b><small>Desfaz o pagamento e devolve o valor ao saldo</small></span></button>`);
+    if(!isSolo()&&canContest(b))actions.push(`<button class="ledger-action" data-action="contest" data-kind="bill" data-id="${b.id}">${icon('flag')}<span><b>Contestar</b><small>Conversa sem apagar o histórico</small></span></button>`);
+    actions.push(`<button class="ledger-action danger" data-action="delete-bill" data-id="${b.id}">${icon('trash')}<span><b>Excluir conta</b><small>${b.status==='paid'?'Apaga a conta e estorna o pagamento':'Remove do planejamento'}</small></span></button>`);
+    openModal(b.name,`<div class="ledger-detail-v3"><div class="ledger-detail-hero"><span class="bills-v3-icon ${categoryColor(b.category)}">${icon((recognize(b.name)||{icon:categoryIcon(b.category)}).icon)}</span><div><span class="ledger-status ${b.status}">${status}</span><strong class="num">${cash(b.amount)}</strong><p>${esc(when)}</p></div></div><div class="ledger-detail-grid">${ledgerMeta('Categoria',b.category)}${ledgerMeta('Quem paga',payerLabel(b.payer))}${ledgerMeta('Tipo',b.recurring?'Conta fixa / mensal':'Conta avulsa')}${ledgerMeta('Criada como',b.item||b.name)}</div>${b.contest?contestBlock(b.contest,'bill',b.id):''}<div class="ledger-actions">${actions.join('')}</div></div>`,'ledger-detail');
+  }
+  function transactionDetailModal(id){
+    const t=state.transactions.find(x=>x.id===id);if(!t)return;const it=itemOf(t),who=payerLabel(t.payer);
+    const actions=[`<button class="ledger-action" data-action="edit-tx" data-id="${t.id}">${icon('edit')}<span><b>Editar</b><small>Corrigir nome, valor, categoria, data ou divisão</small></span></button>`];
+    if(!isSolo()&&canContest(t))actions.push(`<button class="ledger-action" data-action="contest" data-kind="tx" data-id="${t.id}">${icon('flag')}<span><b>Contestar</b><small>Registra a conversa sem apagar o gasto</small></span></button>`);
+    actions.push(`<button class="ledger-action danger" data-action="delete-tx" data-id="${t.id}">${icon('trash')}<span><b>Excluir gasto</b><small>Estorna o valor para o saldo e apaga o lançamento</small></span></button>`);
+    openModal(t.name,`<div class="ledger-detail-v3"><div class="ledger-detail-hero"><span class="bills-v3-icon ${categoryColor(t.category)}">${icon(it.icon)}</span><div><span class="ledger-status spent">Gasto</span><strong class="num">− ${cash(t.amount)}</strong><p>${dateText(t.date)}</p></div></div><div class="ledger-detail-grid">${ledgerMeta('Categoria',t.category)}${ledgerMeta('Quem pagou',who)}${ledgerMeta('Registrado por',first(user(t.by||t.payer).name))}${ledgerMeta('Item',t.item||t.name)}</div>${Array.isArray(t.split)&&t.split.length>1?`<div class="ledger-split-detail">${t.split.map(x=>`<span>${avatar(x.id)}<b>${esc(first(user(x.id).name))}</b><strong class="num">${cash(x.amount)}</strong></span>`).join('')}</div>`:''}${t.contest?contestBlock(t.contest,'tx',t.id):''}<div class="ledger-actions">${actions.join('')}</div></div>`,'ledger-detail');
+  }
+  function editBillModal(id){
+    const b=state.bills.find(x=>x.id===id);if(!b)return;
+    openModal('Editar conta',`<form class="form ledger-edit-form" data-form="edit-bill" data-id="${b.id}">${field('edit-bill-name','Nome da conta','',b.name)}<div class="field-pair">${field('edit-bill-amount','Valor','0,00',moneyNumber(b.amount),true)}<div class="field"><label for="edit-bill-category">Categoria</label><select id="edit-bill-category" name="edit-bill-category">${optionCategories(b.category)}</select></div></div><div class="field"><label for="edit-bill-payer">Quem paga?</label><select id="edit-bill-payer" name="edit-bill-payer" data-split data-amount="${b.amount}">${optionPayers(b.payer)}</select></div><p class="split-preview" id="split-preview">${esc(splitPreview(b.amount,b.payer))}</p><div class="field"><label for="edit-bill-date">Vencimento</label><input id="edit-bill-date" name="edit-bill-date" type="date" value="${b.due}" required></div><label class="check-row"><input type="checkbox" name="edit-bill-recurring" ${b.recurring?'checked':''}><span>Repetir todo mês</span></label>${b.status==='paid'?'<div class="form-note warn">Como esta conta já foi paga, alterar valor ou divisão também recalcula o saldo do pagamento registrado.</div>':''}${formEnd('Salvar alterações')}</form>`,'ledger-edit');
+  }
+  function editTransactionModal(id){
+    const t=state.transactions.find(x=>x.id===id);if(!t)return;
+    openModal('Editar gasto',`<form class="form ledger-edit-form" data-form="edit-tx" data-id="${t.id}">${field('edit-tx-name','Nome do gasto','',t.name)}<div class="field-pair">${field('edit-tx-amount','Valor','0,00',moneyNumber(t.amount),true)}<div class="field"><label for="edit-tx-category">Categoria</label><select id="edit-tx-category" name="edit-tx-category">${optionCategories(t.category)}</select></div></div><div class="field"><label for="edit-tx-payer">Quem pagou?</label><select id="edit-tx-payer" name="edit-tx-payer" data-split data-amount="${t.amount}">${optionPayers(t.payer)}</select></div><p class="split-preview" id="split-preview">${esc(splitPreview(t.amount,t.payer))}</p><div class="field"><label for="edit-tx-date">Data</label><input id="edit-tx-date" name="edit-tx-date" type="date" value="${t.date}" max="${dateISO()}" required></div><div class="form-note">Se o valor ou quem pagou mudar, o Juntô estorna o lançamento antigo e aplica o novo sem duplicar saldo.</div>${formEnd('Salvar alterações')}</form>`,'ledger-edit');
+  }
   function notificationsModal(){
     const list=state.notifications.filter(n=>n.to===active);
     state.notifications.forEach(n=>{if(n.to===active)n.read=true;});persist();
@@ -1562,7 +1600,14 @@ ${JSON.stringify(chatContext())}`;
     if(action==='approve')return approve(id,actor);
     if(action==='decline')return declineModal(id,actor);
     if(action==='purchase')return purchaseModal(id,actor);
+    if(action==='bill-detail')return billDetailModal(id);
+    if(action==='tx-detail')return transactionDetailModal(id);
+    if(action==='edit-bill')return editBillModal(id);
+    if(action==='edit-tx')return editTransactionModal(id);
     if(action==='pay-bill')return payBillModal(id);
+    if(action==='delete-tx'){const t=state.transactions.find(x=>x.id===id);if(!t)return;return openModal('Excluir este gasto?',`<p class="modal-sub"><b>${esc(t.name)}</b> · ${cash(t.amount)}. O valor volta para o saldo de quem pagou e o lançamento sai do histórico.</p><form class="form" data-form="delete-tx" data-id="${id}">${formEnd('Excluir e estornar')}</form>`,'remove');}
+    if(action==='delete-bill'){const b=state.bills.find(x=>x.id===id);if(!b)return;return openModal('Excluir esta conta?',`<p class="modal-sub"><b>${esc(b.name)}</b> · ${cash(b.amount)}.${b.status==='paid'?' O pagamento será estornado e o valor volta ao saldo.':' Ela será removida do planejamento.'}</p><form class="form" data-form="delete-bill" data-id="${id}">${formEnd('Excluir conta')}</form>`,'remove');}
+    if(action==='reopen-bill'){const b=state.bills.find(x=>x.id===id);if(!b||b.status!=='paid')return;return openModal('Reabrir esta conta?',`<p class="modal-sub">O pagamento de <b>${esc(b.name)}</b> será desfeito, o valor voltará ao saldo e a conta aparecerá novamente em “A pagar”.</p><form class="form" data-form="reopen-bill" data-id="${id}">${formEnd('Reabrir conta')}</form>`,'remove');}
     if(action==='notifications')return notificationsModal();
     if(action==='settings')return settingsModal();
     if(action==='about')return aboutModal();
@@ -1701,6 +1746,33 @@ ${JSON.stringify(chatContext())}`;
         state.transactions.push({id:uid(),name:nm,amount,category,payer,date,...itf,by:active,...(c.shares.length>1?{split:c.shares}:{})});log(active,`registrou ${nm}: ${money(amount)}, ${c.shares.length>1?payerLabel(payer).toLowerCase():'na conta de '+first(user(payer).name)}.`);
       }else{state.bills.push({id:uid(),name:nm,amount,category,payer,due:date,item:itf.item,icon:itf.icon,recurring:kind==='fixed',status:'open'});log(active,`adicionou ${kind==='fixed'?'uma conta fixa':'uma conta a pagar'}: ${title}.`);}
       notify(other(),'Conta atualizada.',`${first(user().name)} registrou ${title} por ${money(amount)}.`);close();route='bills';billFilter='all';persist();toast(kind==='spent'?'Gasto anotado. Sem mistério.':'Conta no radar da dupla.',`${title} · ${money(amount)}`);return;
+    }
+    if(type==='edit-tx'){
+      const t=state.transactions.find(x=>x.id===id);if(!t)return;const name=titleValue(d,'edit-tx-name',1,60),amount=amountValue(d,'edit-tx-amount'),category=d.get('edit-tx-category'),payer=d.get('edit-tx-payer'),date=d.get('edit-tx-date');
+      if(name==null||amount==null||!categories.includes(category)||!['a','b','half','prop'].includes(payer)||!/^\d{4}-\d{2}-\d{2}$/.test(date)){error('Confira os dados do gasto.');return;}
+      const moved=reallocateTransaction(t,amount,payer);if(moved.error){error(moved.error);return;}const itf=itemFields(name,category);
+      Object.assign(t,{name:smartName(name),amount,category,payer,date,...itf,split:moved.shares.length>1?moved.shares:undefined});if(moved.shares.length<2)delete t.split;learnFrom(name,category,true);
+      log(active,`editou o gasto ${t.name}: ${money(amount)}.`);close();persist();toast('Gasto atualizado.',`${t.name} · ${money(amount)}`);return;
+    }
+    if(type==='edit-bill'){
+      const b=state.bills.find(x=>x.id===id);if(!b)return;const name=titleValue(d,'edit-bill-name',1,60),amount=amountValue(d,'edit-bill-amount'),category=d.get('edit-bill-category'),payer=d.get('edit-bill-payer'),due=d.get('edit-bill-date'),recurring=d.get('edit-bill-recurring')==='on';
+      if(name==null||amount==null||!categories.includes(category)||!['a','b','half','prop'].includes(payer)||!/^\d{4}-\d{2}-\d{2}$/.test(due)){error('Confira os dados da conta.');return;}
+      const paidTx=state.transactions.find(t=>t.billId===b.id);let shares=null;if(b.status==='paid'&&paidTx){const moved=reallocateTransaction(paidTx,amount,payer);if(moved.error){error(moved.error);return;}shares=moved.shares;}
+      const itf=itemFields(name,category),newName=smartName(name);Object.assign(b,{name:newName,amount,category,payer,due,recurring,item:itf.item,icon:itf.icon});
+      if(paidTx){Object.assign(paidTx,{name:newName,amount,category,payer,item:itf.item,icon:itf.icon,split:shares&&shares.length>1?shares:undefined});if(!shares||shares.length<2)delete paidTx.split;}
+      learnFrom(name,category,true);log(active,`editou a conta ${b.name}: ${money(amount)}.`);close();persist();toast('Conta atualizada.',`${b.name} · ${money(amount)}`);return;
+    }
+    if(type==='delete-tx'){
+      const t=state.transactions.find(x=>x.id===id);if(!t)return;refundTransaction(t);
+      if(t.requestId){const r=state.requests.find(x=>x.id===t.requestId);if(r&&r.status==='purchased'){r.status='approved';delete r.payer;delete r.purchasedAt;}}
+      if(t.billId){const b=state.bills.find(x=>x.id===t.billId);if(b){b.status='open';delete b.paidAt;}}
+      state.transactions=state.transactions.filter(x=>x.id!==id);log(active,`excluiu o gasto ${t.name} e estornou ${money(t.amount)}.`);close();persist();toast('Gasto excluído.','O valor voltou para o saldo.');return;
+    }
+    if(type==='reopen-bill'){
+      const b=state.bills.find(x=>x.id===id);if(!b||b.status!=='paid')return;const t=state.transactions.find(x=>x.billId===b.id);if(t){refundTransaction(t);state.transactions=state.transactions.filter(x=>x.id!==t.id);}b.status='open';delete b.paidAt;log(active,`reabriu a conta ${b.name}.`);close();billFilter='open';persist();toast('Conta reaberta.','O pagamento foi estornado e a conta voltou para “A pagar”.');return;
+    }
+    if(type==='delete-bill'){
+      const b=state.bills.find(x=>x.id===id);if(!b)return;const related=state.transactions.filter(x=>x.billId===b.id);related.forEach(refundTransaction);state.transactions=state.transactions.filter(x=>x.billId!==b.id);state.bills=state.bills.filter(x=>x.id!==b.id);log(active,`excluiu a conta ${b.name}${related.length?' e estornou o pagamento':''}.`);close();persist();toast('Conta excluída.',related.length?'O pagamento também foi estornado.':'Ela saiu do planejamento.');return;
     }
     if(type==='balance'){
       const amount=amountValue(d,'balance-amount',true),who=form.dataset.user;if(amount==null||!user(who))return;

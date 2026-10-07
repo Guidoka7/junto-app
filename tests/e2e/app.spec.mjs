@@ -316,6 +316,27 @@ test('contextual transaction rows open details without losing the current flow',
  await expect(page.locator('.ledger-detail-hero')).toContainText('R$ 32');
 });
 
+
+test('manual backup restore validates, confirms and preserves a pre-restore copy',async({page})=>{
+ await page.goto('/');await personal(page,10000);
+ const backup=await page.evaluate(()=>{
+   const s=window.JuntoApp.getState(),date=new Date().toISOString().slice(0,10);
+   s.users[0].balance=123400;
+   s.transactions=[{id:'restored-tx',name:'Mercado',item:'Mercado',icon:'cart',amount:2300,category:'Alimentação',payer:'a',by:'a',date,createdAt:Date.now()}];
+   return JSON.stringify(s);
+ });
+ await page.locator('#settings-button').click();
+ await page.locator('[data-action="backup-import"]').click();
+ await page.locator('#backup-import-input').setInputFiles({name:'Junto-backup.json',mimeType:'application/json',buffer:Buffer.from(backup)});
+ await expect(page.locator('dialog[data-kind="restore-backup"]')).toBeVisible();
+ await expect(page.locator('#modal')).toContainText('1 gastos');
+ await page.locator('[data-form="restore-backup"] [type="submit"]').click();
+ const state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.users[0].balance).toBe(123400);
+ expect(state.transactions[0].id).toBe('restored-tx');
+ expect(await page.evaluate(()=>Boolean(localStorage.getItem('junto-before-restore-v1')))).toBe(true);
+});
+
 test.describe('offline PWA',()=>{
  test.use({serviceWorkers:'allow'});
  test('PWA reloads offline with its bundled fonts and scripts',async({page,context})=>{

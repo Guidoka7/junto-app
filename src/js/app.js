@@ -1667,7 +1667,9 @@ ${JSON.stringify(chatContext())}`;
   }
   function incomingSync(data){
     if(!valid(data)||JSON.stringify(data)===JSON.stringify(state))return;
-    const oldIds=new Set(state.notifications.map(n=>n.id));state=migrate(data);render();
+    const oldIds=new Set(state.notifications.map(n=>n.id));state=migrate(data);
+    if(!hasUser(active)){active=state.users[0]?.id||'a';try{sessionStorage.setItem(PROFILE,active);}catch{}}
+    render();
     const newNotice=state.notifications.find(n=>n.to===active&&!oldIds.has(n.id));if(newNotice)toast(newNotice.title,newNotice.body,'bell');
   }
   window.addEventListener('storage',(event)=>{if(event.key===KEY&&event.newValue){try{incomingSync(JSON.parse(event.newValue));}catch{}}});

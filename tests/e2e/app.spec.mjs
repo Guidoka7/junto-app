@@ -319,7 +319,16 @@ test('contextual transaction rows open details without losing the current flow',
 test.describe('offline PWA',()=>{
  test.use({serviceWorkers:'allow'});
  test('PWA reloads offline with its bundled fonts and scripts',async({page,context})=>{
- await page.goto('/');await page.evaluate(()=>navigator.serviceWorker.ready);await page.reload();await context.setOffline(true);await page.reload();await expect(page.locator('#app-content')).not.toBeEmpty();await expect(page.locator('#mobile-nav')).toBeVisible();
+ await page.goto('/');
+ await page.evaluate(async()=>{
+   await navigator.serviceWorker.ready;
+   if(!navigator.serviceWorker.controller)await new Promise(resolve=>navigator.serviceWorker.addEventListener('controllerchange',resolve,{once:true}));
+ });
+ await page.waitForLoadState('domcontentloaded');
+ await context.setOffline(true);
+ await page.goto('/',{waitUntil:'domcontentloaded'});
+ await expect(page.locator('#app-content')).not.toBeEmpty();
+ await expect(page.locator('#mobile-nav')).toBeVisible();
  });
 });
 test('Android back closes a dialog, chat, navigation, then exits',async({page})=>{

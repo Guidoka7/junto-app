@@ -384,6 +384,27 @@ test('automatic income and recurring maintenance run again when the app resumes'
  expect(state.received[0].auto).toBe(true);
 });
 
+
+test('editing a recurring income schedule does not create a duplicate confirmation in the same period',async({page})=>{
+ await page.goto('/');await personal(page,10000);
+ await page.evaluate(()=>{
+   const s=window.JuntoApp.getState(),d=new Date(),ym=String(d.getFullYear())+'-'+String(d.getMonth()+1).padStart(2,'0');
+   const oldDay=Math.max(1,d.getDate()-2),newDay=Math.max(1,d.getDate()-1);
+   s.incomes=[{id:'salary-edit',name:'Salário',person:'a',amount:50000,rule:'monthly',day:oldDay,since:ym+'-01',auto:false}];
+   s.received=[{id:'salary-received',incomeId:'salary-edit',person:'a',date:ym+'-'+String(oldDay).padStart(2,'0'),amount:50000,status:'received',at:Date.now(),balanceDelta:50000}];
+   window.JuntoApp.applyState(s);
+ });
+ await page.locator('#mobile-nav [data-route="future"]').click();
+ await page.locator('.future-v3-tabs [data-route="incomes"]').click();
+ await page.locator('[data-action="income-edit"]').first().click();
+ const today=await page.evaluate(()=>new Date().getDate());
+ await page.locator('input[name="income-rule"][value="monthly"]').check();
+ await page.locator('#income-day').fill(String(Math.max(1,today-1)));
+ await page.locator('[data-form="income"] [type="submit"]').click();
+ await page.locator('#mobile-nav [data-route="home"]').click();
+ await expect(page.locator('.pending-banner.arrival')).toHaveCount(0);
+});
+
 test.describe('offline PWA',()=>{
  test.use({serviceWorkers:'allow'});
  test('PWA reloads offline with its bundled fonts and scripts',async({page,context})=>{

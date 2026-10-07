@@ -899,11 +899,53 @@
     if(!best)return null;const e=ITEMS[best.idx];return {item:e[1],category:e[2],icon:e[3],fuzzy:true};
   }
   let parsing=false;
+  const MONTH_PT={janeiro:0,fevereiro:1,marco:2,abril:3,maio:4,junho:5,julho:6,agosto:7,setembro:8,outubro:9,novembro:10,dezembro:11};
+  function naturalDate(raw){
+    const t=norm(raw),today=new Date(),todayISO=dateISO(today);
+    if(/\banteontem\b/.test(t))return {date:dateISO(addDays(today,-2)),kind:'spent'};
+    if(/\bontem\b/.test(t))return {date:dateISO(addDays(today,-1)),kind:'spent'};
+    if(/\bamanha\b/.test(t))return {date:dateISO(addDays(today,1)),kind:/todo mes|mensal|fix[ao]|recorrent/.test(t)?'fixed':'bill'};
+    if(/\bhoje\b/.test(t)&&/vence|vencimento|pagar|boleto/.test(t))return {date:todayISO,kind:/todo mes|mensal|fix[ao]|recorrent/.test(t)?'fixed':'bill'};
+    const recurring=/\b(todo mes|todo mês|mensal|mensalmente|fixa|fixo|recorrente)\b/.test(t);
+    const dueHint=/\b(vence|vencimento|vencera|vencer|boleto|a pagar|vou pagar|pra pagar|para pagar)\b/.test(t);
+    const spentHint=/\b(gastei|gastamos|comprei|compramos|paguei|pagamos|ja paguei|já paguei)\b/.test(t);
+    let date=null;
+    let m=t.match(/\b(\d{1,2})[\/.-](\d{1,2})(?:[\/.-](\d{2,4}))?\b/);
+    if(m){
+      let y=m[3]?Number(m[3]):today.getFullYear();if(y<100)y+=2000;
+      const d=Number(m[1]),mo=Number(m[2])-1,dt=new Date(y,mo,d);
+      if(dt.getFullYear()===y&&dt.getMonth()===mo&&dt.getDate()===d){
+        if(!m[3]&&(dueHint||recurring)&&dateISO(dt)<todayISO)dt.setFullYear(dt.getFullYear()+1);
+        date=dateISO(dt);
+      }
+    }
+    if(!date){
+      const monthNames=Object.keys(MONTH_PT).join('|');
+      m=t.match(new RegExp('\\b(?:dia\\s+)?(\\d{1,2})\\s+(?:de\\s+)?('+monthNames+')(?:\\s+(?:de\\s+)?(\\d{4}))?\\b'));
+      if(m){
+        let y=m[3]?Number(m[3]):today.getFullYear(),mo=MONTH_PT[m[2]],d=Number(m[1]),dt=new Date(y,mo,d);
+        if(!m[3]&&(dueHint||recurring)&&dateISO(dt)<todayISO)dt.setFullYear(dt.getFullYear()+1);
+        if(dt.getMonth()===mo&&dt.getDate()===d)date=dateISO(dt);
+      }
+    }
+    if(!date){
+      m=t.match(/\b(?:vence(?:\s+no)?|vencimento(?:\s+no)?|pagar(?:\s+no)?|dia)\s+(?:dia\s+)?(\d{1,2})\b/);
+      if(m){
+        const d=Number(m[1]);if(d>=1&&d<=31){let y=today.getFullYear(),mo=today.getMonth(),last=daysInMonth(y,mo),dt=new Date(y,mo,Math.min(d,last));if(dateISO(dt)<todayISO&&(dueHint||recurring)){mo++;dt=new Date(y,mo,Math.min(d,daysInMonth(y,mo)));}date=dateISO(dt);}
+      }
+    }
+    return {date,kind:recurring?'fixed':dueHint?'bill':spentHint?'spent':null,recurring,dueHint};
+  }
   function parseQuick(text){
-    const raw=String(text||'').trim();let toks=norm(raw).replace(/r\$\s*/g,' r$ ').replace(/(\d)(reais|real|conto|contos|pila|pilas|r\$)\b/g,'$1 $2').split(/\s+/).filter(Boolean).map(t=>NUMW[t]!=null?String(NUMW[t]):t);
-    const isNum=(t)=>/^\d+(?:[.,]\d{1,2})?$/.test(t),numIdx=toks.map((t,i)=>isNum(t)?i:-1).filter(i=>i>=0);
-    if(numIdx.length>1)toks=toks.map(t=>t==='99'?'noventaenove':t);
-    const nums=toks.map((t,i)=>isNum(t)?i:-1).filter(i=>i>=0),used=new Set();let amount=null,unit=null,qty=1,ambiguous=false;
+    const raw=String(text||'').trim(),meta=naturalDate(raw);let toks=norm(raw).replace(/r\$\s*/g,' r$ ').replace(/(\d)(reais|real|conto|contos|pila|pilas|r\$)\b/g,'$1 $2').split(/\s+/).filter(Boolean).map(t=>NUMW[t]!=null?String(NUMW[t]):t);
+    const isNum=(t)=>/^\d+(?:[.,]\d{1,2})?$/.test(t),dateNums=new Set();
+    toks.forEach((tok,i)=>{
+      if((tok==='dia'||tok==='vence'||tok==='vencimento'||tok==='vencer'||tok==='pagar')&&isNum(toks[i+1]||''))dateNums.add(i+1);
+      if((tok==='vence'||tok==='vencimento'||tok==='vencer'||tok==='pagar')&&toks[i+1]==='dia'&&isNum(toks[i+2]||''))dateNums.add(i+2);
+    });
+    const rawNumIdx=toks.map((t,i)=>isNum(t)&&!dateNums.has(i)?i:-1).filter(i=>i>=0);
+    if(rawNumIdx.length>1)toks=toks.map((t,i)=>t==='99'&&!dateNums.has(i)?'noventaenove':t);
+    const nums=toks.map((t,i)=>isNum(t)&&!dateNums.has(i)?i:-1).filter(i=>i>=0),used=new Set(dateNums);let amount=null,unit=null,qty=1,ambiguous=false;
     const money=nums.filter(i=>CUR.test(toks[i+1]||'')||toks[i-1]==='r$'||/[.,]\d{1,2}$/.test(toks[i]));
     const before=(i)=>toks.slice(Math.max(0,i-1),i).join(' '),after=(i)=>toks[i+1]||'';
     const perUnitAt=(i)=>/^(a|de)$/.test(before(i))||after(i)==='cada'||(CUR.test(after(i))&&toks[i+2]==='cada');
@@ -914,12 +956,18 @@
     if(money.length)setPrice(money[money.length-1]);
     else if(nums.length>=2)setPrice(nums[nums.length-1]);
     else if(nums.length===1){const i=nums[0],v=toks[i],next=toks[i+1];if(/^\d+$/.test(v)&&+v<=40&&next&&!STOP.has(next)&&!VERBS.test(next)&&i<toks.length-1){qty=+v;used.add(i);}else setPrice(i);}
-    let payer=null;const nt=toks.join(' ');if(/meio a meio|dividid|dividimos|rachamos|rachei|racha|metade cada|cada um metade/.test(nt))payer='half';else{const u=state.users.find(u=>toks.includes(norm(first(u.name))));if(u)payer=u.id;}
-    const dateOff=toks.includes('anteontem')?-2:toks.includes('ontem')?-1:0,date=dateOff?dateISO(addDays(new Date(),dateOff)):null;
-    const nameWords=new Set(['meio','dividido','dividida','dividimos','rachamos','rachei','racha','metade','pagou',...state.users.map(u=>norm(first(u.name)))]);
-    const keep=toks.filter((t,i)=>!used.has(i)&&!isNum(t)&&!CUR.test(t)&&!VERBS.test(t)&&!nameWords.has(t)&&t!=='cada'&&t!=='noventaenove'||t==='noventaenove');
-    const phrase=keep.map(t=>t==='noventaenove'?'99':t).join(' ').trim(),label=keep.filter(t=>!STOP.has(t)).map(t=>t==='noventaenove'?'99':t).join(' ').trim();
-    const res={qty,unit,amount,ambiguous,payer,date,phrase,label:label||phrase,name:label||raw};
+    let payer=null;const nt=toks.join(' ');
+    if(isSolo())payer='a';
+    else if(/meio a meio|dividid|dividimos|rachamos|rachei|racha|metade cada|cada um metade/.test(nt))payer='half';
+    else if(/proporcional|pela renda|proporcao da renda|proporção da renda/.test(nt))payer='prop';
+    else if(/\b(meu amor|amor|ela|ele)\s+(pagou|paga|pagara|vai pagar)\b|\b(pagou|paga)\s+(meu amor|ela|ele)\b/.test(nt))payer=other();
+    else if(/\b(eu|me|minha conta)\s+(paguei|pago|paga|vou pagar)\b|\b(paguei|pago)\s+eu\b/.test(nt))payer=active;
+    else{const u=state.users.find(u=>toks.includes(norm(first(u.name))));if(u)payer=u.id;}
+    const date=meta.date;
+    const nameWords=new Set(['meio','dividido','dividida','dividimos','rachamos','rachei','racha','metade','pagou','paga','paguei','pagamos','vai','pagar','vence','vencer','vencimento','boleto','mensal','mensalmente','fixa','fixo','recorrente','todo','toda','mes','mês','dia','amanha','meu','minha','amor','ela','ele','proporcional','renda',...state.users.map(u=>norm(first(u.name)))]);
+    const keep=toks.filter((t,i)=>!used.has(i)&&!isNum(t)&&!CUR.test(t)&&!VERBS.test(t)&&!nameWords.has(t)&&!STOP.has(t)&&!/^\d{1,2}[\/.-]\d{1,2}(?:[\/.-]\d{2,4})?$/.test(t)||t==='noventaenove');
+    const phrase=keep.map(t=>t==='noventaenove'?'99':t).join(' ').trim(),label=phrase;
+    const res={qty,unit,amount,ambiguous,payer,date,kind:meta.kind,recurring:meta.recurring,phrase,label:label||phrase,name:label||raw};
     if(ambiguous&&!parsing){parsing=true;try{const r=recognizeP(res);if(r){const hist=state.transactions.filter(t=>!t.billId&&t.item===r.item).slice(-40);if(hist.length>=3){const u=hist.reduce((s,t)=>s+t.amount/(t.qty||1),0)/hist.length;if(Math.abs(amount-u)<Math.abs(res.unit-u)){res.unit=amount;res.amount=amount*qty;}}}}finally{parsing=false;}}
     return res;
   }
@@ -963,6 +1011,7 @@
     const pay=$('#'+prefix+'-payer'),payer=p.payer||hist?.payer;
     if(pay&&payer&&pay.dataset.touched!=='1'&&[...state.users.map(u=>u.id),'half','prop'].includes(payer))pay.value=payer;
     const dt=$('#'+prefix+'-date');if(dt&&p.date&&dt.dataset.touched!=='1')dt.value=p.date;
+    if(prefix==='expense'&&p.kind){const form=input.closest('form'),radio=form?.querySelector(`input[name="expense-type"][value="${p.kind}"]`);if(radio&&form?.dataset.typeTouched!=='1'){radio.checked=true;syncExpenseKind(p.kind);}}
     if(!read)return;if(!input.value.trim()){read.innerHTML=READ_DEFAULT;return;}
     const learnedByHistory=hist&&!p.payer&&!p.amount;
     read.innerHTML=`<span class="chip strong">${icon(ic)}${esc(r?r.item:cap(p.label||p.name))}</span><span class="chip">${esc(catPath(cat))}</span>${p.qty>1&&p.unit?`<span class="chip">${p.qty} × ${money(p.unit)}</span>`:''}${payer?`<span class="chip">${esc(payerLabel(payer))}</span>`:''}${p.date?`<span class="chip">${dateText(p.date)}</span>`:''}${hist?.amount&&!p.amount?`<span class="chip soft">valor habitual ${money(hist.amount)}</span>`:''}${r?.fuzzy?`<span class="chip soft">entendi “${esc(p.label)}” como ${esc(r.item.toLowerCase())}</span>`:''}${r?.learned?'<span class="chip soft">aprendido com você</span>':learnedByHistory?`<span class="chip soft">preenchido pelo histórico (${hist.count}x)</span>`:!r?'<span class="chip soft">novo: o Juntô aprende com a categoria escolhida</span>':''}<button type="button" class="text-link" data-action="cat-change" data-prefix="${prefix}">Trocar categoria</button>`;
@@ -1713,6 +1762,7 @@ ${JSON.stringify(chatContext())}`;
     el.innerHTML=after<0?`<strong>Vale conversar antes. O pedido passa do livre.</strong>Faltariam ${cash(-after)} para cobrir esse pedido sem mexer em contas e planos.`:`<strong>${after<20000?'Cabe, mas o mês fica apertadinho.':'Cabe no livre da dupla. 💚'}</strong>Depois desse pedido, ficam ${cash(after)} livres. Contas e planos continuam separados.`;soloize(el);
   }
   function updateSplit(){const el=$('#split-preview'),sel=document.querySelector('select[data-split]');if(!el||!sel)return;const form=sel.closest('form'),moneyInput=form?.querySelector('.money-input input');let amt=moneyInput?parseMoney(moneyInput.value||''):NaN;if(!Number.isFinite(amt)&&sel.dataset.amount)amt=Number(sel.dataset.amount);el.textContent=['half','prop'].includes(sel.value)||Number.isFinite(amt)&&amt>0?splitPreview(amt,sel.value):'';}
+  function syncExpenseKind(type){const label=$('#expense-date-label'),note=$('#expense-note'),submit=document.querySelector('[data-form="expense"] button[type="submit"]');if(label)label.textContent=type==='spent'?'Data do gasto':'Vencimento';if(note)note.textContent=type==='spent'?'O valor sai do saldo agora e entra no histórico.':type==='fixed'?'A conta entra no planejamento e se repete todo mês. O saldo só muda quando o pagamento for confirmado.':'A conta entra no planejamento. O saldo só muda quando o pagamento for confirmado.';if(submit)submit.lastChild.textContent=type==='spent'?'Registrar gasto':type==='fixed'?'Adicionar conta fixa':'Adicionar conta';}
   document.addEventListener('input',(event)=>{if(event.target.id==='profile-zoom'||event.target.id==='profile-y'){const z=Number($('#profile-zoom')?.value||state.settings.profileZoom||1.08),y=Number($('#profile-y')?.value||state.settings.profileY||50);const p=document.querySelector('.photo-preview');if(p){p.style.setProperty('--profile-zoom',z);p.style.setProperty('--profile-y',y+'%');}if($('#photo-zoom-value'))$('#photo-zoom-value').textContent=Math.round(z*100)+'%';if($('#photo-y-value'))$('#photo-y-value').textContent=Math.round(y)+'%';return;}if(event.target.id==='chat-input'){const t=event.target;t.style.height='auto';t.style.height=Math.min(130,t.scrollHeight)+'px';return;}
     if(event.target.dataset?.card){const c=chatLog.find(x=>x.id===event.target.dataset.card);if(c&&event.target.dataset.field==='amount'){const v=parseMoney(event.target.value);c.data.amount=Number.isFinite(v)&&v>0?v:null;}return;}if(event.target.id==='request-amount')updateImpact();if(event.target.id==='expense-amount'){event.target.dataset.touched=event.target.value?'1':'';updateSplit();updateBudgetNote();}if(event.target.id==='expense-title'){smartRead('expense');updateSplit();updateBudgetNote();}if(event.target.id==='request-title'){smartRead('request');updateImpact();updateRequestCat();}if(event.target.id==='request-amount'){event.target.dataset.touched=event.target.value?'1':'';updateRequestCat();}if(event.target.id==='edit-tx-amount'||event.target.id==='edit-bill-amount')updateSplit();
     if(event.target.dataset?.budget){const c=event.target.dataset.budget,v=Number(event.target.value),f=Number(event.target.dataset.f),o=document.getElementById('out-'+c),n=document.getElementById('note-'+c);if(o)o.textContent=brl(v);if(n){const s=Math.max(0,f-v);n.textContent=s>0?`Guarda ${brl(s)} por mês (${pct(s/f)}), ${brl(s*12)} por ano.`:v>f?`Meta acima do previsto: folga de ${brl(v-f)} por mês.`:'Meta no nível do previsto: não guarda nada aqui.';}return;}if(event.target.closest?.('[data-form="income"]'))updateIncomePreview();
@@ -1726,12 +1776,9 @@ ${JSON.stringify(chatContext())}`;
     if(event.target.id==='expense-date')event.target.dataset.touched='1';
     if(event.target.id==='yield-rate'){state.settings.yieldRate=Math.min(30,Math.max(0,Number(String(event.target.value).replace(',','.'))||0));const y=window.scrollY;persist();window.scrollTo(0,y);return;}
     if(event.target.id==='expense-category'||event.target.id==='request-category'){event.target.dataset.touched='1';const h=$('#'+(event.target.id==='expense-category'?'expense-cat-hint':'request-cat-hint'));if(h)h.textContent='';smartRead(event.target.id==='expense-category'?'expense':'request');updateBudgetNote();updateRequestCat();}
-    if(event.target.name==='expense-type')setTimeout(updateBudgetNote,0);
+    if(event.target.name==='expense-type'){const form=event.target.closest('form');if(form)form.dataset.typeTouched='1';syncExpenseKind(event.target.value);setTimeout(updateBudgetNote,0);}
     if(event.target.dataset?.budget){const c=event.target.dataset.budget,v=Number(event.target.value);state.budgets[c]=v;openCats.add(c);log(active,`definiu a meta de ${c.toLowerCase()} em ${money(v)} por mês.`);const y=window.scrollY;persist();window.scrollTo(0,y);toast('Meta salva.',`${c}: ${money(v)} por mês. Previsão e plano recalculados.`,'scan');return;}if(event.target.closest?.('[data-form="income"]'))updateIncomePreview();
-    if(event.target.name==='expense-type'){
-      const type=event.target.value;$('#expense-date-label').textContent=type==='spent'?'Data do gasto':'Vencimento';
-      $('#expense-note').textContent=type==='spent'?'O valor sai do saldo de quem pagou e aparece no histórico da dupla.':type==='fixed'?'Conta recorrente no planejamento deste mês. O dinheiro só sai do saldo quando vocês confirmarem o pagamento.':'Entra nas contas a pagar e é descontada do livre. O saldo só muda quando vocês confirmarem o pagamento.';
-    }
+
   });
   document.addEventListener('toggle',(event)=>{const d=event.target;if(d.matches?.('details.cat')){if(d.open)openCats.add(d.dataset.cat);else openCats.delete(d.dataset.cat);}},true);
   function chartTip(event){

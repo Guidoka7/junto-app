@@ -31,7 +31,7 @@ function bankCard(bank){
 function bankSection(group,title,rows,{collapsible=false}={}){
   if(!rows.length)return '';
   const body=`<div class="bank-choice-grid" data-bank-grid="${group}">${rows.map(bankCard).join('')}</div>`;
-  if(collapsible)return `<details class="bank-other" open data-bank-section="${group}"><summary><span><b>${title}</b><small>${rows.length} opções</small></span><span class="bank-chevron">⌄</span></summary><div class="bank-section-tools"><button type="button" class="bank-select-link" data-bank-select="${group}">Selecionar todos</button></div>${body}</details>`;
+  if(collapsible)return `<details class="bank-other" data-bank-section="${group}"><summary><span><b>${title}</b><small>${rows.length} opções</small></span><span class="bank-chevron">⌄</span></summary><div class="bank-section-tools"><button type="button" class="bank-select-link" data-bank-select="${group}">Selecionar todos</button></div>${body}</details>`;
   return `<section class="bank-picker-section" data-bank-section="${group}"><div class="bank-section-head"><h3>${title}</h3><button type="button" class="bank-select-link" data-bank-select="${group}">Selecionar todos</button></div>${body}</section>`;
 }
 function updateBankCardState(input){const card=input?.closest('[data-bank-card]');if(card)card.classList.toggle('selected',input.checked);}
@@ -48,6 +48,7 @@ function updateBadge(){let button=document.getElementById('bank-inbox-button');i
 async function openSettings(){await refresh();
   if(!native){api.openModal('Movimentos bancários no Android',`<p class="modal-sub">Instale o APK do Juntô para usar a captura. O navegador não consegue ler notificações de outros aplicativos.</p><p>Depois de autorizar, o Juntô identifica movimentos nas notificações dos bancos escolhidos e pergunta como registrar. Nenhum gasto entra automaticamente.</p><button class="btn primary wide" data-action="close">Entendi</button>`,'bank-settings');return;}
   const groups={main:[],digital:[],other:[]};for(const bank of banks)(groups[bankMeta(bank).group]||groups.other).push(bank);
+  Object.values(groups).forEach(list=>list.sort((a,b)=>Number(b.installed)-Number(a.installed)||a.name.localeCompare(b.name,'pt-BR')));
   const active=status.enabled&&status.accessGranted;
   api.openModal('Conectar seus bancos',`<div class="bank-settings-screen">
     <div class="bank-settings-intro"><p>Selecione os bancos que você usa para o Juntô identificar movimentações pelas notificações. Nada entra nas suas finanças sem sua confirmação.</p><span class="bank-status-chip ${active?'ok':''}">${active?'Leitura ativa':status.enabled?'Falta autorizar no Android':'Leitura desligada'}</span></div>
@@ -97,7 +98,7 @@ document.addEventListener('input',event=>{
   }
   if(!event.target.matches('[data-bank-search]'))return;const q=event.target.value.trim().toLocaleLowerCase('pt-BR');
   document.querySelectorAll('[data-bank-card]').forEach(card=>{card.hidden=Boolean(q)&&!card.dataset.search.includes(q);});
-  document.querySelectorAll('[data-bank-section]').forEach(section=>{const cards=[...section.querySelectorAll('[data-bank-card]')];section.hidden=cards.length>0&&cards.every(card=>card.hidden);});
+  document.querySelectorAll('[data-bank-section]').forEach(section=>{const cards=[...section.querySelectorAll('[data-bank-card]')],none=cards.length>0&&cards.every(card=>card.hidden);section.hidden=none;if(q&&!none&&section.tagName==='DETAILS')section.open=true;});
 });
 document.addEventListener('click',event=>{
   const select=event.target.closest('[data-bank-select]');if(!select)return;event.preventDefault();

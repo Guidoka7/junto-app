@@ -38,6 +38,7 @@ test('new Home stays functional in solo and couple modes',async({page})=>{
  await expect(page.locator('#peer-rail')).toBeHidden();
  const categories=await page.evaluate(()=>window.JuntoApp.getCategories());
  for(const category of ['Educação','Pets','Beleza','Viagem','Presentes','Restaurantes','Tecnologia','Trabalho','Impostos'])expect(categories).toContain(category);
+ await page.locator('.home-more-v3>summary').click();
  await page.locator('[data-action="quick-expense"][data-category="Transporte"]').click();
  await expect(page.locator('#expense-cat-wrap')).toBeVisible();
  await expect(page.locator('#expense-category')).toHaveValue('Transporte');

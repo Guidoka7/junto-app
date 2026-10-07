@@ -34,6 +34,21 @@ export function weeklyBenefitEstimate(income,date,holidayDates=[]){
   let days=0;for(let i=0;i<(income.benefitSaturday?6:5);i++){const work=new Date(monday);work.setUTCDate(monday.getUTCDate()+i);if(!holidayDates.includes(work.toISOString().slice(0,10)))days++;}
   return income.benefitDaily*days;
 }
+export function routineTransportAmount(preferences,date,holidayDates=[]){
+  if(!preferences||!cents(preferences.fare)||!Number.isInteger(preferences.trips)||preferences.trips<1)return 0;
+  const weekday=new Date(`${date}T12:00:00Z`).getUTCDay();
+  if(weekday===0||weekday===6&&preferences.transportSaturday===false||holidayDates.includes(date))return 0;
+  return preferences.fare*preferences.trips;
+}
+export function weeklyTransportBudget(state,person,today,preferences,holidayDates,share){
+  const d=new Date(`${today}T12:00:00Z`),start=new Date(d);start.setUTCDate(d.getUTCDate()-(d.getUTCDay()+6)%7);
+  const monday=start.toISOString().slice(0,10),sources=state.incomes.filter(i=>i.person===person&&i.purpose==='transport'&&i.rule==='weekly');
+  const received=state.received.filter(r=>r.status==='received'&&r.date>=monday&&r.date<=today&&sources.some(i=>i.id===r.incomeId)).reduce((n,r)=>n+r.amount,0);
+  const rows=state.transactions.filter(t=>t.category==='Transporte'&&t.date>=monday&&t.date<=today),spent=rows.reduce((n,t)=>n+share(t,person),0),spentToday=rows.filter(t=>t.date===today).reduce((n,t)=>n+share(t,person),0);
+  let reserve=0;
+  for(let i=0;i<6;i++){const next=new Date(start);next.setUTCDate(start.getUTCDate()+i);const iso=next.toISOString().slice(0,10),amount=routineTransportAmount(preferences,iso,holidayDates),registered=rows.filter(t=>t.date===iso).reduce((n,t)=>n+share(t,person),0);if(iso<today){if(!registered)reserve+=amount;}else reserve+=Math.max(0,amount-(iso===today?spentToday:0));}
+  return {received,spent,reserve,possibleSaving:Math.max(0,received-spent-reserve)};
+}
 export function benefitEnvelope(state,person,purpose,today,share){
   const sources=state.incomes.filter(i=>i.person===person&&i.purpose===purpose);
   const receipts=state.received.filter(r=>r.status==='received'&&r.date<=today&&sources.some(i=>i.id===r.incomeId));
@@ -60,6 +75,8 @@ export function validateBudgetProfile(data){
     if(i.benefitDaily!==undefined&&(!Number.isSafeInteger(i.benefitDaily)||i.benefitDaily<0||i.benefitDaily>1e8))throw Error('Valor diário inválido.');
     return {name:i.name.trim(),amount:i.amount,rule:i.rule,purpose:i.purpose,nth:i.nth||5,weekday:i.weekday??2,day:i.day||1,countSat:i.countSat!==false,variable:i.variable===true,benefitDaily:i.benefitDaily||0,benefitSaturday:i.benefitSaturday===true,auto:false};
   });
+  if(new Set(sources.map(i=>normalized(i.name))).size!==sources.length)throw Error('Há entradas repetidas no perfil.');
+  if(!Number.isFinite(day(p.debtSince))||new Date(day(p.debtSince)).toISOString().slice(0,10)!==p.debtSince)throw Error('Data de referência inválida.');
   const goal=data.goal;if(!goal||typeof goal.name!=='string'||goal.name.trim().length<2||goal.name.length>60||!cents(goal.target)||goal.target>1e10)throw Error('Meta inválida.');
   return {sources,preferences:{fare:p.fare,trips:p.trips,debtPrincipal:p.debtPrincipal,debtMinimum:p.debtMinimum,debtRate:p.debtRate,debtSince:p.debtSince},goal:{name:goal.name.trim(),target:goal.target}};
 }

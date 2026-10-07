@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {isEverydayExpense,spendingBaseline,incomeEstimate,benefitEnvelope,debtSuggestion,weeklyBenefitEstimate,validateBudgetProfile} from '../src/features/budget-core.js';
+import {isEverydayExpense,spendingBaseline,incomeEstimate,benefitEnvelope,debtSuggestion,weeklyBenefitEstimate,validateBudgetProfile,routineTransportAmount,weeklyTransportBudget} from '../src/features/budget-core.js';
 test('two days of spending and a debt payment do not become a daily debt until month end',()=>{
   const tx=[{name:'Agiota',amount:80000,date:'2026-10-06'},{name:'Ônibus',amount:1100,date:'2026-10-06'},{name:'Almoço',amount:3500,date:'2026-10-07'}];
   const model=spendingBaseline(tx,'2026-10-07');assert.equal(model.daily,4600/14);assert.equal(model.confidence,'baixa');assert.equal(model.sampleSize,2);
@@ -45,4 +45,10 @@ test('profile import rejects malformed income and strips cash ledgers and arbitr
   const data={type:'junto-budget-profile',schemaVersion:1,sources:[{name:'Salário',amount:200000,rule:'business',nth:5,purpose:'general',variable:true}],preferences:{fare:550,trips:2,debtPrincipal:90000,debtMinimum:30000,debtRate:7,debtSince:'2026-10-06',balance:999999},goal:{name:'Carro',target:1000000},users:[{balance:999999}]};
   const parsed=validateBudgetProfile(data);assert.equal(parsed.preferences.balance,undefined);assert.equal(parsed.users,undefined);assert.equal(parsed.sources[0].auto,false);
   assert.throws(()=>validateBudgetProfile({...data,sources:[{...data.sources[0],amount:-1}]}));
+});
+test('the commute reserves two buses on workdays, skips Sunday and holidays and an Uber reduces possible savings',()=>{
+  const p={fare:550,trips:2};assert.equal(routineTransportAmount(p,'2026-10-07'),1100);assert.equal(routineTransportAmount(p,'2026-10-11'),0);assert.equal(routineTransportAmount(p,'2026-10-12',['2026-10-12']),0);
+  const state={incomes:[{id:'vt',purpose:'transport',person:'a',rule:'weekly'}],received:[{incomeId:'vt',status:'received',amount:11160,date:'2026-10-06'}],transactions:[{category:'Transporte',payer:'a',amount:1200,date:'2026-10-07'}]},share=(t,id)=>t.payer===id?t.amount:0;
+  const a=weeklyTransportBudget(state,'a','2026-10-07',p,[],share);assert.equal(a.reserve,5500);assert.equal(a.possibleSaving,4460);
+  state.transactions.push({category:'Transporte',payer:'a',amount:5000,date:'2026-10-07'});assert.equal(weeklyTransportBudget(state,'a','2026-10-07',p,[],share).possibleSaving,0);
 });

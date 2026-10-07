@@ -183,7 +183,7 @@ test('income goal and solo spending flows stay connected',async({page})=>{
 
 test('couple request flow reserves then charges only when purchase is confirmed',async({page})=>{
  await page.goto('/');await personal(page,100000);
- await page.evaluate(()=>{const s=window.JuntoApp.getState();s.users.push({id:'b',name:'Bia',balance:100000,tone:'pink'});window.JuntoApp.applyState(s);});
+ await page.evaluate(()=>{const s=window.JuntoApp.getState();s.users.push({id:'b',name:'Bia',balance:100000,tone:'pink'});window.JuntoApp.applyState(s);window.JuntoApp.setSlot(null);});
  await page.locator('#mobile-nav [data-route="home"]').click();
  await page.locator('.home-spend-cta').click();
  await page.locator('#request-title').fill('pizza 40 meio a meio');

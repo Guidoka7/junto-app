@@ -314,7 +314,7 @@
   let state;try{const s=JSON.parse(localStorage.getItem(KEY));state=migrate(valid(s)?s:freshPersonalState());}catch{state=freshPersonalState();}
   let active='a';try{active=sessionStorage.getItem(PROFILE)==='b'?'b':'a';}catch{}if(state.users.length<2)active='a';
   let route='home',billFilter='all',requestFilter='all',hidden=false,noticesEnabled=true;
-  let analysisTab='overview',futureTab='forecast',incomeTab='overview',planTab='plan';
+  let analysisTab='overview',analysisPerson='both',futureTab='forecast',incomeTab='overview',planTab='plan';
   let onboardDraft={},onboardStep=1,channel=null;
   try{channel=new BroadcastChannel('junto-demo-sync');}catch{}
   const user=(id=active)=>state.users.find(u=>u.id===id)||{id:'b',name:'Seu amor',balance:0,tone:'pink'};
@@ -1513,6 +1513,8 @@ ${JSON.stringify(chatContext())}`;
     if(cloudSlot&&['switch','profile-photo-switch','reset-solo','reset-couple','reset-confirm','onboard'].includes(action)){toast('Seu perfil está conectado.','Use sua própria conta para registrar movimentos. Exporte um backup antes de sair.');return;}
     if(action==='route'){route=el.dataset.route;render();const anchor=el.dataset.anchor;if(anchor)setTimeout(()=>document.getElementById(anchor)?.scrollIntoView({behavior:'smooth',block:'start'}),60);else window.scrollTo({top:0,behavior:'smooth'});return;}
     if(action==='topic-tab'){const kind=el.dataset.kind,v=el.dataset.value;if(kind==='analysis')analysisTab=v;if(kind==='future')futureTab=v;if(kind==='income')incomeTab=v;if(kind==='plan')planTab=v;render();window.scrollTo({top:0,behavior:'smooth'});return;}
+    if(action==='analysis-person'){analysisPerson=el.dataset.person||'both';analysisTab='overview';render();return;}
+    if(action==='analysis-cut'){futureTab='tips';route='future';render();window.scrollTo({top:0,behavior:'smooth'});return;}
     if(action==='switch'){active=el.dataset.user;try{sessionStorage.setItem(PROFILE,active);}catch{}render();return;}
     if(action==='profile-photo-switch'){active=other(active);try{sessionStorage.setItem(PROFILE,active);}catch{}render();return;}
     if(action==='pick-couple-photo'){document.getElementById('couple-photo-input')?.click();return;}

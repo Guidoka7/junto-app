@@ -1695,7 +1695,7 @@ ${JSON.stringify(chatContext())}`;
     if(action==='edit-tx')return editTransactionModal(id);
     if(action==='pay-bill')return payBillModal(id);
     if(action==='delete-tx'){const t=state.transactions.find(x=>x.id===id);if(!t)return;const neutral=t.balanceDelta===0;return openModal('Excluir este gasto?',`<p class="modal-sub"><b>${esc(t.name)}</b> · ${cash(t.amount)}. ${neutral?'Esse movimento foi importado sem ajuste de saldo, então excluir não vai mexer no saldo.':'O valor volta para o saldo de quem pagou.'} O lançamento sai do histórico.</p><form class="form" data-form="delete-tx" data-id="${id}">${formEnd(neutral?'Excluir lançamento':'Excluir e estornar')}</form>`,'remove');}
-    if(action==='delete-bill'){const b=state.bills.find(x=>x.id===id);if(!b)return;return openModal('Excluir esta conta?',`<p class="modal-sub"><b>${esc(b.name)}</b> · ${cash(b.amount)}.${b.status==='paid'?' O pagamento será estornado e o valor volta ao saldo.':' Ela será removida do planejamento.'}</p><form class="form" data-form="delete-bill" data-id="${id}">${formEnd('Excluir conta')}</form>`,'remove');}
+    if(action==='delete-bill'){const b=state.bills.find(x=>x.id===id);if(!b)return;return openModal('Excluir esta conta?',`<p class="modal-sub"><b>${esc(b.name)}</b> · ${cash(b.amount)}.${b.status==='paid'?' O pagamento será estornado de acordo com o ajuste de saldo usado no registro.':' Ela será removida do planejamento.'}${b.recurring?' Como é uma conta fixa, a repetição dos próximos meses também será encerrada.':''}</p><form class="form" data-form="delete-bill" data-id="${id}">${formEnd(b.recurring?'Excluir e parar repetição':'Excluir conta')}</form>`,'remove');}
     if(action==='reopen-bill'){const b=state.bills.find(x=>x.id===id);if(!b||b.status!=='paid')return;return openModal('Reabrir esta conta?',`<p class="modal-sub">O pagamento de <b>${esc(b.name)}</b> será desfeito, o valor voltará ao saldo e a conta aparecerá novamente em “A pagar”.</p><form class="form" data-form="reopen-bill" data-id="${id}">${formEnd('Reabrir conta')}</form>`,'remove');}
     if(action==='notifications')return notificationsModal();
     if(action==='settings')return settingsModal();
@@ -1866,7 +1866,10 @@ ${JSON.stringify(chatContext())}`;
       const b=state.bills.find(x=>x.id===id);if(!b||b.status!=='paid')return;const t=state.transactions.find(x=>x.billId===b.id);if(t){refundTransaction(t);state.transactions=state.transactions.filter(x=>x.id!==t.id);}b.status='open';delete b.paidAt;log(active,`reabriu a conta ${b.name}.`);close();billFilter='open';persist();toast('Conta reaberta.','O pagamento foi estornado e a conta voltou para “A pagar”.');return;
     }
     if(type==='delete-bill'){
-      const b=state.bills.find(x=>x.id===id);if(!b)return;const related=state.transactions.filter(x=>x.billId===b.id);related.forEach(refundTransaction);state.transactions=state.transactions.filter(x=>x.billId!==b.id);state.bills=state.bills.filter(x=>x.id!==b.id);log(active,`excluiu a conta ${b.name}${related.length?' e estornou o pagamento':''}.`);close();persist();toast('Conta excluída.',related.length?'O pagamento também foi estornado.':'Ela saiu do planejamento.');return;
+      const b=state.bills.find(x=>x.id===id);if(!b)return;const related=state.transactions.filter(x=>x.billId===b.id),wasRecurring=Boolean(b.recurring),key=b.recurringKey||b.id,nameKey=norm(b.name);
+      related.forEach(refundTransaction);state.transactions=state.transactions.filter(x=>x.billId!==b.id);
+      if(wasRecurring)state.bills.forEach(x=>{if((x.recurringKey&&x.recurringKey===key)||norm(x.name)===nameKey)x.recurring=false;});
+      state.bills=state.bills.filter(x=>x.id!==b.id);log(active,`excluiu a conta ${b.name}${related.length?' e estornou o pagamento':''}${wasRecurring?'; repetição encerrada':''}.`);close();persist();toast('Conta excluída.',wasRecurring?'A repetição também foi encerrada.':related.length?'O pagamento também foi estornado.':'Ela saiu do planejamento.');return;
     }
     if(type==='balance'){
       const amount=amountValue(d,'balance-amount',true),who=form.dataset.user;if(amount==null||!user(who))return;

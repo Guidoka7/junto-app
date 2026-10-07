@@ -22,6 +22,34 @@ async function fakeNative(page,inbox){await page.addInitScript(inbox=>{
   const capacitor={};Object.defineProperty(capacitor,'registerPlugin',{get:()=>name=>plugins[name],set:()=>{}});window.Capacitor=capacitor;
 },inbox);}
 async function personal(page,balance=10000){await expect(page.locator('#authenticated-app')).toBeVisible();await page.evaluate(balance=>{const s=window.JuntoApp.freshState('Guilherme');s.users[0].balance=balance;window.JuntoApp.applyState(s);},balance);}
+
+test('a debt paid during onboarding does not repeat every day in the month forecast',async({page})=>{
+ await page.goto('/');await personal(page,100000);
+ await page.evaluate(()=>{const s=window.JuntoApp.getState(),today=new Date(),iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`,yesterday=new Date(today);yesterday.setDate(today.getDate()-1);
+ s.incomes=[{id:'salary',name:'Salário',person:'a',amount:244100,rule:'business',nth:5,countSat:true,since:iso(today),variable:true}];
+ s.transactions=[{id:'debt-payment',name:'Pagamento de dívida',amount:80000,payer:'a',category:'Outros',date:iso(yesterday)},{id:'bus',name:'Ônibus',amount:1200,payer:'a',category:'Transporte',date:iso(today)}];window.JuntoApp.applyState(s);
+ });
+ await page.locator('#mobile-nav [data-route="future"]').click();await expect(page.locator('.future-v3-card')).toContainText('Pagamentos avulsos não se repetem');
+ await expect(page.locator('.future-v3-total')).not.toHaveClass(/neg/);await expect(page.locator('.personal-budget')).toContainText('Ainda sem sugestão segura');
+});
+
+test('personal budget import preserves cash and receipts, applies weekly benefits and is idempotent',async({page})=>{
+ await page.goto('/');await personal(page,300000);
+ await page.evaluate(()=>{const s=window.JuntoApp.getState();s.incomes=[{id:'existing',name:'Salário',person:'a',amount:150000,rule:'business',nth:5,countSat:true,since:'2026-01-01'}];window.JuntoApp.applyState(s);});
+ const date=await page.evaluate(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;});
+ const profile={type:'junto-budget-profile',schemaVersion:1,sources:[{name:'Salário',amount:244100,rule:'business',nth:5,purpose:'general',variable:true},{name:'Vale alimentação',amount:17440,rule:'weekly',weekday:2,purpose:'food',variable:true,benefitDaily:3488},{name:'Vale transporte',amount:11160,rule:'weekly',weekday:2,purpose:'transport',variable:true,benefitDaily:1860,benefitSaturday:true}],preferences:{fare:550,trips:2,debtPrincipal:97800,debtMinimum:30000,debtRate:7,debtSince:date},goal:{name:'Arrumar meu carro',target:1000000}};
+ for(let i=0;i<2;i++){
+  await page.locator('#budget-profile-input').setInputFiles({name:'budget.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(profile))});await expect(page.locator('#modal')).toContainText('sem criar recebimentos');await page.getByRole('button',{name:'Aplicar ao meu perfil'}).click();await expect(page.locator('#modal')).not.toBeVisible();
+ }
+ const result=await page.evaluate(()=>{const s=window.JuntoApp.getState();return {balance:s.users[0].balance,received:s.received.length,sources:s.incomes,goals:s.goals};});
+ expect(result.balance).toBe(300000);expect(result.received).toBe(0);expect(result.sources).toHaveLength(3);expect(result.sources.find(x=>x.name==='Salário').id).toBe('existing');expect(result.sources.every(x=>x.auto===false)).toBe(true);expect(result.goals).toHaveLength(1);expect(result.goals[0].saved).toBe(0);expect(result.goals[0].target).toBe(1000000);
+});
+
+test('income form keeps variable amounts pending and exposes benefit workday rules',async({page})=>{
+ await page.goto('/');await personal(page,100000);await page.evaluate(()=>window.JuntoApp.openModal('Configurar','<button data-action="income-new">Nova entrada</button>'));await page.getByRole('button',{name:'Nova entrada',exact:true}).click();
+ await page.locator('#income-name').fill('Vale transporte');await page.locator('#income-amount').fill('111,60');await page.locator('[name="income-rule"][value="weekly"]').check();await page.locator('#income-weekday').selectOption('2');await page.locator('#income-purpose').selectOption('transport');await page.locator('#income-benefit-daily').fill('18,60');await page.locator('[name="income-benefit-saturday"]').check();await page.locator('[name="income-auto"]').check();await page.getByRole('button',{name:'Adicionar entrada',exact:true}).click();
+ const inc=await page.evaluate(()=>window.JuntoApp.getState().incomes[0]);expect(inc.auto).toBe(false);expect(inc.variable).toBe(true);expect(inc.benefitDaily).toBe(1860);expect(inc.benefitSaturday).toBe(true);
+});
 test('mobile app renders, navigates and preserves the fixed bottom bar',async({page})=>{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/');await expect(page.locator('#app-content')).not.toBeEmpty();
  if(process.env.JUNTO_CHROME){try{execFileSync('node_modules/.bin/agent-browser',['--executable-path',process.env.JUNTO_CHROME,'--session','junto-smoke','open','http://127.0.0.1:5173'],{stdio:'pipe',timeout:20000});execFileSync('node_modules/.bin/agent-browser',['--session','junto-smoke','snapshot','-i'],{stdio:'pipe',timeout:10000});execFileSync('node_modules/.bin/agent-browser',['--session','junto-smoke','close'],{stdio:'pipe',timeout:10000});}catch{console.log('agent-browser unavailable; browser verification continues with Playwright.');}}

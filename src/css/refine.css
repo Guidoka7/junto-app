@@ -264,3 +264,4 @@ dialog[data-kind="cloud-account"] .modal-head h2{font-size:23px!important;color:
 .cloud-disconnect-link{display:block;margin:14px 0 0;padding:10px 0;border:0;background:transparent;color:var(--muted);font:inherit;font-size:13px;text-decoration:underline;text-underline-offset:4px;cursor:pointer}
 .cloud-disconnect-summary{margin:0 0 18px;padding-left:20px;color:var(--muted);font-size:13px;line-height:1.55}
 .cloud-disconnect-summary li+li{margin-top:9px}
+.expense-context{border:1px solid var(--line);border-radius:14px;padding:12px 14px}.expense-context summary{cursor:pointer;font-weight:600;font-size:13px}.expense-context[open] .field{margin-top:14px}.month-transactions{border-top:1px solid var(--line);margin-top:18px;padding-top:18px}.tip small{display:block}

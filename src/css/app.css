@@ -1728,6 +1728,8 @@ dialog:has(.bank-settings-screen) .modal-wrap{padding:24px}
 
 body[data-route="home"]{background:linear-gradient(180deg,#fff9f5 0,#fff 48%,#f8fafc 100%)}
 body[data-route="home"] .columns{grid-template-columns:minmax(0,1fr) 302px}
+body.solo[data-route="home"] .columns{grid-template-columns:minmax(0,1fr)}
+body.solo[data-route="home"] .peer-rail{display:none!important}
 .home-v2{display:flex;flex-direction:column;gap:15px;max-width:930px;margin:0 auto}
 .home-greeting{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:2px 2px 0}
 .home-greeting h2{font-size:30px;line-height:1.15;letter-spacing:-1px;margin-top:8px}

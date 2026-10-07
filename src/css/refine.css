@@ -102,6 +102,9 @@ dialog .modal-head .icon-btn{min-width:44px;min-height:44px}
   *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
 
+/* The companion panel is hidden on tablets; its grid column must collapse too. */
+@media(max-width:1060px){.columns{grid-template-columns:minmax(0,1fr)}}
+
 @media(max-width:760px){
   body{background:linear-gradient(180deg,#fffdfa 0%,var(--junto-canvas) 56%,#f6f7f9 100%)}
   .workspace{max-width:100%;overflow-x:clip}

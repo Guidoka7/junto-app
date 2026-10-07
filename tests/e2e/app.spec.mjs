@@ -332,6 +332,7 @@ test('approved screens remain usable at mobile, tablet and desktop widths in bot
    for(const route of ['home','future','analysis','bills','goals']){
      await page.locator(`button[data-route="${route}"]:visible`).first().click();await expect(page.locator('body')).toHaveAttribute('data-route',route);
      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${width}px ${couple?'dupla':'solo'} ${route}`).toBe(true);
+     if(width===768){const area=await page.locator('#app-content').boundingBox(),columns=await page.locator('.columns').boundingBox();expect(area.width,`tablet ${route}: a coluna oculta não deve estreitar o conteúdo`).toBeGreaterThanOrEqual(columns.width-1);}
      const duplicates=await page.locator('[id]').evaluateAll(nodes=>{const ids=nodes.map(n=>n.id);return [...new Set(ids.filter((id,i)=>ids.indexOf(id)!==i))];});expect(duplicates).toEqual([]);
      if(width<760)expect(await page.locator('#mobile-nav').evaluate(el=>getComputedStyle(el).position)).toBe('fixed');
    }

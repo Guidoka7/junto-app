@@ -37,10 +37,21 @@ test('new Home stays functional in solo and couple modes',async({page})=>{
  await expect(page.locator('.home-v2 .connect-card')).toHaveCount(0);
  await expect(page.locator('#peer-rail')).toBeHidden();
  const categories=await page.evaluate(()=>window.JuntoApp.getCategories());
- for(const category of ['Educação','Pets','Beleza','Viagem','Presentes'])expect(categories).toContain(category);
+ for(const category of ['Educação','Pets','Beleza','Viagem','Presentes','Restaurantes','Tecnologia','Trabalho','Impostos'])expect(categories).toContain(category);
  await page.locator('[data-action="quick-expense"][data-category="Transporte"]').click();
  await expect(page.locator('#expense-cat-wrap')).toBeVisible();
  await expect(page.locator('#expense-category')).toHaveValue('Transporte');
+ await page.locator('#modal [data-action="close"]').click();
+ await page.evaluate(()=>{const s=window.JuntoApp.freshState('Guilherme');s.users[0].balance=250000;s.transactions=[
+  {id:'u1',name:'Uber',item:'Corrida de app',icon:'ride',amount:1800,category:'Transporte',payer:'a',by:'a',date:'2026-10-01'},
+  {id:'u2',name:'Uber',item:'Corrida de app',icon:'ride',amount:1900,category:'Transporte',payer:'a',by:'a',date:'2026-10-02'},
+  {id:'u3',name:'Uber',item:'Corrida de app',icon:'ride',amount:1800,category:'Transporte',payer:'a',by:'a',date:'2026-10-03'}
+ ];window.JuntoApp.applyState(s);});
+ await page.locator('.home-register-cta').click();
+ await page.locator('#expense-title').fill('uber');
+ await expect(page.locator('#expense-category')).toHaveValue('Transporte');
+ await expect(page.locator('#expense-amount')).toHaveValue('18,00');
+ await expect(page.locator('#expense-read')).toContainText('valor habitual');
  await page.locator('#modal [data-action="close"]').click();
  await page.evaluate(()=>{const s=window.JuntoApp.freshState('Guilherme');s.users[0].balance=250000;s.users.push({id:'b',name:'Bia',balance:150000,tone:'pink'});window.JuntoApp.applyState(s);});
  await expect(page.locator('.home-money-card')).toContainText('Saldo livre da dupla hoje');

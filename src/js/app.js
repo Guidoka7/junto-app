@@ -33,6 +33,8 @@
     plane:'<path d="m22 2-7 20-4-9-9-4Z M22 2 11 13"/>',
     gift:'<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v9h14v-9M12 8v13M12 8H8a3 3 0 1 1 3-3zm0 0h4a3 3 0 1 0-3-3z"/>',
     trash:'<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/>',
+    edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4M4 20h16"/>',
+    refresh:'<path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M19 11a7 7 0 0 0-12-4L4 10M5 13a7 7 0 0 0 12 4l3-3"/>',
     clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     repeat:'<path d="m17 2 4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3"/>',
     info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/>',
@@ -110,10 +112,38 @@
   // ===== Quem paga: um, meio a meio ou proporcional =====
   const PAYER_LABEL={half:'Meio a meio',prop:'Proporcional à renda'};
   const payerLabel=(p)=>PAYER_LABEL[p]||(user(p)?first(user(p).name):'—');
-  function splitShares(amount,mode){if(mode==='a'||mode==='b')return [{id:mode,amount}];const r=mode==='prop'?incomeShare():.5,a=Math.round(amount*r);return [{id:'a',amount:a},{id:'b',amount:amount-a}].filter(s=>s.amount>0);}
-  function splitPreview(amount,mode){if(!Number.isFinite(amount)||amount<=0)return mode==='prop'?`Divide pela renda prevista do mês: ${pct(incomeShare())} para ${first(user('a').name)}, ${pct(1-incomeShare())} para ${first(user('b').name)}.`:mode==='half'?'Cada um paga a metade, da própria conta.':'';const s=splitShares(amount,mode);if(s.length<2)return `Sai tudo da conta de ${first(user(s[0].id).name)}.`;return s.map(x=>`${first(user(x.id).name)} paga ${money(x.amount)}`).join(' · ')+(mode==='prop'?` (renda prevista: ${pct(incomeShare())} / ${pct(1-incomeShare())})`:'');}
-  function charge(amount,mode){const shares=splitShares(amount,mode),short=shares.find(s=>s.amount>user(s.id).balance);if(short)return {error:`O saldo de ${first(user(short.id).name)} não cobre ${money(short.amount)}. Atualize o saldo ou escolha outra divisão.`};shares.forEach(s=>user(s.id).balance-=s.amount);return {shares};}
-  const optionPayers=(selected=active)=>state.users.map(u=>`<option value="${u.id}" ${u.id===selected?'selected':''}>${esc(u.name)}</option>`).join('')+`<option value="half" ${selected==='half'?'selected':''}>Meio a meio</option><option value="prop" ${selected==='prop'?'selected':''}>Proporcional à renda</option>`;
+  function splitShares(amount,mode){
+    if(isSolo())return [{id:'a',amount}];
+    if(mode==='a'||mode==='b')return [{id:mode,amount}];
+    const r=mode==='prop'?incomeShare():.5,a=Math.round(amount*r);return [{id:'a',amount:a},{id:'b',amount:amount-a}].filter(s=>s.amount>0);
+  }
+  function splitPreview(amount,mode){
+    if(isSolo())return Number.isFinite(amount)&&amount>0?`Sai da sua conta: ${money(amount)}.`:'Sai da sua conta.';
+    if(!Number.isFinite(amount)||amount<=0)return mode==='prop'?`Divide pela renda prevista do mês: ${pct(incomeShare())} para ${first(user('a').name)}, ${pct(1-incomeShare())} para ${first(user('b').name)}.`:mode==='half'?'Cada um paga a metade, da própria conta.':'';
+    const s=splitShares(amount,mode);if(s.length<2)return `Sai tudo da conta de ${first(user(s[0].id).name)}.`;return s.map(x=>`${first(user(x.id).name)} paga ${money(x.amount)}`).join(' · ')+(mode==='prop'?` (renda prevista: ${pct(incomeShare())} / ${pct(1-incomeShare())})`:'');
+  }  function charge(amount,mode){const shares=splitShares(amount,mode),short=shares.find(s=>s.amount>user(s.id).balance);if(short)return {error:`O saldo de ${first(user(short.id).name)} não cobre ${money(short.amount)}. Atualize o saldo ou escolha outra divisão.`};shares.forEach(s=>user(s.id).balance-=s.amount);return {shares};}
+  function transactionShares(t){
+    if(Number.isSafeInteger(t?.balanceDelta)){
+      if(t.balanceDelta===0)return [];
+      const amount=Math.abs(t.balanceDelta);
+      if(Array.isArray(t.split)&&t.split.length){const total=t.split.reduce((sum,x)=>sum+x.amount,0)||1;return t.split.map(x=>({id:x.id,amount:Math.round(amount*x.amount/total)})).filter(x=>state.users.some(u=>u.id===x.id)&&Number.isSafeInteger(x.amount));}
+      if(state.users.some(u=>u.id===t.payer))return [{id:t.payer,amount}];
+    }
+    if(Array.isArray(t?.split)&&t.split.length)return t.split.map(x=>({id:x.id,amount:x.amount})).filter(x=>state.users.some(u=>u.id===x.id)&&Number.isSafeInteger(x.amount));
+    if(t&&state.users.some(u=>u.id===t.payer))return [{id:t.payer,amount:t.amount}];
+    if(t&&['half','prop'].includes(t.payer))return splitShares(t.amount,t.payer);
+    return [];
+  }
+  function applyBalanceShares(shares,direction){shares.forEach(x=>{const u=state.users.find(u=>u.id===x.id);if(u)u.balance+=direction*x.amount;});}
+  function reallocateTransaction(t,amount,payer){
+    if(t?.balanceDelta===0)return {shares:[]};
+    const oldShares=transactionShares(t);applyBalanceShares(oldShares,1);
+    const nextShares=splitShares(amount,payer),short=nextShares.find(x=>x.amount>user(x.id).balance);
+    if(short){applyBalanceShares(oldShares,-1);return {error:`O saldo de ${first(user(short.id).name)} não cobre ${money(short.amount)}. Atualize o saldo ou escolha outra divisão.`};}
+    applyBalanceShares(nextShares,-1);return {shares:nextShares};
+  }
+  function refundTransaction(t){applyBalanceShares(transactionShares(t),1);}
+  const optionPayers=(selected=active)=>isSolo()?`<option value="a" selected>${esc(user('a').name)}</option>`:state.users.map(u=>`<option value="${u.id}" ${u.id===selected?'selected':''}>${esc(u.name)}</option>`).join('')+`<option value="half" ${selected==='half'?'selected':''}>Meio a meio</option><option value="prop" ${selected==='prop'?'selected':''}>Proporcional à renda</option>`;
   function rollRecurring(){
     const now=new Date(),cm=dateISO().slice(0,7),names=new Set(state.bills.filter(b=>b.due.slice(0,7)===cm).map(b=>b.name.toLowerCase())),latest={};let changed=false;
     state.bills.filter(b=>b.recurring&&b.due.slice(0,7)<cm).forEach(b=>{const k=b.name.toLowerCase();if(!latest[k]||b.due>latest[k].due)latest[k]=b;});
@@ -127,7 +157,7 @@
   const CUT_WEIGHT={Hábitos:.9,Delivery:.65,Lazer:.55,Compras:.6,Lanches:.5,Outros:.4,Alimentação:.15,Transporte:.15,Assinaturas:.4,Casa:.1,Saúde:0};
   const CUT_UNIT={Hábitos:['compra','compras'],Delivery:['pedido','pedidos'],Lazer:['saída','saídas'],Compras:['compra','compras'],Lanches:['lanche','lanches']};
   const isVariable=(t)=>!t.billId;
-  function shareOf(t,id){if(Array.isArray(t.split))return(t.split.find(s=>s.id===id)||{}).amount||0;return t.payer===id?t.amount:0;}
+  function shareOf(t,id){if(Array.isArray(t.split))return(t.split.find(s=>s.id===id)||{}).amount||0;if(t.payer===id)return t.amount;if(['half','prop'].includes(t.payer))return(splitShares(t.amount,t.payer).find(s=>s.id===id)||{}).amount||0;return 0;}
   function history(){return cached('hist',()=>{
     const T=new Date(),firstData=state.transactions.reduce((m,t)=>t.date<m?t.date:m,dateISO(T)),months=[];
     for(let k=6;k>=0;k--){const f=new Date(T.getFullYear(),T.getMonth()-k,1),ym=dateISO(f).slice(0,7);if(k>0&&dateISO(f)<firstData)continue;
@@ -323,7 +353,7 @@
   const avatar=(id,size='')=>`<span class="avatar ${id==='b'?'b':''} ${size}" aria-hidden="true">${esc(user(id).name.slice(0,1).toUpperCase())}</span>`;
   const profileTone=(id=active)=>user(id)?.tone||(id==='b'?'pink':'blue');
   const coupleInitials=()=>isSolo()?first(user('a').name).slice(0,1).toUpperCase():`${first(user('a').name).slice(0,1)}${first(user('b').name).slice(0,1)}`.toUpperCase();
-  function profilePhotoButton(){const src=state.settings?.couplePhoto||'',tone=profileTone(active),z=Number(state.settings?.profileZoom||1.08).toFixed(2),y=Math.round(state.settings?.profileY||50);return `<div class="profile-hub-clean"><button class="profile-photo-button ${tone}" style="--profile-zoom:${z};--profile-y:${y}%" data-action="${isSolo()?'settings':'profile-photo-switch'}" aria-label="${isSolo()?'Ajustes':`Trocar para ${esc(first(user(other()).name))}`}" title="${isSolo()?'Ajustes':`Trocar para ${esc(first(user(other()).name))}`}"><span class="profile-photo-inner">${src?`<img src="${src}" alt="Foto do casal">`:`<span class="profile-monogram">${esc(coupleInitials())}</span>`}</span><span class="profile-switch-mark" aria-hidden="true">${icon('refresh')}</span></button></div>`;}
+  function profilePhotoButton(){const src=state.settings?.couplePhoto||'',tone=profileTone(active),z=Number(state.settings?.profileZoom||1.08).toFixed(2),y=Math.round(state.settings?.profileY||50),locked=Boolean(cloudSlot)&&!isSolo(),action=isSolo()||locked?'settings':'profile-photo-switch',label=isSolo()?'Ajustes':locked?'Ajustes do meu perfil':`Trocar para ${esc(first(user(other()).name))}`;return `<div class="profile-hub-clean"><button class="profile-photo-button ${tone} ${locked?'profile-locked':''}" style="--profile-zoom:${z};--profile-y:${y}%" data-action="${action}" aria-label="${label}" title="${label}"><span class="profile-photo-inner">${src?`<img src="${src}" alt="Foto do casal">`:`<span class="profile-monogram">${esc(coupleInitials())}</span>`}</span>${locked?'':`<span class="profile-switch-mark" aria-hidden="true">${icon('refresh')}</span>`}</button></div>`;}
   const cash=(cents)=>hidden?'R$ •••••':money(cents);
   const total=()=>state.users.reduce((a,u)=>a+u.balance,0);
   const billsTotal=()=>state.bills.filter(b=>b.status==='open').reduce((a,b)=>a+b.amount,0);
@@ -464,6 +494,11 @@
   }
   function renderPeer(){
     if(isSolo()){$('#peer-rail').innerHTML=connectCard(false);return;}
+    if(cloudSlot){
+      const waiting=state.requests.filter(r=>r.status==='pending'&&r.recipient===other()).length;
+      $('#peer-rail').innerHTML=`<div class="peer-heading"><h2>Do outro lado</h2><span class="badge">${icon('link')}Sincronizado</span></div><div class="peer-live-card">${avatar(other(),'large')}<div><h3>${esc(first(user(other()).name))} está na própria conta</h3><p>${waiting?`${waiting} ${waiting===1?'pedido está esperando resposta':'pedidos estão esperando resposta'}.`:'Quando você mandar um pedido, ele aparece no Juntô da outra pessoa.'}</p><small>Por segurança, você não responde no lugar dela. A resposta sincroniza automaticamente quando ela usar a conta dela.</small></div></div>`;
+      return;
+    }
     $('#peer-rail').innerHTML=`<div class="peer-heading"><h2>Do outro lado</h2><span class="badge">${icon('phone')}${esc(first(user(other()).name))}</span></div>${peerHTML()}<p class="peer-caption">Envie um pedido e responda aqui.<br><strong>O combinado atualiza nas duas telas.</strong></p><div class="sync-line">${icon('link')}Celulares simulados nesta demonstração</div>`;
     if($('#modal').open&&$('#modal').dataset.kind==='peer')$('#modal-content').innerHTML=modalHead(`Celular de ${first(user(other()).name)}`)+peerHTML()+'<p class="peer-caption">A outra pessoa pode responder por aqui.<br>Esta é uma simulação no mesmo navegador.</p>';
   }
@@ -868,7 +903,7 @@
   const NUMW={um:1,uma:1,dois:2,duas:2,tres:3,quatro:4,cinco:5,seis:6,sete:7,oito:8,nove:9,dez:10,onze:11,doze:12,quinze:15,vinte:20,trinta:30,quarenta:40,cinquenta:50,cem:100};
   const CUR=/^(reais|real|conto|contos|pila|pilas|mango|mangos|pratas?|rs|r\$|r)$/;
   const VERBS=/^(gastei|gastamos|gasto|comprei|compramos|paguei|pagamos|pagou|registra|registrar|anota|anotar|lanca|lancar|coloca|bota)$/;
-  const STOP=new Set('com de do da dos das no na nos nas em um uma o a os as pra para pro pelo pela por e foi deu hoje ontem anteontem cada total unidade unidades un eu meu minha mais ai la so tipo'.split(' '));
+  const STOP=new Set('com de do da dos das no na nos nas em um uma o a os as pra para pro pelo pela por e foi deu hoje ontem anteontem cada total unidade unidades un eu meu minha mais ai la so tipo meio metade'.split(' '));
   const FUZZY_STOP=new Set('quanto quantos gastei gastamos gastou gasto gastos mais menos hoje ontem semana posso podemos comprar conta contas saldo sobra sobrar fecha fechar quem onde como parar cortar largar metade guardar guardo economizo economizar dinheiro reais real total valor pagar paguei comprei esse essa isso esta estou ficar todo toda dia dias meses mes'.split(' '));
   const squash=(w)=>w.replace(/(.)\1+/g,'$1');
   function dist(a,b){if(Math.abs(a.length-b.length)>2)return 9;const d=[];for(let i=0;i<=a.length;i++){d[i]=[i];}for(let j=0;j<=b.length;j++)d[0][j]=j;for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++){d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));if(i>1&&j>1&&a[i-1]===b[j-2]&&a[i-2]===b[j-1])d[i][j]=Math.min(d[i][j],d[i-2][j-2]+1);}return d[a.length][b.length];}
@@ -878,11 +913,54 @@
     if(!best)return null;const e=ITEMS[best.idx];return {item:e[1],category:e[2],icon:e[3],fuzzy:true};
   }
   let parsing=false;
+  const MONTH_PT={janeiro:0,fevereiro:1,marco:2,abril:3,maio:4,junho:5,julho:6,agosto:7,setembro:8,outubro:9,novembro:10,dezembro:11};
+  function naturalDate(raw){
+    const t=norm(raw),today=new Date(),todayISO=dateISO(today);
+    if(/\banteontem\b/.test(t))return {date:dateISO(addDays(today,-2)),kind:'spent'};
+    if(/\bontem\b/.test(t))return {date:dateISO(addDays(today,-1)),kind:'spent'};
+    if(/\bamanha\b/.test(t))return {date:dateISO(addDays(today,1)),kind:/todo mes|mensal|fix[ao]|recorrent/.test(t)?'fixed':'bill'};
+    if(/\bhoje\b/.test(t)&&/vence|vencimento|pagar|boleto/.test(t))return {date:todayISO,kind:/todo mes|mensal|fix[ao]|recorrent/.test(t)?'fixed':'bill'};
+    const recurring=/\b(todo mes|todo mês|mensal|mensalmente|fixa|fixo|recorrente)\b/.test(t);
+    const dueHint=/\b(vence|vencimento|vencera|vencer|boleto|a pagar|vou pagar|pra pagar|para pagar)\b/.test(t);
+    const spentHint=/\b(gastei|gastamos|comprei|compramos|paguei|pagamos|ja paguei|já paguei)\b/.test(t);
+    let date=null;
+    let m=t.match(/\b(\d{1,2})[\/.-](\d{1,2})(?:[\/.-](\d{2,4}))?\b/);
+    if(m){
+      let y=m[3]?Number(m[3]):today.getFullYear();if(y<100)y+=2000;
+      const d=Number(m[1]),mo=Number(m[2])-1,dt=new Date(y,mo,d);
+      if(dt.getFullYear()===y&&dt.getMonth()===mo&&dt.getDate()===d){
+        if(!m[3]&&(dueHint||recurring)&&dateISO(dt)<todayISO)dt.setFullYear(dt.getFullYear()+1);
+        date=dateISO(dt);
+      }
+    }
+    if(!date){
+      const monthNames=Object.keys(MONTH_PT).join('|');
+      m=t.match(new RegExp('\\b(?:dia\\s+)?(\\d{1,2})\\s+(?:de\\s+)?('+monthNames+')(?:\\s+(?:de\\s+)?(\\d{4}))?\\b'));
+      if(m){
+        let y=m[3]?Number(m[3]):today.getFullYear(),mo=MONTH_PT[m[2]],d=Number(m[1]),dt=new Date(y,mo,d);
+        if(!m[3]&&(dueHint||recurring)&&dateISO(dt)<todayISO)dt.setFullYear(dt.getFullYear()+1);
+        if(dt.getMonth()===mo&&dt.getDate()===d)date=dateISO(dt);
+      }
+    }
+    if(!date){
+      m=t.match(/\b(?:vence(?:\s+no)?|vencimento(?:\s+no)?|vencer(?:\s+no)?|dia)\s+(?:dia\s+)?(\d{1,2})\b/)||t.match(/\bpagar\s+(?:no\s+)?dia\s+(\d{1,2})\b/);
+      if(m){
+        const d=Number(m[1]);if(d>=1&&d<=31){let y=today.getFullYear(),mo=today.getMonth(),last=daysInMonth(y,mo),dt=new Date(y,mo,Math.min(d,last));if(dateISO(dt)<todayISO&&(dueHint||recurring)){mo++;dt=new Date(y,mo,Math.min(d,daysInMonth(y,mo)));}date=dateISO(dt);}
+      }
+    }
+    return {date,kind:recurring?'fixed':dueHint?'bill':spentHint?'spent':null,recurring,dueHint};
+  }
   function parseQuick(text){
-    const raw=String(text||'').trim();let toks=norm(raw).replace(/r\$\s*/g,' r$ ').replace(/(\d)(reais|real|conto|contos|pila|pilas|r\$)\b/g,'$1 $2').split(/\s+/).filter(Boolean).map(t=>NUMW[t]!=null?String(NUMW[t]):t);
-    const isNum=(t)=>/^\d+(?:[.,]\d{1,2})?$/.test(t),numIdx=toks.map((t,i)=>isNum(t)?i:-1).filter(i=>i>=0);
-    if(numIdx.length>1)toks=toks.map(t=>t==='99'?'noventaenove':t);
-    const nums=toks.map((t,i)=>isNum(t)?i:-1).filter(i=>i>=0),used=new Set();let amount=null,unit=null,qty=1,ambiguous=false;
+    const raw=String(text||'').trim(),meta=naturalDate(raw);let toks=norm(raw).replace(/r\$\s*/g,' r$ ').replace(/(\d)(reais|real|conto|contos|pila|pilas|r\$)\b/g,'$1 $2').split(/\s+/).filter(Boolean).map(t=>NUMW[t]!=null?String(NUMW[t]):t);
+    const isNum=(t)=>/^\d+(?:[.,]\d{1,2})?$/.test(t),dateNums=new Set();
+    const markDateNum=(i)=>{const v=Number(toks[i]);if(isNum(toks[i]||'')&&v>=1&&v<=31)dateNums.add(i);};
+    toks.forEach((tok,i)=>{
+      if((tok==='dia'||tok==='vence'||tok==='vencimento'||tok==='vencer')&&isNum(toks[i+1]||''))markDateNum(i+1);
+      if((tok==='vence'||tok==='vencimento'||tok==='vencer'||tok==='pagar')&&toks[i+1]==='dia'&&isNum(toks[i+2]||''))markDateNum(i+2);
+    });
+    const rawNumIdx=toks.map((t,i)=>isNum(t)&&!dateNums.has(i)?i:-1).filter(i=>i>=0);
+    if(rawNumIdx.length>1)toks=toks.map((t,i)=>t==='99'&&!dateNums.has(i)?'noventaenove':t);
+    const nums=toks.map((t,i)=>isNum(t)&&!dateNums.has(i)?i:-1).filter(i=>i>=0),used=new Set(dateNums);let amount=null,unit=null,qty=1,ambiguous=false;
     const money=nums.filter(i=>CUR.test(toks[i+1]||'')||toks[i-1]==='r$'||/[.,]\d{1,2}$/.test(toks[i]));
     const before=(i)=>toks.slice(Math.max(0,i-1),i).join(' '),after=(i)=>toks[i+1]||'';
     const perUnitAt=(i)=>/^(a|de)$/.test(before(i))||after(i)==='cada'||(CUR.test(after(i))&&toks[i+2]==='cada');
@@ -893,12 +971,18 @@
     if(money.length)setPrice(money[money.length-1]);
     else if(nums.length>=2)setPrice(nums[nums.length-1]);
     else if(nums.length===1){const i=nums[0],v=toks[i],next=toks[i+1];if(/^\d+$/.test(v)&&+v<=40&&next&&!STOP.has(next)&&!VERBS.test(next)&&i<toks.length-1){qty=+v;used.add(i);}else setPrice(i);}
-    let payer=null;const nt=toks.join(' ');if(/meio a meio|dividid|dividimos|rachamos|rachei|racha|metade cada|cada um metade/.test(nt))payer='half';else{const u=state.users.find(u=>toks.includes(norm(first(u.name))));if(u)payer=u.id;}
-    const dateOff=toks.includes('anteontem')?-2:toks.includes('ontem')?-1:0,date=dateOff?dateISO(addDays(new Date(),dateOff)):null;
-    const nameWords=new Set(['meio','dividido','dividida','dividimos','rachamos','rachei','racha','metade','pagou',...state.users.map(u=>norm(first(u.name)))]);
-    const keep=toks.filter((t,i)=>!used.has(i)&&!isNum(t)&&!CUR.test(t)&&!VERBS.test(t)&&!nameWords.has(t)&&t!=='cada'&&t!=='noventaenove'||t==='noventaenove');
-    const phrase=keep.map(t=>t==='noventaenove'?'99':t).join(' ').trim(),label=keep.filter(t=>!STOP.has(t)).map(t=>t==='noventaenove'?'99':t).join(' ').trim();
-    const res={qty,unit,amount,ambiguous,payer,date,phrase,label:label||phrase,name:label||raw};
+    let payer=null;const nt=toks.join(' ');
+    if(isSolo())payer='a';
+    else if(/meio a meio|dividid|dividimos|rachamos|rachei|racha|metade cada|cada um metade/.test(nt))payer='half';
+    else if(/proporcional|pela renda|proporcao da renda|proporção da renda/.test(nt))payer='prop';
+    else if(/\b(meu amor|amor|ela|ele)\s+(pagou|paga|pagara|vai pagar)\b|\b(pagou|paga)\s+(meu amor|ela|ele)\b/.test(nt))payer=other();
+    else if(/\b(eu|me|minha conta)\s+(paguei|pago|paga|vou pagar)\b|\b(paguei|pago)\s+eu\b/.test(nt))payer=active;
+    else{const u=state.users.find(u=>toks.includes(norm(first(u.name))));if(u)payer=u.id;}
+    const date=meta.date;
+    const nameWords=new Set(['meio','dividido','dividida','dividimos','rachamos','rachei','racha','metade','pagou','paga','paguei','pagamos','vai','pagar','vence','vencer','vencimento','boleto','mensal','mensalmente','fixa','fixo','recorrente','todo','toda','mes','mês','dia','amanha','meu','minha','amor','ela','ele','proporcional','renda',...state.users.map(u=>norm(first(u.name)))]);
+    const keep=toks.filter((t,i)=>!used.has(i)&&!isNum(t)&&!CUR.test(t)&&!VERBS.test(t)&&!nameWords.has(t)&&!STOP.has(t)&&!/^\d{1,2}[\/.-]\d{1,2}(?:[\/.-]\d{2,4})?$/.test(t)||t==='noventaenove');
+    const phrase=keep.map(t=>t==='noventaenove'?'99':t).join(' ').trim(),label=phrase;
+    const res={qty,unit,amount,ambiguous,payer,date,kind:meta.kind,recurring:meta.recurring,phrase,label:label||phrase,name:label||raw};
     if(ambiguous&&!parsing){parsing=true;try{const r=recognizeP(res);if(r){const hist=state.transactions.filter(t=>!t.billId&&t.item===r.item).slice(-40);if(hist.length>=3){const u=hist.reduce((s,t)=>s+t.amount/(t.qty||1),0)/hist.length;if(Math.abs(amount-u)<Math.abs(res.unit-u)){res.unit=amount;res.amount=amount*qty;}}}}finally{parsing=false;}}
     return res;
   }
@@ -931,29 +1015,49 @@
     }
     return {category,payer,amount,count:matches.length};
   }
+  function billHistoryPrefill(text){
+    const p=parseQuick(text),r=recognizeP(p),key=norm(p.label||p.name).trim();if(key.length<2)return null;
+    const matches=state.bills.filter(b=>{
+      const nk=norm(b.name||''),ik=norm(b.item||'');
+      if(r&&ik&&ik===norm(r.item))return true;
+      return nk===key||(firstWord(nk).length>3&&firstWord(nk)===firstWord(key));
+    }).slice(-24);
+    if(!matches.length)return null;
+    const mode=(fn,min=1)=>{const c={};matches.forEach(x=>{const k=fn(x);if(k!==undefined&&k!==null&&k!=='')c[k]=(c[k]||0)+1;});const best=Object.entries(c).sort((a,b)=>b[1]-a[1])[0];return best&&best[1]>=min?best[0]:null;};
+    const category=mode(b=>b.category),payer=isSolo()?'a':mode(b=>b.payer),recurring=matches.filter(b=>b.recurring).length>=Math.ceil(matches.length*.5);
+    const amounts=matches.map(b=>b.amount).filter(Number.isSafeInteger).sort((a,b)=>a-b),amount=amounts.length?amounts[Math.floor(amounts.length/2)]:null;
+    const days=matches.map(b=>pd(b.due).getDate()),dueDay=Number(mode(b=>String(pd(b.due).getDate())));
+    let date=null;if(dueDay){const now=new Date(),today=dateISO(now),y=now.getFullYear(),m=now.getMonth(),cur=new Date(y,m,Math.min(dueDay,daysInMonth(y,m)));date=dateISO(cur);if(date<today){const nx=new Date(y,m+1,1);date=dateISO(new Date(nx.getFullYear(),nx.getMonth(),Math.min(dueDay,daysInMonth(nx.getFullYear(),nx.getMonth()))));}}
+    const open=matches.find(b=>b.status==='open'&&(!p.amount||b.amount===p.amount));
+    return {category,payer,amount,date,kind:recurring?'fixed':'bill',count:matches.length,openId:open?.id||null};
+  }
   function smartRead(prefix){
     const input=$('#'+prefix+'-title');if(!input)return;
-    const p=parseQuick(input.value),r=recognizeP(p),hist=prefix==='expense'?historyPrefill(input.value):null,sel=$('#'+prefix+'-category'),tile=$('#'+prefix+'-icon'),read=$('#'+prefix+'-read'),amt=$('#'+prefix+'-amount');
-    const suggestedCategory=r?.category||hist?.category;
+    const p=parseQuick(input.value),r=recognizeP(p),hist=['expense','request'].includes(prefix)?historyPrefill(input.value):null,billHist=prefix==='expense'?billHistoryPrefill(input.value):null,sel=$('#'+prefix+'-category'),tile=$('#'+prefix+'-icon'),read=$('#'+prefix+'-read'),amt=$('#'+prefix+'-amount');
+    const suggestedCategory=r?.category||hist?.category||billHist?.category;
     if(suggestedCategory&&sel&&sel.dataset.touched!=='1'&&categories.includes(suggestedCategory))sel.value=suggestedCategory;
     const cat=sel?.value||'Outros',ic=r?r.icon:input.value.trim()?categoryIcon(cat):'sparkle';
     if(tile){tile.innerHTML=icon(ic);tile.classList.toggle('known',!!r||!!hist);}
-    if(amt&&amt.dataset.touched!=='1'){if(p.amount)amt.value=moneyNumber(p.amount);else if(hist?.amount)amt.value=moneyNumber(hist.amount);else if(input.value.trim())amt.value='';}
-    const pay=$('#'+prefix+'-payer'),payer=p.payer||hist?.payer;
+    if(amt&&amt.dataset.touched!=='1'){if(p.amount)amt.value=moneyNumber(p.amount);else if(hist?.amount)amt.value=moneyNumber(hist.amount);else if(billHist?.amount)amt.value=moneyNumber(billHist.amount);else if(input.value.trim())amt.value='';}
+    const pay=$('#'+prefix+'-payer'),payer=p.payer||hist?.payer||billHist?.payer;
     if(pay&&payer&&pay.dataset.touched!=='1'&&[...state.users.map(u=>u.id),'half','prop'].includes(payer))pay.value=payer;
-    const dt=$('#'+prefix+'-date');if(dt&&p.date&&dt.dataset.touched!=='1')dt.value=p.date;
+    const dt=$('#'+prefix+'-date'),smartDate=p.date||billHist?.date;if(dt&&smartDate&&dt.dataset.touched!=='1')dt.value=smartDate;
+    const smartKind=p.kind||billHist?.kind;if(prefix==='expense'&&smartKind){const form=input.closest('form'),radio=form?.querySelector(`input[name="expense-type"][value="${smartKind}"]`);if(radio&&form?.dataset.typeTouched!=='1'){radio.checked=true;syncExpenseKind(smartKind);}}
     if(!read)return;if(!input.value.trim()){read.innerHTML=READ_DEFAULT;return;}
-    const learnedByHistory=hist&&!p.payer&&!p.amount;
-    read.innerHTML=`<span class="chip strong">${icon(ic)}${esc(r?r.item:cap(p.label||p.name))}</span><span class="chip">${esc(catPath(cat))}</span>${p.qty>1&&p.unit?`<span class="chip">${p.qty} × ${money(p.unit)}</span>`:''}${payer?`<span class="chip">${esc(payerLabel(payer))}</span>`:''}${p.date?`<span class="chip">${dateText(p.date)}</span>`:''}${hist?.amount&&!p.amount?`<span class="chip soft">valor habitual ${money(hist.amount)}</span>`:''}${r?.fuzzy?`<span class="chip soft">entendi “${esc(p.label)}” como ${esc(r.item.toLowerCase())}</span>`:''}${r?.learned?'<span class="chip soft">aprendido com você</span>':learnedByHistory?`<span class="chip soft">preenchido pelo histórico (${hist.count}x)</span>`:!r?'<span class="chip soft">novo: o Juntô aprende com a categoria escolhida</span>':''}<button type="button" class="text-link" data-action="cat-change" data-prefix="${prefix}">Trocar categoria</button>`;
+    const learnedByHistory=hist&&!p.payer&&!p.amount,learnedBill=billHist&&!p.amount&&!p.date;
+    read.innerHTML=`<span class="chip strong">${icon(ic)}${esc(r?r.item:cap(p.label||p.name))}</span><span class="chip">${esc(catPath(cat))}</span>${p.qty>1&&p.unit?`<span class="chip">${p.qty} × ${money(p.unit)}</span>`:''}${payer?`<span class="chip">${esc(payerLabel(payer))}</span>`:''}${smartDate?`<span class="chip">${dateText(smartDate)}</span>`:''}${smartKind&&prefix==='expense'?`<span class="chip soft">${smartKind==='fixed'?'conta fixa':smartKind==='bill'?'a pagar':'gasto'}</span>`:''}${hist?.amount&&!p.amount?`<span class="chip soft">valor habitual ${money(hist.amount)}</span>`:billHist?.amount&&!p.amount?`<span class="chip soft">valor habitual ${money(billHist.amount)}</span>`:''}${billHist?.openId?`<span class="chip warn">já existe uma conta parecida aberta</span>`:''}${r?.fuzzy?`<span class="chip soft">entendi “${esc(p.label)}” como ${esc(r.item.toLowerCase())}</span>`:''}${r?.learned?'<span class="chip soft">aprendido com você</span>':learnedByHistory?`<span class="chip soft">preenchido pelo histórico (${hist.count}x)</span>`:learnedBill?`<span class="chip soft">aprendido com contas anteriores (${billHist.count}x)</span>`:!r?'<span class="chip soft">novo: o Juntô aprende com a categoria escolhida</span>':''}<button type="button" class="text-link" data-action="cat-change" data-prefix="${prefix}">Trocar categoria</button>`;
   }
   function smartEntry(prefix,label){return `<div class="smart-entry"><span class="item-tile" id="${prefix}-icon" aria-hidden="true">${icon('sparkle')}</span><div class="field"><label for="${prefix}-title">${label}</label><input id="${prefix}-title" name="${prefix}-title" type="text" maxlength="60" autocomplete="off" placeholder="Ex.: 2 cigarros a 3, pizza 45, uber 18" required></div></div><p class="smart-read" id="${prefix}-read" aria-live="polite">${READ_DEFAULT}</p>`;}
   function askModal(){
     openModal('Amor, posso gastar?',`<div class="ask-v3-intro"><span>${icon('chat')}</span><div><b>Uma vontade, uma conversa.</b><small>O Juntô mostra o impacto antes de mandar pro seu amor.</small></div></div><form class="form ask-v3-form" data-form="ask">${smartEntry('request','O que bateu vontade?')}<div class="field-pair">${field('request-amount','Quanto?','0,00','',true)}<div class="field cat-wrap" id="request-cat-wrap" hidden><label for="request-category">Categoria</label><select id="request-category" name="request-category">${optionCategories('Lazer')}</select></div></div><div class="field"><label for="request-payer">Quem paga?</label><select id="request-payer" name="request-payer">${optionPayers('half')}</select></div><div class="field"><label for="request-note">Conta pro seu amor <span>opcional</span></label><textarea id="request-note" name="request-note" maxlength="180" placeholder="Ex.: a gente merece um date sem lavar louça."></textarea></div><div class="form-note ask-v3-impact" id="request-impact"><strong>Depois desse gasto</strong>Hoje vocês têm ${cash(free())} livres depois das contas e dos planos.</div><div class="form-note" id="request-cat" hidden></div>${formEnd(`${icon('send')}Mandar pro meu amor`)}<button class="ask-v3-later" type="button" data-action="close">Agora não</button></form>`,'ask');
   }
-  function expenseModal(presetCategory=''){
-    const preset=categories.includes(presetCategory)?presetCategory:'';
-    openModal('Mais um gasto, menos um mistério.',`<p class="modal-sub">Se já pagou, entra no saldo. Se vai pagar, entra nas contas.</p><form class="form" data-form="expense"><div class="segmented" aria-label="Tipo de gasto"><label><input type="radio" name="expense-type" value="spent" checked>Já gastei</label><label><input type="radio" name="expense-type" value="bill">Vou pagar</label><label><input type="radio" name="expense-type" value="fixed">Conta fixa</label></div>${smartEntry('expense','O que foi?')}<div class="field cat-wrap" id="expense-cat-wrap" ${preset?'':'hidden'}><label for="expense-category">Categoria</label><select id="expense-category" name="expense-category">${optionCategories(preset||'Outros')}</select></div><div class="field-pair">${field('expense-amount','Valor','0,00','',true)}<div class="field"><label for="expense-payer">Quem paga?</label><select name="expense-payer" id="expense-payer" data-split>${optionPayers()}</select></div></div><p class="split-preview" id="split-preview"></p><div class="field"><label for="expense-date" id="expense-date-label">Data do gasto</label><input type="date" id="expense-date" name="expense-date" value="${dateISO()}" required></div><div class="form-note" id="budget-note" hidden></div><div class="form-note" id="expense-note">O valor sai do saldo de quem pagou e aparece no histórico ${isSolo()?'do seu controle':'da dupla'}.</div>${formEnd(isSolo()?'Registrar no meu controle':'Registrar na nossa conta')}</form>`,'expense');
-    if(preset){const sel=$('#expense-category');if(sel)sel.dataset.touched='1';smartRead('expense');}
+  function expenseModal(presetCategory='',presetType='spent'){
+    const preset=categories.includes(presetCategory)?presetCategory:'',kind=['spent','bill','fixed'].includes(presetType)?presetType:'spent',quick=quickCategorySuggestions(6);
+    const title=kind==='spent'?'Registrar gasto':kind==='fixed'?'Adicionar conta fixa':'Adicionar conta';
+    const note=kind==='spent'?'O valor sai do saldo agora e entra no histórico.':kind==='fixed'?'A conta entra no planejamento e pode se repetir todo mês.':'A conta entra no planejamento e só mexe no saldo quando for marcada como paga.';
+    openModal(title,`<p class="modal-sub">Escreva do seu jeito. O Juntô tenta completar categoria, valor habitual, pagador e data usando seu histórico — você confirma antes de salvar.</p><form class="form" data-form="expense"><div class="segmented" aria-label="Tipo de lançamento"><label><input type="radio" name="expense-type" value="spent" ${kind==='spent'?'checked':''}>Já gastei</label><label><input type="radio" name="expense-type" value="bill" ${kind==='bill'?'checked':''}>Vou pagar</label><label><input type="radio" name="expense-type" value="fixed" ${kind==='fixed'?'checked':''}>Conta fixa</label></div>${smartEntry('expense','O que foi?')}<div class="smart-category-picks" aria-label="Categorias sugeridas">${quick.map(c=>`<button type="button" data-action="expense-category-pick" data-category="${esc(c)}">${icon(categoryIcon(c))}${esc(c)}</button>`).join('')}</div><div class="field cat-wrap" id="expense-cat-wrap" ${preset?'':'hidden'}><label for="expense-category">Categoria</label><select id="expense-category" name="expense-category">${optionCategories(preset||'Outros')}</select></div><div class="field-pair">${field('expense-amount','Valor','0,00','',true)}<div class="field"><label for="expense-payer">${isSolo()?'Conta':'Quem paga?'}</label><select name="expense-payer" id="expense-payer" data-split>${optionPayers()}</select></div></div><p class="split-preview" id="split-preview"></p><div class="field"><label for="expense-date" id="expense-date-label">${kind==='spent'?'Data do gasto':'Vencimento'}</label><input type="date" id="expense-date" name="expense-date" value="${dateISO()}" required></div><div class="form-note" id="budget-note" hidden></div><div class="form-note" id="expense-note">${note}</div>${formEnd(kind==='spent'?'Registrar gasto':kind==='fixed'?'Adicionar conta fixa':'Adicionar conta')}</form>`,'expense');
+    if(preset){const sel=$('#expense-category');if(sel)sel.dataset.touched='1';}
+    smartRead('expense');updateSplit();updateBudgetNote();
   }
   // ===== Contestar gastos =====
   const CONTEST_REASONS=['Não foi combinado','Valor alto demais','Não precisava','Dava pra esperar','Outro motivo'];
@@ -978,9 +1082,9 @@
     const txs=billFilter==='month'?state.transactions.filter(t=>t.date.slice(0,7)===ym&&!t.billId):[];
     const openTotal=openBills.reduce((sum,b)=>sum+b.amount,0),shared=openBills.filter(b=>['half','prop'].includes(b.payer));
     const parts=shared.reduce((acc,b)=>{splitShares(b.amount,b.payer).forEach(x=>acc[x.id]=(acc[x.id]||0)+x.amount);return acc;},{a:0,b:0});
-    const billRow=(b)=>{const it=recognize(b.name)||{icon:categoryIcon(b.category)};const shares=splitShares(b.amount,b.payer);return `<article class="bills-v3-row ${b.contest?'has-contest':''}"><span class="bills-v3-icon ${categoryColor(b.category)}">${icon(it.icon)}</span><span class="bills-v3-copy"><b>${esc(b.name)}</b><small>${dateText(b.due)} · ${esc(payerLabel(b.payer))}${b.recurring?' · mensal':''}</small>${shares.length>1?`<span class="bills-v3-avatars">${shares.map(x=>avatar(x.id)).join('')}</span>`:''}</span><strong class="num">${cash(b.amount)}</strong>${b.status==='open'?`<button class="bills-v3-arrow" data-action="pay-bill" data-id="${b.id}" aria-label="Pagar ${esc(b.name)}">›</button>`:`<span class="bills-v3-paid">${icon('check')}</span>`}${b.contest?contestBlock(b.contest,'bill',b.id):''}</article>`;};
-    const txRow=(t)=>{const it=itemOf(t);return `<article class="bills-v3-row"><span class="bills-v3-icon ${categoryColor(t.category)}">${icon(it.icon)}</span><span class="bills-v3-copy"><b>${esc(t.name)}</b><small>${dateText(t.date)} · ${esc(t.category)} · ${esc(payerLabel(t.payer))}</small></span><strong class="num">− ${cash(t.amount)}</strong><span class="bills-v3-paid">›</span></article>`;};
-    return `<div class="bills-v3-head"><span>${solo?'MINHAS CONTAS':'NOSSAS CONTAS'}</span><h2>${solo?'Minhas contas':'Nossas contas'}</h2><p>${solo?'Tudo em dia. Cabeça em paz.':'Tudo em dia. Amor em paz.'}</p></div><div class="bills-v3-surface"><section class="bills-v3-summary"><div><span>A PAGAR ESTE MÊS</span><strong class="num">${cash(openTotal)}</strong><p>${openBills.length} ${openBills.length===1?'conta aberta':'contas abertas'}</p></div><button data-feature="bank-settings">${icon('wallet')}<span>Bancos ›</span></button><button class="bills-v3-income" data-action="route" data-route="incomes">${icon('trend')}<span>Entradas do mês</span><b>›</b></button></section><nav class="bills-v3-tabs"><button class="${billFilter==='open'?'active':''}" data-action="bill-filter" data-value="open">A pagar</button><button class="${billFilter==='paid'?'active':''}" data-action="bill-filter" data-value="paid">Pagas</button><button class="${billFilter==='all'?'active':''}" data-action="bill-filter" data-value="all">Todas</button></nav><div class="bills-v3-more"><button class="${billFilter==='fixed'?'active':''}" data-action="bill-filter" data-value="fixed">Fixas</button><button class="${billFilter==='month'?'active':''}" data-action="bill-filter" data-value="month">Gastos do mês</button><button class="${billFilter==='contested'?'active':''}" data-action="bill-filter" data-value="contested">Revisões${nOpen?` (${nOpen})`:''}</button></div><section class="bills-v3-list">${billFilter==='month'?txs.slice().reverse().map(txRow).join(''):bills.sort((a,b)=>a.due.localeCompare(b.due)).map(billRow).join('')}${billFilter!=='month'&&!bills.length?`<div class="home-empty-row">${icon(billFilter==='contested'?'flag':'wallet')}<span><b>${billFilter==='contested'?'Nenhuma revisão em aberto.':'Nada por aqui.'}</b><small>${billFilter==='open'?'As próximas contas aparecem assim que forem cadastradas.':'Troque o filtro ou adicione uma conta.'}</small></span></div>`:''}${billFilter==='month'&&!txs.length?`<div class="home-empty-row">${icon('wallet')}<span><b>Nenhum gasto neste mês.</b><small>O primeiro lançamento aparece aqui.</small></span></div>`:''}${shared.length&&!solo&&billFilter==='open'?`<div class="bills-v3-split"><span>${icon('half')}</span><div><b>Cada um com sua parte</b><small>Você ${cash(parts[active]||0)} · Meu amor ${cash(parts[other()]||0)}</small></div></div>`:''}</section><button class="bills-v3-add" data-action="expense">${icon('plus')}Adicionar conta</button></div>`;
+    const billRow=(b)=>{const it=recognize(b.name)||{icon:categoryIcon(b.category)};const shares=splitShares(b.amount,b.payer);return `<div class="bills-v3-row-wrap"><button class="bills-v3-row ${b.contest?'has-contest':''}" data-action="bill-detail" data-id="${b.id}" aria-label="Ver detalhes de ${esc(b.name)}"><span class="bills-v3-icon ${categoryColor(b.category)}">${icon(it.icon)}</span><span class="bills-v3-copy"><b>${esc(b.name)}</b><small>${dateText(b.due)} · ${esc(payerLabel(b.payer))}${b.recurring?' · mensal':''}</small>${shares.length>1?`<span class="bills-v3-avatars">${shares.map(x=>avatar(x.id)).join('')}</span>`:''}</span><strong class="num">${cash(b.amount)}</strong><span class="bills-v3-chevron">${b.status==='paid'?icon('check'):'›'}</span></button>${b.contest?`<div class="bills-v3-contest-wrap">${contestBlock(b.contest,'bill',b.id)}</div>`:''}</div>`;};
+    const txRow=(t)=>{const it=itemOf(t);return `<button class="bills-v3-row" data-action="tx-detail" data-id="${t.id}" aria-label="Ver detalhes de ${esc(t.name)}"><span class="bills-v3-icon ${categoryColor(t.category)}">${icon(it.icon)}</span><span class="bills-v3-copy"><b>${esc(t.name)}</b><small>${dateText(t.date)} · ${esc(t.category)} · ${esc(payerLabel(t.payer))}</small></span><strong class="num">− ${cash(t.amount)}</strong><span class="bills-v3-chevron">›</span></button>`;};
+    return `<div class="bills-v3-head"><span>${solo?'MINHAS CONTAS':'NOSSAS CONTAS'}</span><h2>${solo?'Minhas contas':'Nossas contas'}</h2><p>${solo?'Tudo em dia. Cabeça em paz.':'Tudo em dia. Amor em paz.'}</p></div><div class="bills-v3-surface"><section class="bills-v3-summary"><div><span>A PAGAR ESTE MÊS</span><strong class="num">${cash(openTotal)}</strong><p>${openBills.length} ${openBills.length===1?'conta aberta':'contas abertas'}</p></div><button data-feature="bank-settings">${icon('wallet')}<span>Bancos ›</span></button><button class="bills-v3-income" data-action="route" data-route="incomes">${icon('trend')}<span>Entradas do mês</span><b>›</b></button></section><nav class="bills-v3-tabs"><button class="${billFilter==='open'?'active':''}" data-action="bill-filter" data-value="open">A pagar</button><button class="${billFilter==='paid'?'active':''}" data-action="bill-filter" data-value="paid">Pagas</button><button class="${billFilter==='all'?'active':''}" data-action="bill-filter" data-value="all">Todas</button></nav><div class="bills-v3-more"><button class="${billFilter==='fixed'?'active':''}" data-action="bill-filter" data-value="fixed">Fixas</button><button class="${billFilter==='month'?'active':''}" data-action="bill-filter" data-value="month">Gastos do mês</button><button class="${billFilter==='contested'?'active':''}" data-action="bill-filter" data-value="contested">Revisões${nOpen?` (${nOpen})`:''}</button></div><section class="bills-v3-list">${billFilter==='month'?txs.slice().reverse().map(txRow).join(''):bills.sort((a,b)=>a.due.localeCompare(b.due)).map(billRow).join('')}${billFilter!=='month'&&!bills.length?`<div class="home-empty-row">${icon(billFilter==='contested'?'flag':'wallet')}<span><b>${billFilter==='contested'?'Nenhuma revisão em aberto.':'Nada por aqui.'}</b><small>${billFilter==='open'?'As próximas contas aparecem assim que forem cadastradas.':'Troque o filtro ou adicione uma conta.'}</small></span></div>`:''}${billFilter==='month'&&!txs.length?`<div class="home-empty-row">${icon('wallet')}<span><b>Nenhum gasto neste mês.</b><small>O primeiro lançamento aparece aqui.</small></span></div>`:''}${shared.length&&!solo&&billFilter==='open'?`<div class="bills-v3-split"><span>${icon('half')}</span><div><b>Cada um com sua parte</b><small>Você ${cash(parts[active]||0)} · Meu amor ${cash(parts[other()]||0)}</small></div></div>`:''}</section><button class="bills-v3-add" data-action="${billFilter==='month'?'expense':'bill-new'}" ${billFilter==='fixed'?'data-kind="fixed"':''}>${icon('plus')}${billFilter==='month'?'Registrar gasto':billFilter==='fixed'?'Adicionar conta fixa':'Adicionar conta'}</button></div>`;
   }
     // ===== Cortar o que não precisa =====
   let cutPerson=null;const cutSel={};
@@ -1494,6 +1598,32 @@ ${JSON.stringify(chatContext())}`;
     const b=state.bills.find(b=>b.id===id);if(!b||b.status!=='open')return;
     openModal('Boleto pago. Dupla aliviada.',`<p class="modal-sub">${esc(b.name)} · <b>${cash(b.amount)}</b></p><form class="form" data-form="pay-bill" data-id="${id}"><div class="field"><label for="bill-payer">Quem pagou?</label><select id="bill-payer" name="bill-payer" data-split data-amount="${b.amount}">${optionPayers(b.payer)}</select></div><p class="split-preview" id="split-preview">${esc(splitPreview(b.amount,b.payer))}</p><div class="form-note">Meio a meio ou proporcional: cada parte sai da conta de cada um. A conta deixa de aparecer nas pendências.</div>${formEnd('Confirmar pagamento')}</form>`,'pay-bill');
   }
+  function ledgerMeta(label,value){return `<div class="ledger-detail-meta"><span>${esc(label)}</span><b>${esc(value)}</b></div>`;}
+  function billDetailModal(id){
+    const b=state.bills.find(x=>x.id===id);if(!b)return;const paidTx=state.transactions.find(t=>t.billId===b.id);
+    const status=b.status==='paid'?'Paga':'A pagar',when=b.status==='paid'&&paidTx?`Pago em ${dateText(paidTx.date)}`:`Vence ${dateText(b.due)}`;
+    const actions=[`<button class="ledger-action" data-action="edit-bill" data-id="${b.id}">${icon('edit')}<span><b>Editar</b><small>Nome, valor, categoria, data e divisão</small></span></button>`];
+    if(b.status==='open')actions.push(`<button class="ledger-action primary" data-action="pay-bill" data-id="${b.id}">${icon('check')}<span><b>Marcar como paga</b><small>Registra o pagamento e atualiza o saldo</small></span></button>`);
+    if(b.status==='paid')actions.push(`<button class="ledger-action" data-action="reopen-bill" data-id="${b.id}">${icon('refresh')}<span><b>Reabrir conta</b><small>Desfaz o pagamento e devolve o valor ao saldo</small></span></button>`);
+    if(!isSolo()&&canContest(b))actions.push(`<button class="ledger-action" data-action="contest" data-kind="bill" data-id="${b.id}">${icon('flag')}<span><b>Contestar</b><small>Conversa sem apagar o histórico</small></span></button>`);
+    actions.push(`<button class="ledger-action danger" data-action="delete-bill" data-id="${b.id}">${icon('trash')}<span><b>Excluir conta</b><small>${b.status==='paid'?'Apaga a conta e estorna o pagamento':'Remove do planejamento'}</small></span></button>`);
+    openModal(b.name,`<div class="ledger-detail-v3"><div class="ledger-detail-hero"><span class="bills-v3-icon ${categoryColor(b.category)}">${icon((recognize(b.name)||{icon:categoryIcon(b.category)}).icon)}</span><div><span class="ledger-status ${b.status}">${status}</span><strong class="num">${cash(b.amount)}</strong><p>${esc(when)}</p></div></div><div class="ledger-detail-grid">${ledgerMeta('Categoria',b.category)}${ledgerMeta('Quem paga',payerLabel(b.payer))}${ledgerMeta('Tipo',b.recurring?'Conta fixa / mensal':'Conta avulsa')}${ledgerMeta('Criada como',b.item||b.name)}</div>${b.contest?contestBlock(b.contest,'bill',b.id):''}<div class="ledger-actions">${actions.join('')}</div></div>`,'ledger-detail');
+  }
+  function transactionDetailModal(id){
+    const t=state.transactions.find(x=>x.id===id);if(!t)return;const it=itemOf(t),who=payerLabel(t.payer);
+    const actions=[`<button class="ledger-action" data-action="edit-tx" data-id="${t.id}">${icon('edit')}<span><b>Editar</b><small>Corrigir nome, valor, categoria, data ou divisão</small></span></button>`];
+    if(!isSolo()&&canContest(t))actions.push(`<button class="ledger-action" data-action="contest" data-kind="tx" data-id="${t.id}">${icon('flag')}<span><b>Contestar</b><small>Registra a conversa sem apagar o gasto</small></span></button>`);
+    actions.push(`<button class="ledger-action danger" data-action="delete-tx" data-id="${t.id}">${icon('trash')}<span><b>Excluir gasto</b><small>${t.balanceDelta===0?'Apaga o lançamento sem alterar o saldo':'Estorna o valor para o saldo e apaga o lançamento'}</small></span></button>`);
+    openModal(t.name,`<div class="ledger-detail-v3"><div class="ledger-detail-hero"><span class="bills-v3-icon ${categoryColor(t.category)}">${icon(it.icon)}</span><div><span class="ledger-status spent">Gasto</span><strong class="num">− ${cash(t.amount)}</strong><p>${dateText(t.date)}</p></div></div><div class="ledger-detail-grid">${ledgerMeta('Categoria',t.category)}${ledgerMeta('Quem pagou',who)}${ledgerMeta('Registrado por',first(user(t.by||t.payer).name))}${ledgerMeta('Item',t.item||t.name)}</div>${Array.isArray(t.split)&&t.split.length>1?`<div class="ledger-split-detail">${t.split.map(x=>`<span>${avatar(x.id)}<b>${esc(first(user(x.id).name))}</b><strong class="num">${cash(x.amount)}</strong></span>`).join('')}</div>`:''}${t.contest?contestBlock(t.contest,'tx',t.id):''}<div class="ledger-actions">${actions.join('')}</div></div>`,'ledger-detail');
+  }
+  function editBillModal(id){
+    const b=state.bills.find(x=>x.id===id);if(!b)return;
+    openModal('Editar conta',`<form class="form ledger-edit-form" data-form="edit-bill" data-id="${b.id}">${field('edit-bill-name','Nome da conta','',b.name)}<div class="field-pair">${field('edit-bill-amount','Valor','0,00',moneyNumber(b.amount),true)}<div class="field"><label for="edit-bill-category">Categoria</label><select id="edit-bill-category" name="edit-bill-category">${optionCategories(b.category)}</select></div></div><div class="field"><label for="edit-bill-payer">Quem paga?</label><select id="edit-bill-payer" name="edit-bill-payer" data-split data-amount="${b.amount}">${optionPayers(b.payer)}</select></div><p class="split-preview" id="split-preview">${esc(splitPreview(b.amount,b.payer))}</p><div class="field"><label for="edit-bill-date">Vencimento</label><input id="edit-bill-date" name="edit-bill-date" type="date" value="${b.due}" required></div><label class="check-row"><input type="checkbox" name="edit-bill-recurring" ${b.recurring?'checked':''}><span>Repetir todo mês</span></label>${b.status==='paid'?'<div class="form-note warn">Como esta conta já foi paga, alterar valor ou divisão também recalcula o saldo do pagamento registrado.</div>':''}${formEnd('Salvar alterações')}</form>`,'ledger-edit');
+  }
+  function editTransactionModal(id){
+    const t=state.transactions.find(x=>x.id===id);if(!t)return;
+    openModal('Editar gasto',`<form class="form ledger-edit-form" data-form="edit-tx" data-id="${t.id}">${field('edit-tx-name','Nome do gasto','',t.name)}<div class="field-pair">${field('edit-tx-amount','Valor','0,00',moneyNumber(t.amount),true)}<div class="field"><label for="edit-tx-category">Categoria</label><select id="edit-tx-category" name="edit-tx-category">${optionCategories(t.category)}</select></div></div><div class="field"><label for="edit-tx-payer">Quem pagou?</label><select id="edit-tx-payer" name="edit-tx-payer" data-split data-amount="${t.amount}">${optionPayers(t.payer)}</select></div><p class="split-preview" id="split-preview">${esc(splitPreview(t.amount,t.payer))}</p><div class="field"><label for="edit-tx-date">Data</label><input id="edit-tx-date" name="edit-tx-date" type="date" value="${t.date}" max="${dateISO()}" required></div><div class="form-note">Se o valor ou quem pagou mudar, o Juntô estorna o lançamento antigo e aplica o novo sem duplicar saldo.</div>${formEnd('Salvar alterações')}</form>`,'ledger-edit');
+  }
   function notificationsModal(){
     const list=state.notifications.filter(n=>n.to===active);
     state.notifications.forEach(n=>{if(n.to===active)n.read=true;});persist();
@@ -1552,8 +1682,10 @@ ${JSON.stringify(chatContext())}`;
     if(action==='remove-couple-photo'){state.settings.couplePhoto='';state.settings.profileZoom=1.08;state.settings.profileY=50;persist();if($('#modal').open&&$('#modal').dataset.kind==='settings')settingsModal();toast('Foto removida.','','info');return;}
     if(action==='hide'){hidden=!hidden;render();return;}
     if(action==='ask')return isSolo()?canSpendModal():askModal();
-    if(action==='expense')return expenseModal();
-    if(action==='quick-expense')return expenseModal(el.dataset.category||'');
+    if(action==='expense')return expenseModal('', 'spent');
+    if(action==='bill-new')return expenseModal('',el.dataset.kind==='fixed'?'fixed':'bill');
+    if(action==='quick-expense')return expenseModal(el.dataset.category||'','spent');
+    if(action==='expense-category-pick'){const sel=$('#expense-category');if(!sel)return;sel.value=el.dataset.category||'Outros';sel.dataset.touched='1';const wrap=$('#expense-cat-wrap');if(wrap)wrap.hidden=false;smartRead('expense');updateBudgetNote();return;}
     if(action==='balance')return balanceModal(el.dataset.user||active);
     if(action==='new-goal')return newGoalModal();
     if(action==='contribute')return contributeModal(id);
@@ -1562,11 +1694,18 @@ ${JSON.stringify(chatContext())}`;
     if(action==='approve')return approve(id,actor);
     if(action==='decline')return declineModal(id,actor);
     if(action==='purchase')return purchaseModal(id,actor);
+    if(action==='bill-detail')return billDetailModal(id);
+    if(action==='tx-detail')return transactionDetailModal(id);
+    if(action==='edit-bill')return editBillModal(id);
+    if(action==='edit-tx')return editTransactionModal(id);
     if(action==='pay-bill')return payBillModal(id);
+    if(action==='delete-tx'){const t=state.transactions.find(x=>x.id===id);if(!t)return;const neutral=t.balanceDelta===0;return openModal('Excluir este gasto?',`<p class="modal-sub"><b>${esc(t.name)}</b> · ${cash(t.amount)}. ${neutral?'Esse movimento foi importado sem ajuste de saldo, então excluir não vai mexer no saldo.':'O valor volta para o saldo de quem pagou.'} O lançamento sai do histórico.</p><form class="form" data-form="delete-tx" data-id="${id}">${formEnd(neutral?'Excluir lançamento':'Excluir e estornar')}</form>`,'remove');}
+    if(action==='delete-bill'){const b=state.bills.find(x=>x.id===id);if(!b)return;return openModal('Excluir esta conta?',`<p class="modal-sub"><b>${esc(b.name)}</b> · ${cash(b.amount)}.${b.status==='paid'?' O pagamento será estornado de acordo com o ajuste de saldo usado no registro.':' Ela será removida do planejamento.'}${b.recurring?' Como é uma conta fixa, a repetição dos próximos meses também será encerrada.':''}</p><form class="form" data-form="delete-bill" data-id="${id}">${formEnd(b.recurring?'Excluir e parar repetição':'Excluir conta')}</form>`,'remove');}
+    if(action==='reopen-bill'){const b=state.bills.find(x=>x.id===id);if(!b||b.status!=='paid')return;return openModal('Reabrir esta conta?',`<p class="modal-sub">O pagamento de <b>${esc(b.name)}</b> será desfeito, o valor voltará ao saldo e a conta aparecerá novamente em “A pagar”.</p><form class="form" data-form="reopen-bill" data-id="${id}">${formEnd('Reabrir conta')}</form>`,'remove');}
     if(action==='notifications')return notificationsModal();
     if(action==='settings')return settingsModal();
     if(action==='about')return aboutModal();
-    if(action==='peer'){openModal(`Celular de ${first(user(other()).name)}`,peerHTML()+'<p class="peer-caption">Responda como a outra pessoa.<br>As duas telas são simuladas neste navegador.</p>','peer');return;}
+    if(action==='peer'){if(cloudSlot)return openModal('Juntô sincronizado',`<div class="peer-live-card">${avatar(other(),'large')}<div><h3>${esc(first(user(other()).name))} responde na própria conta</h3><p>Os pedidos, respostas e compras sincronizam entre os dois perfis. Você não responde no lugar da outra pessoa.</p></div></div>`,'peer-info');openModal(`Celular de ${first(user(other()).name)}`,peerHTML()+'<p class="peer-caption">Responda como a outra pessoa.<br>As duas telas são simuladas neste navegador.</p>','peer');return;}
     if(action==='onboard'){onboardDraft={};onboard(0);return;}
     if(action==='onboard-back')return onboard(Math.max(1,onboardStep-1));
     if(action==='onboard-finish'){
@@ -1605,7 +1744,7 @@ ${JSON.stringify(chatContext())}`;
     if(action==='connect')return connectModal();
     if(action==='connect-setup'){if(window.JuntoCloud){close();window.JuntoCloud.open();return;}return connectSetupModal();}
     if(action==='can-spend')return canSpendModal();
-    if(action==='can-buy'){if(!canDraft)return;const {title,amount,cat,touched}=canDraft;learnFrom(title,cat,touched);const ch=charge(amount,'a');if(ch.error){toast('Não deu pra registrar.',ch.error,'info');return;}const itf=itemFields(title,cat),nm=smartName(title);state.transactions.push({id:uid(),name:nm,amount,category:cat,payer:'a',date:dateISO(),...itf,by:'a'});log('a',`comprou ${nm} (${money(amount)}) depois de conferir no “Posso gastar?”.`);canDraft=null;close();persist();toast('Registrado.',`${nm} · ${money(amount)}`,'circleCheck');return;}
+    if(action==='can-buy'){if(!canDraft)return;const {title,amount,cat,touched}=canDraft;learnFrom(title,cat,touched);const ch=charge(amount,'a');if(ch.error){toast('Não deu pra registrar.',ch.error,'info');return;}const itf=itemFields(title,cat),nm=smartName(title);state.transactions.push({id:uid(),name:nm,amount,category:cat,payer:'a',date:dateISO(),...itf,by:'a',createdAt:Date.now()});log('a',`comprou ${nm} (${money(amount)}) depois de conferir no “Posso gastar?”.`);canDraft=null;close();persist();toast('Registrado.',`${nm} · ${money(amount)}`,'circleCheck');return;}
     if(action==='can-wait'){const t=canDraft;canDraft=null;close();if(t){log('a',`decidiu esperar: ${smartName(t.title)} (${money(t.amount)}).`);persist();}toast('Boa escolha.','Dinheiro que fica é dinheiro que guarda.','sparkle');return;}
     if(action==='onboard-solo')return openModal('Começar no modo individual',`<p class="modal-kicker">Só você, por enquanto</p><h3 class="onboard-title">Primeiro passo:<br><span>o seu número.</span></h3><form class="form" data-form="onboard-solo">${field('solo-name','Seu nome','Como prefere ser chamado')}${field('solo-balance','Quanto você tem em conta hoje?','0,00','',true)}${formEnd('Começar meu controle')}<button type="button" class="btn ghost wide" style="margin-top:10px" data-action="onboard">Voltar</button></form>`,'onboard');
     if(action==='onboard-couple'){onboard(1);return;}
@@ -1653,9 +1792,10 @@ ${JSON.stringify(chatContext())}`;
     const after=free()-amount;el.className='form-note '+(after<0?'bad':after<20000?'warn':'');
     el.innerHTML=after<0?`<strong>Vale conversar antes. O pedido passa do livre.</strong>Faltariam ${cash(-after)} para cobrir esse pedido sem mexer em contas e planos.`:`<strong>${after<20000?'Cabe, mas o mês fica apertadinho.':'Cabe no livre da dupla. 💚'}</strong>Depois desse pedido, ficam ${cash(after)} livres. Contas e planos continuam separados.`;soloize(el);
   }
-  function updateSplit(){const el=$('#split-preview'),sel=document.querySelector('select[data-split]');if(!el||!sel)return;const amt=sel.dataset.amount?Number(sel.dataset.amount):parseMoney($('#expense-amount')?.value||'');el.textContent=['half','prop'].includes(sel.value)||Number.isFinite(amt)&&amt>0?splitPreview(amt,sel.value):'';}
+  function updateSplit(){const el=$('#split-preview'),sel=document.querySelector('select[data-split]');if(!el||!sel)return;const form=sel.closest('form'),moneyInput=form?.querySelector('.money-input input');let amt=moneyInput?parseMoney(moneyInput.value||''):NaN;if(!Number.isFinite(amt)&&sel.dataset.amount)amt=Number(sel.dataset.amount);el.textContent=['half','prop'].includes(sel.value)||Number.isFinite(amt)&&amt>0?splitPreview(amt,sel.value):'';}
+  function syncExpenseKind(type){const label=$('#expense-date-label'),note=$('#expense-note'),submit=document.querySelector('[data-form="expense"] button[type="submit"]');if(label)label.textContent=type==='spent'?'Data do gasto':'Vencimento';if(note)note.textContent=type==='spent'?'O valor sai do saldo agora e entra no histórico.':type==='fixed'?'A conta entra no planejamento e se repete todo mês. O saldo só muda quando o pagamento for confirmado.':'A conta entra no planejamento. O saldo só muda quando o pagamento for confirmado.';if(submit)submit.lastChild.textContent=type==='spent'?'Registrar gasto':type==='fixed'?'Adicionar conta fixa':'Adicionar conta';}
   document.addEventListener('input',(event)=>{if(event.target.id==='profile-zoom'||event.target.id==='profile-y'){const z=Number($('#profile-zoom')?.value||state.settings.profileZoom||1.08),y=Number($('#profile-y')?.value||state.settings.profileY||50);const p=document.querySelector('.photo-preview');if(p){p.style.setProperty('--profile-zoom',z);p.style.setProperty('--profile-y',y+'%');}if($('#photo-zoom-value'))$('#photo-zoom-value').textContent=Math.round(z*100)+'%';if($('#photo-y-value'))$('#photo-y-value').textContent=Math.round(y)+'%';return;}if(event.target.id==='chat-input'){const t=event.target;t.style.height='auto';t.style.height=Math.min(130,t.scrollHeight)+'px';return;}
-    if(event.target.dataset?.card){const c=chatLog.find(x=>x.id===event.target.dataset.card);if(c&&event.target.dataset.field==='amount'){const v=parseMoney(event.target.value);c.data.amount=Number.isFinite(v)&&v>0?v:null;}return;}if(event.target.id==='request-amount')updateImpact();if(event.target.id==='expense-amount'){event.target.dataset.touched=event.target.value?'1':'';updateSplit();updateBudgetNote();}if(event.target.id==='expense-title'){smartRead('expense');updateSplit();updateBudgetNote();}if(event.target.id==='request-title'){smartRead('request');updateImpact();updateRequestCat();}if(event.target.id==='request-amount'){event.target.dataset.touched=event.target.value?'1':'';updateRequestCat();}
+    if(event.target.dataset?.card){const c=chatLog.find(x=>x.id===event.target.dataset.card);if(c&&event.target.dataset.field==='amount'){const v=parseMoney(event.target.value);c.data.amount=Number.isFinite(v)&&v>0?v:null;}return;}if(event.target.id==='request-amount')updateImpact();if(event.target.id==='expense-amount'){event.target.dataset.touched=event.target.value?'1':'';updateSplit();updateBudgetNote();}if(event.target.id==='expense-title'){smartRead('expense');updateSplit();updateBudgetNote();}if(event.target.id==='request-title'){smartRead('request');updateImpact();updateRequestCat();}if(event.target.id==='request-amount'){event.target.dataset.touched=event.target.value?'1':'';updateRequestCat();}if(event.target.id==='edit-tx-amount'||event.target.id==='edit-bill-amount')updateSplit();
     if(event.target.dataset?.budget){const c=event.target.dataset.budget,v=Number(event.target.value),f=Number(event.target.dataset.f),o=document.getElementById('out-'+c),n=document.getElementById('note-'+c);if(o)o.textContent=brl(v);if(n){const s=Math.max(0,f-v);n.textContent=s>0?`Guarda ${brl(s)} por mês (${pct(s/f)}), ${brl(s*12)} por ano.`:v>f?`Meta acima do previsto: folga de ${brl(v-f)} por mês.`:'Meta no nível do previsto: não guarda nada aqui.';}return;}if(event.target.closest?.('[data-form="income"]'))updateIncomePreview();
     if(event.target.id==='sim-cut'||event.target.id==='sim-extra'){simCut=Number($('#sim-cut').value);simExtra=Number($('#sim-extra').value);$('#sim-cut-out').textContent=simCut+'%';$('#sim-extra-out').textContent=brl(simExtra*100);$('#sim-out').innerHTML=simOut();return;}if($('#form-error'))$('#form-error').textContent='';});
   document.addEventListener('change',(event)=>{
@@ -1667,12 +1807,9 @@ ${JSON.stringify(chatContext())}`;
     if(event.target.id==='expense-date')event.target.dataset.touched='1';
     if(event.target.id==='yield-rate'){state.settings.yieldRate=Math.min(30,Math.max(0,Number(String(event.target.value).replace(',','.'))||0));const y=window.scrollY;persist();window.scrollTo(0,y);return;}
     if(event.target.id==='expense-category'||event.target.id==='request-category'){event.target.dataset.touched='1';const h=$('#'+(event.target.id==='expense-category'?'expense-cat-hint':'request-cat-hint'));if(h)h.textContent='';smartRead(event.target.id==='expense-category'?'expense':'request');updateBudgetNote();updateRequestCat();}
-    if(event.target.name==='expense-type')setTimeout(updateBudgetNote,0);
+    if(event.target.name==='expense-type'){const form=event.target.closest('form');if(form)form.dataset.typeTouched='1';syncExpenseKind(event.target.value);setTimeout(updateBudgetNote,0);}
     if(event.target.dataset?.budget){const c=event.target.dataset.budget,v=Number(event.target.value);state.budgets[c]=v;openCats.add(c);log(active,`definiu a meta de ${c.toLowerCase()} em ${money(v)} por mês.`);const y=window.scrollY;persist();window.scrollTo(0,y);toast('Meta salva.',`${c}: ${money(v)} por mês. Previsão e plano recalculados.`,'scan');return;}if(event.target.closest?.('[data-form="income"]'))updateIncomePreview();
-    if(event.target.name==='expense-type'){
-      const type=event.target.value;$('#expense-date-label').textContent=type==='spent'?'Data do gasto':'Vencimento';
-      $('#expense-note').textContent=type==='spent'?'O valor sai do saldo de quem pagou e aparece no histórico da dupla.':type==='fixed'?'Conta recorrente no planejamento deste mês. O dinheiro só sai do saldo quando vocês confirmarem o pagamento.':'Entra nas contas a pagar e é descontada do livre. O saldo só muda quando vocês confirmarem o pagamento.';
-    }
+
   });
   document.addEventListener('toggle',(event)=>{const d=event.target;if(d.matches?.('details.cat')){if(d.open)openCats.add(d.dataset.cat);else openCats.delete(d.dataset.cat);}},true);
   function chartTip(event){
@@ -1694,13 +1831,50 @@ ${JSON.stringify(chatContext())}`;
       notify(r.recipient,'Amor, posso gastar?',`${first(user().name)} quer combinar ${title} por ${money(amount)}.`,'request',r.id);log(active,`pediu um combinado: ${title} por ${money(amount)}.`);close();route='requests';requestFilter='all';persist();toast('Pedido entregue. Agora é com teu amor.',`Responda no celular de ${first(user(other()).name)} ou troque de perfil.`,'chat');return;
     }
     if(type==='expense'){
-      const title=titleValue(d,'expense-title'),amount=amountValue(d,'expense-amount'),payer=d.get('expense-payer'),kind=d.get('expense-type'),date=d.get('expense-date'),category=d.get('expense-category');
-      if(title==null||amount==null)return;learnFrom(title,category,$('#expense-category')?.dataset.touched==='1');const itf=itemFields(title,category),nm=smartName(title);if(!['a','b','half','prop'].includes(payer)||!/^\d{4}-\d{2}-\d{2}$/.test(date)){error('Confira quem paga e a data do gasto.');return;}
+      const title=titleValue(d,'expense-title'),amount=amountValue(d,'expense-amount'),payer=isSolo()?'a':d.get('expense-payer'),kind=d.get('expense-type'),date=d.get('expense-date'),category=d.get('expense-category');
+      if(title==null||amount==null)return;learnFrom(title,category,$('#expense-category')?.dataset.touched==='1');const itf=itemFields(title,category),nm=smartName(title);if(!['a','b','half','prop'].includes(payer)||!/^\d{4}-\d{2}-\d{2}$/.test(date)){error('Confira quem paga e a data do lançamento.');return;}
+      const now=Date.now();
       if(kind==='spent'){
+        const duplicate=state.transactions.find(t=>!t.billId&&now-(t.createdAt||0)<90000&&t.amount===amount&&t.date===date&&t.payer===payer&&norm(t.name)===norm(nm));
+        if(duplicate){error('Esse gasto parece já ter sido registrado agora. Abra o lançamento existente para editar, em vez de duplicar.');return;}
         const c=charge(amount,payer);if(c.error){error(c.error);return;}
-        state.transactions.push({id:uid(),name:nm,amount,category,payer,date,...itf,by:active,...(c.shares.length>1?{split:c.shares}:{})});log(active,`registrou ${nm}: ${money(amount)}, ${c.shares.length>1?payerLabel(payer).toLowerCase():'na conta de '+first(user(payer).name)}.`);
-      }else{state.bills.push({id:uid(),name:nm,amount,category,payer,due:date,item:itf.item,icon:itf.icon,recurring:kind==='fixed',status:'open'});log(active,`adicionou ${kind==='fixed'?'uma conta fixa':'uma conta a pagar'}: ${title}.`);}
-      notify(other(),'Conta atualizada.',`${first(user().name)} registrou ${title} por ${money(amount)}.`);close();route='bills';billFilter='all';persist();toast(kind==='spent'?'Gasto anotado. Sem mistério.':'Conta no radar da dupla.',`${title} · ${money(amount)}`);return;
+        state.transactions.push({id:uid(),name:nm,amount,category,payer,date,...itf,by:active,createdAt:now,...(c.shares.length>1?{split:c.shares}:{})});log(active,`registrou ${nm}: ${money(amount)}, ${c.shares.length>1?payerLabel(payer).toLowerCase():'na conta de '+first(user(payer).name)}.`);
+      }else{
+        const duplicate=state.bills.find(b=>b.status==='open'&&b.amount===amount&&b.due===date&&b.payer===payer&&norm(b.name)===norm(nm));
+        if(duplicate){error('Essa conta parece já ter sido adicionada agora. Abra a existente para editar, em vez de duplicar.');return;}
+        state.bills.push({id:uid(),name:nm,amount,category,payer,due:date,item:itf.item,icon:itf.icon,recurring:kind==='fixed',status:'open',createdAt:now});log(active,`adicionou ${kind==='fixed'?'uma conta fixa':'uma conta a pagar'}: ${title}.`);
+      }
+      notify(other(),'Conta atualizada.',`${first(user().name)} registrou ${title} por ${money(amount)}.`);close();route='bills';billFilter=kind==='spent'?'month':kind==='fixed'?'fixed':'open';persist();toast(kind==='spent'?'Gasto anotado. Sem mistério.':'Conta no radar.',`${title} · ${money(amount)}`);return;
+    }
+    if(type==='edit-tx'){
+      const t=state.transactions.find(x=>x.id===id);if(!t)return;const name=titleValue(d,'edit-tx-name',1,60),amount=amountValue(d,'edit-tx-amount'),category=d.get('edit-tx-category'),payer=d.get('edit-tx-payer'),date=d.get('edit-tx-date');
+      if(name==null||amount==null||!categories.includes(category)||!['a','b','half','prop'].includes(payer)||!/^\d{4}-\d{2}-\d{2}$/.test(date)){error('Confira os dados do gasto.');return;}
+      const moved=reallocateTransaction(t,amount,payer);if(moved.error){error(moved.error);return;}const itf=itemFields(name,category);
+      Object.assign(t,{name:smartName(name),amount,category,payer,date,...itf,split:moved.shares.length>1?moved.shares:undefined});if(moved.shares.length<2)delete t.split;if(Number.isSafeInteger(t.balanceDelta))t.balanceDelta=t.balanceDelta===0?0:-amount;learnFrom(name,category,true);
+      log(active,`editou o gasto ${t.name}: ${money(amount)}.`);close();persist();toast('Gasto atualizado.',`${t.name} · ${money(amount)}`);return;
+    }
+    if(type==='edit-bill'){
+      const b=state.bills.find(x=>x.id===id);if(!b)return;const name=titleValue(d,'edit-bill-name',1,60),amount=amountValue(d,'edit-bill-amount'),category=d.get('edit-bill-category'),payer=d.get('edit-bill-payer'),due=d.get('edit-bill-date'),recurring=d.get('edit-bill-recurring')==='on';
+      if(name==null||amount==null||!categories.includes(category)||!['a','b','half','prop'].includes(payer)||!/^\d{4}-\d{2}-\d{2}$/.test(due)){error('Confira os dados da conta.');return;}
+      const paidTx=state.transactions.find(t=>t.billId===b.id);let shares=null;if(b.status==='paid'&&paidTx){const moved=reallocateTransaction(paidTx,amount,payer);if(moved.error){error(moved.error);return;}shares=moved.shares;}
+      const itf=itemFields(name,category),newName=smartName(name);Object.assign(b,{name:newName,amount,category,payer,due,recurring,item:itf.item,icon:itf.icon});
+      if(paidTx){Object.assign(paidTx,{name:newName,amount,category,payer,item:itf.item,icon:itf.icon,split:shares&&shares.length>1?shares:undefined});if(!shares||shares.length<2)delete paidTx.split;}
+      learnFrom(name,category,true);log(active,`editou a conta ${b.name}: ${money(amount)}.`);close();persist();toast('Conta atualizada.',`${b.name} · ${money(amount)}`);return;
+    }
+    if(type==='delete-tx'){
+      const t=state.transactions.find(x=>x.id===id);if(!t)return;refundTransaction(t);
+      if(t.requestId){const r=state.requests.find(x=>x.id===t.requestId);if(r&&r.status==='purchased'){r.status='approved';delete r.payer;delete r.purchasedAt;}}
+      if(t.billId){const b=state.bills.find(x=>x.id===t.billId);if(b){b.status='open';delete b.paidAt;}}
+      state.transactions=state.transactions.filter(x=>x.id!==id);const neutral=t.balanceDelta===0;log(active,neutral?`excluiu o gasto ${t.name}, sem alterar o saldo.`:`excluiu o gasto ${t.name} e estornou ${money(t.amount)}.`);close();persist();toast('Gasto excluído.',neutral?'O saldo permaneceu igual.':'O valor voltou para o saldo.');return;
+    }
+    if(type==='reopen-bill'){
+      const b=state.bills.find(x=>x.id===id);if(!b||b.status!=='paid')return;const t=state.transactions.find(x=>x.billId===b.id);if(t){refundTransaction(t);state.transactions=state.transactions.filter(x=>x.id!==t.id);}b.status='open';delete b.paidAt;log(active,`reabriu a conta ${b.name}.`);close();billFilter='open';persist();toast('Conta reaberta.','O pagamento foi estornado e a conta voltou para “A pagar”.');return;
+    }
+    if(type==='delete-bill'){
+      const b=state.bills.find(x=>x.id===id);if(!b)return;const related=state.transactions.filter(x=>x.billId===b.id),wasRecurring=Boolean(b.recurring),key=b.recurringKey||b.id,nameKey=norm(b.name);
+      related.forEach(refundTransaction);state.transactions=state.transactions.filter(x=>x.billId!==b.id);
+      if(wasRecurring)state.bills.forEach(x=>{if((x.recurringKey&&x.recurringKey===key)||norm(x.name)===nameKey)x.recurring=false;});
+      state.bills=state.bills.filter(x=>x.id!==b.id);log(active,`excluiu a conta ${b.name}${related.length?' e estornou o pagamento':''}${wasRecurring?'; repetição encerrada':''}.`);close();persist();toast('Conta excluída.',wasRecurring?'A repetição também foi encerrada.':related.length?'O pagamento também foi estornado.':'Ela saiu do planejamento.');return;
     }
     if(type==='balance'){
       const amount=amountValue(d,'balance-amount',true),who=form.dataset.user;if(amount==null||!user(who))return;
@@ -1719,12 +1893,12 @@ ${JSON.stringify(chatContext())}`;
     if(type==='purchase'){
       const r=state.requests.find(r=>r.id===id),payer=d.get('purchase-payer');if(!r||r.status!=='approved'||r.author!==actor||!['a','b','half','prop'].includes(payer))return;
       const c=charge(r.amount,payer);if(c.error){error(c.error);return;}
-      r.status='purchased';r.payer=payer;r.purchasedAt=Date.now();state.transactions.push({id:uid(),requestId:r.id,name:r.title,item:r.item,icon:r.icon,by:actor,amount:r.amount,category:r.category,payer,date:dateISO(),...(c.shares.length>1?{split:c.shares}:{})});log(actor,`comprou ${r.title} por ${money(r.amount)}. Combinado cumprido.`);notify(r.recipient,'Combinado virou compra.',`${first(user(actor).name)} registrou ${r.title}. O saldo foi atualizado.`,'purchased',id);close();persist();toast('Comprou e registrou. Tudo certo.','O valor saiu da conta uma única vez.');return;
+      r.status='purchased';r.payer=payer;r.purchasedAt=Date.now();state.transactions.push({id:uid(),requestId:r.id,name:r.title,item:r.item,icon:r.icon,by:actor,amount:r.amount,category:r.category,payer,date:dateISO(),createdAt:Date.now(),...(c.shares.length>1?{split:c.shares}:{})});log(actor,`comprou ${r.title} por ${money(r.amount)}. Combinado cumprido.`);notify(r.recipient,'Combinado virou compra.',`${first(user(actor).name)} registrou ${r.title}. O saldo foi atualizado.`,'purchased',id);close();persist();toast('Comprou e registrou. Tudo certo.','O valor saiu da conta uma única vez.');return;
     }
     if(type==='pay-bill'){
       const b=state.bills.find(b=>b.id===id),payer=d.get('bill-payer');if(!b||b.status!=='open'||!['a','b','half','prop'].includes(payer))return;
       const c=charge(b.amount,payer);if(c.error){error(c.error);return;}
-      b.status='paid';b.paidAt=Date.now();b.payer=payer;state.transactions.push({id:uid(),billId:b.id,name:b.name,by:active,amount:b.amount,category:b.category,payer,date:dateISO(),...(c.shares.length>1?{split:c.shares}:{})});log(active,c.shares.length>1?`confirmou ${b.name} pago ${payerLabel(payer).toLowerCase()}: ${c.shares.map(x=>first(user(x.id).name)+' '+money(x.amount)).join(', ')}.`:`confirmou ${b.name} pago por ${first(user(payer).name)}: ${money(b.amount)}.`);notify(other(),'Um boleto a menos. 🙌',`${first(user().name)} marcou ${b.name} como pago.`);close();persist();toast('Conta paga. Respira.','O gasto foi registrado e a conta saiu das pendências.');return;
+      b.status='paid';b.paidAt=Date.now();b.payer=payer;state.transactions.push({id:uid(),billId:b.id,name:b.name,by:active,amount:b.amount,category:b.category,payer,date:dateISO(),createdAt:Date.now(),...(c.shares.length>1?{split:c.shares}:{})});log(active,c.shares.length>1?`confirmou ${b.name} pago ${payerLabel(payer).toLowerCase()}: ${c.shares.map(x=>first(user(x.id).name)+' '+money(x.amount)).join(', ')}.`:`confirmou ${b.name} pago por ${first(user(payer).name)}: ${money(b.amount)}.`);notify(other(),'Um boleto a menos. 🙌',`${first(user().name)} marcou ${b.name} como pago.`);close();billFilter='paid';persist();toast('Conta paga. Respira.','O pagamento ficou em “Pagas” e o saldo foi atualizado.');return;
     }
     if(type==='cancel-request'){
       const r=state.requests.find(r=>r.id===id);if(!r||r.author!==actor||!['pending','approved'].includes(r.status))return;r.status='cancelled';log(actor,`cancelou o pedido ${r.title}.`);notify(r.recipient,'Planos mudam. Tudo bem.',`${first(user(actor).name)} cancelou o pedido ${r.title}.`,'cancelled',id);close();persist();toast('Pedido cancelado.','Se havia dinheiro reservado, ele voltou ao livre.');return;

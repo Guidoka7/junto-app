@@ -151,6 +151,35 @@ test('critical money flow stays coherent: spend, edit, delete, bill, pay and reo
  expect(state.users[0].balance).toBe(10000);expect(state.bills[0].status).toBe('open');expect(state.transactions).toHaveLength(0);
 });
 
+test('income goal and solo spending flows stay connected',async({page})=>{
+ await page.goto('/');await personal(page,500000);
+ await page.locator('#mobile-nav [data-route="future"]').click();
+ await page.locator('[data-route="incomes"]').first().click();
+ await page.locator('[data-action="income-new"]').click();
+ await page.locator('#income-name').fill('Salário');
+ await page.locator('#income-amount').fill('5600');
+ await page.locator('[data-form="income"] [type="submit"]').click();
+ let state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.incomes).toHaveLength(1);expect(state.incomes[0].amount).toBe(560000);
+ await page.locator('#mobile-nav [data-route="goals"]').click();
+ await page.locator('[data-action="new-goal"]').first().click();
+ await page.locator('#goal-title').fill('Viagem');
+ await page.locator('#goal-target').fill('1000');
+ await page.locator('[data-form="goal"] [type="submit"]').click();
+ await page.locator('[data-action="contribute"]').first().click();
+ await page.locator('#contribute-amount').fill('100');
+ await page.locator('[data-form="contribute"] [type="submit"]').click();
+ state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.goals[0].saved).toBe(10000);expect(state.users[0].balance).toBe(500000);
+ await page.locator('#mobile-nav [data-route="home"]').click();
+ await page.locator('.home-spend-cta').click();
+ await page.locator('#request-title').fill('pizza 45');
+ await expect(page.locator('#request-amount')).toHaveValue('45,00');
+ await page.locator('[data-form="can-spend"] [type="submit"]').click();
+ await page.locator('[data-action="can-buy"]').click();
+ state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.transactions).toHaveLength(1);expect(state.users[0].balance).toBe(495500);
+});
 test.describe('offline PWA',()=>{
  test.use({serviceWorkers:'allow'});
  test('PWA reloads offline with its bundled fonts and scripts',async({page,context})=>{

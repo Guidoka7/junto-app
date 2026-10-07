@@ -20,6 +20,7 @@ jobs:
     env:
       SUPABASE_URL: ${{ vars.SUPABASE_URL }}
       SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+      JUNTO_APP_URL: https://junto-app-tan.vercel.app
     steps:
       - uses: actions/checkout@v4
 

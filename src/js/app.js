@@ -123,6 +123,12 @@
     const s=splitShares(amount,mode);if(s.length<2)return `Sai tudo da conta de ${first(user(s[0].id).name)}.`;return s.map(x=>`${first(user(x.id).name)} paga ${money(x.amount)}`).join(' · ')+(mode==='prop'?` (renda prevista: ${pct(incomeShare())} / ${pct(1-incomeShare())})`:'');
   }  function charge(amount,mode){const shares=splitShares(amount,mode),short=shares.find(s=>s.amount>user(s.id).balance);if(short)return {error:`O saldo de ${first(user(short.id).name)} não cobre ${money(short.amount)}. Atualize o saldo ou escolha outra divisão.`};shares.forEach(s=>user(s.id).balance-=s.amount);return {shares};}
   function transactionShares(t){
+    if(Number.isSafeInteger(t?.balanceDelta)){
+      if(t.balanceDelta===0)return [];
+      const amount=Math.abs(t.balanceDelta);
+      if(Array.isArray(t.split)&&t.split.length){const total=t.split.reduce((sum,x)=>sum+x.amount,0)||1;return t.split.map(x=>({id:x.id,amount:Math.round(amount*x.amount/total)})).filter(x=>state.users.some(u=>u.id===x.id)&&Number.isSafeInteger(x.amount));}
+      if(state.users.some(u=>u.id===t.payer))return [{id:t.payer,amount}];
+    }
     if(Array.isArray(t?.split)&&t.split.length)return t.split.map(x=>({id:x.id,amount:x.amount})).filter(x=>state.users.some(u=>u.id===x.id)&&Number.isSafeInteger(x.amount));
     if(t&&state.users.some(u=>u.id===t.payer))return [{id:t.payer,amount:t.amount}];
     if(t&&['half','prop'].includes(t.payer))return splitShares(t.amount,t.payer);
@@ -1838,7 +1844,7 @@ ${JSON.stringify(chatContext())}`;
       const t=state.transactions.find(x=>x.id===id);if(!t)return;const name=titleValue(d,'edit-tx-name',1,60),amount=amountValue(d,'edit-tx-amount'),category=d.get('edit-tx-category'),payer=d.get('edit-tx-payer'),date=d.get('edit-tx-date');
       if(name==null||amount==null||!categories.includes(category)||!['a','b','half','prop'].includes(payer)||!/^\d{4}-\d{2}-\d{2}$/.test(date)){error('Confira os dados do gasto.');return;}
       const moved=reallocateTransaction(t,amount,payer);if(moved.error){error(moved.error);return;}const itf=itemFields(name,category);
-      Object.assign(t,{name:smartName(name),amount,category,payer,date,...itf,split:moved.shares.length>1?moved.shares:undefined});if(moved.shares.length<2)delete t.split;learnFrom(name,category,true);
+      Object.assign(t,{name:smartName(name),amount,category,payer,date,...itf,split:moved.shares.length>1?moved.shares:undefined});if(moved.shares.length<2)delete t.split;if(Number.isSafeInteger(t.balanceDelta))t.balanceDelta=t.balanceDelta===0?0:-amount;learnFrom(name,category,true);
       log(active,`editou o gasto ${t.name}: ${money(amount)}.`);close();persist();toast('Gasto atualizado.',`${t.name} · ${money(amount)}`);return;
     }
     if(type==='edit-bill'){

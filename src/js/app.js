@@ -391,7 +391,7 @@
   }
   let state;try{const s=JSON.parse(localStorage.getItem(KEY));state=migrate(validBackup(s)?s:freshPersonalState());}catch{state=freshPersonalState();}
   let active='a';try{active=sessionStorage.getItem(PROFILE)==='b'?'b':'a';}catch{}if(state.users.length<2)active='a';
-  let route='home',billFilter='all',requestFilter='all',hidden=false,noticesEnabled=true;
+  let route='home',billFilter='all',requestFilter='all',hidden=false,noticesEnabled=true;try{noticesEnabled=localStorage.getItem('junto-notices-v1')!=='off';}catch{}
   let analysisTab='overview',analysisPerson='both',futureTab='forecast',incomeTab='overview',planTab='goals';
   let onboardDraft={},onboardStep=1,channel=null;
   try{channel=new BroadcastChannel('junto-demo-sync');}catch{}
@@ -1801,7 +1801,7 @@ ${JSON.stringify(chatContext())}`;
       return openModal('Mudar de plano também é planejar.',`<p class="modal-sub">Encerrar <b>${esc(g.name)}</b> devolve ${cash(g.saved)} ao saldo livre. O dinheiro continua na conta.</p><form class="form" data-form="release-goal" data-id="${id}">${formEnd('Encerrar plano e liberar saldo')}</form>`,'release');
     }
     if(action==='notice-request'){close();route='requests';requestFilter='all';render();setTimeout(()=>document.getElementById('request-'+id)?.scrollIntoView({behavior:'smooth',block:'center'}),50);return;}
-    if(action==='toggle-notices'){noticesEnabled=!noticesEnabled;settingsModal();return;}
+    if(action==='toggle-notices'){noticesEnabled=!noticesEnabled;try{localStorage.setItem('junto-notices-v1',noticesEnabled?'on':'off');}catch{}settingsModal();toast(noticesEnabled?'Avisos ligados.':'Avisos silenciosos.',noticesEnabled?'As confirmações rápidas voltam a aparecer.':'Seus registros continuam funcionando normalmente.','bell');return;}
     if(action==='test-push'){
       notify(other(),'Olha a dupla por aqui. 💚',`${first(user().name)} está testando como um aviso aparece no teu celular.`);persist();close();
       if(window.innerWidth<=1060)openModal(`Celular de ${first(user(other()).name)}`,peerHTML()+'<p class="peer-caption">Prévia visual do aviso.<br>Notificações reais com o app fechado vêm na próxima etapa.</p>','peer');

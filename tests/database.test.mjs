@@ -25,6 +25,7 @@ test('database: membership isolation, one-use invites, CAS and malformed payload
  const invite=await rpc(A,'junto_make_invite',[space.space_id]);assert.match(invite.code,/^[A-F0-9]{16}$/);
  const formatted=invite.code.toLowerCase().match(/.{4}/g).join(' \t');
  const joined=await rpc(B,'junto_join_space',[formatted,'Bia']);assert.equal(joined.members,2);assert.equal(joined.slot,'b');assert.equal(joined.payload.users[1].name,'Bia');
+ assert.equal(joined.payload.users[1].balance,27500);assert.equal(joined.payload.transactions[0].payer,'b');assert.equal(joined.personal_archive_pending,false);
  assert.deepEqual(await rpc(B,'junto_read_personal_archive'),solo.payload);
  assert.equal(await rpc(A,'junto_read_personal_archive'),null);assert.equal(await rpc(C,'junto_read_personal_archive'),null);
  await assert.rejects(()=>rpc(null,'junto_read_personal_archive'),/permission denied/);

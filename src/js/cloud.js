@@ -7,7 +7,7 @@ const app=window.JuntoApp,PERSONAL_KEY='junto-personal-backup-v1';
 let client=null,user=null,sessionReady=false,checkpoint=null,subscription=null,authLoading=null,authLoadingUID=null,authGeneration=0;
 let syncRunning=false,syncTimer=null,conflict=null,authView='login',passwordRecovery=false;
 let syncCompletion=Promise.resolve(),spaceSwitching=false;
-let message='Dados neste aparelho',lastSync=null;
+let message='Dados neste aparelho',lastSync=null,restoreDraft=null;
 const PENDING_EMAIL_KEY='junto-auth-pending-email';
 let pendingEmail=localStorage.getItem(PENDING_EMAIL_KEY)||'',authNotice=pendingEmail?'Confirme seu e-mail pelo link recebido e entre com sua senha.':'';
 const confirmationCallback=new URLSearchParams(location.search).has('code')||/access_token=|error_description=/.test(location.hash);
@@ -39,13 +39,14 @@ function accountHTML(){
   return `<div class="cloud-account-layout">
     <div class="cloud-profile"><span class="cloud-profile-avatar" aria-hidden="true">${esc(Array.from(name.trim())[0]?.toUpperCase()||'J')}</span><div><strong>${esc(name)}</strong><span>${esc(user.email||'Sua conta')}</span></div></div>
     <section class="cloud-couple" aria-labelledby="cloud-couple-title"><div class="cloud-section-head"><h3 id="cloud-couple-title">${paired?'Nossa dupla':'Conectar meu amor'}</h3><span class="cloud-membership${paired?' is-paired':''}">${paired?'Conectados':'Modo solo'}</span></div>${connection}</section>
+    ${checkpoint.archivePending?'<div class="cloud-restore-notice"><strong>Seus registros solo estão guardados</strong><p>Traga os dados anteriores para esta dupla.</p><button class="btn secondary wide" data-feature="cloud-restore-open">Recuperar meus registros</button></div>':''}
     <section class="cloud-sync-section" aria-label="Sincronização">
       <div class="cloud-sync-row"><div><h3>Sincronização</h3><p id="cloud-live-status" role="status" aria-live="polite">${esc(message)}</p></div><button class="cloud-sync-button" data-feature="cloud-sync">${accountIcon('sync')}<span>Sincronizar</span></button></div>
       ${checkpoint.dirty?'<p class="cloud-pending-note">Há alterações neste aparelho aguardando envio. Mantenha o app instalado até sincronizar.</p>':''}
     </section>
     <details class="cloud-backups">
       <summary><span class="cloud-action-icon">${accountIcon('archive')}</span><span class="cloud-action-copy"><strong>Meus backups</strong><small>Baixar uma cópia dos seus dados</small></span><span class="cloud-action-chevron">${accountIcon('chevron')}</span></summary>
-      <div class="cloud-backup-actions">${accountAction('cloud-export','download','Exportar registros atuais','Salvar os dados deste espaço')}${accountAction('cloud-export-personal','archive','Exportar dados anteriores','Recuperar seu espaço individual guardado')}</div>
+      <div class="cloud-backup-actions">${accountAction('cloud-export','download','Exportar registros atuais','Salvar os dados deste espaço')}${accountAction('cloud-export-personal','archive','Exportar dados anteriores','Baixar uma cópia do modo solo')}</div>
     </details>
     <div class="cloud-account-footer"><button class="cloud-signout-button" data-feature="cloud-signout">${accountIcon('exit')}Sair da conta</button></div>
   </div>`;
@@ -55,7 +56,7 @@ function updateStatus(){let button=document.getElementById('cloud-account-button
 function settingsHTML(){return `<div class="feature-card"><div><span class="feature-eyebrow">Sua conta</span><h3>Juntô em dois celulares</h3><p>${esc(message)}. Cada pessoa entra na própria conta; os registros da dupla ficam juntos.</p></div><button class="btn primary" data-feature="cloud-open">${user?'Ver minha conta':'Entrar / criar conta'}</button><button class="btn secondary" data-feature="cloud-export">Exportar meus dados</button></div>`;}
 const errorMessage=e=>{
   const text=String(e?.message||e||'Não foi possível conectar.');
-  const errors={LOGIN_REQUIRED:'Entre na sua conta.',ALREADY_MEMBER:'Esta conta já está conectada a uma dupla. Não é possível entrar em outra dupla.',NOT_OWNER:'Só quem criou a dupla pode gerar um convite.',COUPLE_FULL:'Essa dupla já tem duas pessoas.',INVITE_INVALID:'O convite está incorreto, expirou ou já foi usado.',INVITE_OWN:'Esse código é seu. Peça o código gerado pela outra pessoa.',INVALID_NAME:'Informe seu nome com até 24 caracteres.',TOO_MANY_ATTEMPTS:'Muitas tentativas de convite. Aguarde uma hora.',ACCESS_DENIED:'Sua conta não tem acesso a esta dupla.',MISSING_MEMBER_PROFILE:'Os dois perfis precisam permanecer no espaço.',INVALID_PAYLOAD:'Os dados não puderam ser sincronizados. Exporte um backup para conferir.'};
+  const errors={LOGIN_REQUIRED:'Entre na sua conta.',ALREADY_MEMBER:'Esta conta já está conectada a uma dupla. Não é possível entrar em outra dupla.',NOT_OWNER:'Só quem criou a dupla pode gerar um convite.',COUPLE_FULL:'Essa dupla já tem duas pessoas.',INVITE_INVALID:'O convite está incorreto, expirou ou já foi usado.',INVITE_OWN:'Esse código é seu. Peça o código gerado pela outra pessoa.',INVALID_NAME:'Informe seu nome com até 24 caracteres.',TOO_MANY_ATTEMPTS:'Muitas tentativas de convite. Aguarde uma hora.',ACCESS_DENIED:'Sua conta não tem acesso a esta dupla.',MISSING_MEMBER_PROFILE:'Os dois perfis precisam permanecer no espaço.',RESTORE_CHANGED:'As finanças mudaram. Volte à conta e confira a recuperação novamente.',INVALID_SOLO_PROFILE:'O arquivo anterior precisa conter apenas o seu perfil individual.',INVALID_PAYLOAD:'Os dados não puderam ser sincronizados. Exporte um backup para conferir.'};
   for(const[key,value]of Object.entries(errors))if(text.includes(key))return value;
   if(/invalid login credentials/i.test(text))return 'E-mail ou senha incorretos.';
   if(/email not confirmed/i.test(text))return 'Seu e-mail ainda não foi confirmado. Abra o link recebido e depois entre com sua senha.';
@@ -98,7 +99,7 @@ async function handleSession(session){
         if(result.conflicts.length){conflict={base:clone(saved.base),local:clone(local),remote:clone(remote.payload),revision:remote.revision,conflicts:result.conflicts};checkpoint={...checkpoint,pending:clone(local),dirty:true,members:remote.members};app.applyState(local);setMessage('Alterações para conferir');}
         else{checkpoint={...checkpoint,revision:remote.revision,base:clone(remote.payload),pending:result.state,dirty:!equal(result.state,remote.payload),members:remote.members};app.applyState(result.state);}
       }else{checkpoint={spaceId:remote.space_id,slot:remote.slot,revision:remote.revision,base:clone(remote.payload),pending:clone(remote.payload),dirty:false,members:remote.members};app.applyState(remote.payload);}
-      app.setSlot(remote.slot);checkpoint.slot=remote.slot;saveCheckpoint();subscribe();app.setAccess(true);if(!conflict){setMessage(checkpoint.dirty?'Mudanças aguardando sincronização':connectionMessage());if(checkpoint.dirty)syncSoon();}if(passwordRecovery)open();
+      app.setSlot(remote.slot);checkpoint.slot=remote.slot;checkpoint.archivePending=Boolean(remote.personal_archive_pending);saveCheckpoint();subscribe();app.setAccess(true);if(!conflict){setMessage(checkpoint.dirty?'Mudanças aguardando sincronização':connectionMessage());if(checkpoint.dirty)syncSoon();}if(passwordRecovery)open();
     }catch(e){if(generation!==authGeneration||user?.id!==sessionUID)return;if(checkpoint?.spaceId&&checkpoint?.pending&&Date.now()<sessionExpiresAt&&/fetch|network|abort/i.test(String(e?.message||e))){validateState(local||checkpoint.pending);app.setSlot(checkpoint.slot);app.applyState(local||checkpoint.pending);app.setAccess(true);setMessage('Sem conexão · dados salvos');return;}setMessage(errorMessage(e));accessError(e);throw e;}
   })();authLoading=loading;try{await loading;}finally{if(authLoading===loading){authLoading=null;authLoadingUID=null;}}
 }
@@ -141,7 +142,7 @@ async function synchronize(force=false){
       const remote=await rpc('junto_read_space');
       if(checkpoint!==currentCheckpoint||user?.id!==currentUserID)return;
       if(!remote)throw new Error('ACCESS_DENIED');
-      checkpoint.members=remote.members;
+      checkpoint.members=remote.members;checkpoint.archivePending=Boolean(remote.personal_archive_pending);
       if(remote.revision!==checkpoint.revision){
         const local=app.getState(),oldBase=clone(checkpoint.base),result=mergeStates(oldBase,local,remote.payload);
         if(result.conflicts.length){
@@ -162,7 +163,24 @@ async function synchronize(force=false){
   }finally{syncRunning=false;finish();}
 }
 function joinForm(){
-  return `<form class="form" data-feature-form="cloud-join"><div class="field"><label for="cloud-join-name">Seu nome</label><input id="cloud-join-name" name="name" maxlength="24" autocomplete="given-name" value="${esc(userName())}" required></div><div class="field"><label for="cloud-invite">Código recebido do seu amor</label><input id="cloud-invite" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" placeholder="XXXX-XXXX-XXXX-XXXX" aria-describedby="cloud-join-note" required><small>Cole o código que a outra pessoa gerou. Ele vale por 48 horas.</small></div><p class="form-note" id="cloud-join-note">Ao entrar, você passa a usar os registros dessa dupla.${checkpoint?' Seu espaço individual fica guardado e pode ser exportado em “Exportar dados anteriores”.':' Cada pessoa usa sua própria conta.'}</p>${checkpoint?'<label class="check"><input type="checkbox" name="confirm-space" required><span>Entendi: vou usar os registros da dupla e meu espaço individual ficará guardado.</span></label>':''}<p class="feature-error" role="alert"></p><button class="btn primary wide" type="submit">Conectar com esse código</button></form>`;
+  return `<form class="form" data-feature-form="cloud-join"><div class="field"><label for="cloud-join-name">Seu nome</label><input id="cloud-join-name" name="name" maxlength="24" autocomplete="given-name" value="${esc(userName())}" required></div><div class="field"><label for="cloud-invite">Código recebido do seu amor</label><input id="cloud-invite" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" placeholder="XXXX-XXXX-XXXX-XXXX" aria-describedby="cloud-join-note" required><small>Cole o código que a outra pessoa gerou. Ele vale por 48 horas.</small></div><p class="form-note" id="cloud-join-note">${checkpoint?'Seu saldo, gastos, contas, entradas e planos serão levados para a dupla. Os registros da outra pessoa também serão mantidos. Uma cópia do seu espaço solo continuará guardada.':'Cada pessoa usa sua própria conta. Os registros ficam juntos no mesmo espaço.'}</p>${checkpoint?'<label class="check"><input type="checkbox" name="confirm-space" required><span>Quero juntar meus registros com os do meu amor.</span></label>':''}<p class="feature-error" role="alert"></p><button class="btn primary wide" type="submit">Conectar com esse código</button></form>`;
+}
+async function openRestore(){
+  const generation=authGeneration,uid=user?.id;
+  await synchronize(true);
+  if(generation!==authGeneration||uid!==user?.id)return;
+  if(!checkpoint?.archivePending)return open();
+  if(checkpoint.dirty||conflict)throw new Error('Sincronize ou confira suas alterações antes de recuperar os registros.');
+  const personal=await rpc('junto_read_personal_archive');
+  if(generation!==authGeneration||uid!==user?.id)return;
+  if(!personal)throw new Error('Não há um espaço individual anterior para recuperar.');
+  validateState(personal);
+  const state=app.getState(),slot=checkpoint.slot,current=state.users.find(u=>u.id===slot).balance,previous=personal.users[0].balance;
+  const hasOwnRecords=['transactions','bills','incomes','received','saves','requests'].some(k=>(state[k]||[]).some(row=>['payer','person','actor','by','author'].some(field=>row[field]===slot)||row.split?.some(part=>part.id===slot)));
+  const usePrevious=current===0&&!hasOwnRecords;
+  restoreDraft={spaceId:checkpoint.spaceId,revision:checkpoint.revision,generation,uid};
+  const counts=[['transactions','gastos'],['bills','contas'],['incomes','entradas'],['received','recebimentos'],['goals','planos']].filter(([key])=>personal[key]?.length).map(([key,label])=>`<li>${personal[key].length} ${label}</li>`).join('');
+  app.openModal('Recuperar registros solo',`<p class="modal-sub">Seus registros anteriores serão adicionados aos desta dupla. Os registros do seu amor serão mantidos.</p>${counts?`<ul class="cloud-restore-counts">${counts}</ul>`:''}<form class="form" data-feature-form="cloud-restore"><fieldset class="conflict-choice"><legend>Como recuperar seu saldo?</legend><label><input type="radio" name="restore-balance" value="solo" ${usePrevious?'checked':''} required><span>Somar o saldo solo ao atual: <strong>${formatMoney(previous+current)}</strong><small>Recuperar ${formatMoney(previous)} e manter os movimentos feitos na dupla.</small></span></label><label><input type="radio" name="restore-balance" value="current" ${usePrevious?'':'checked'} required><span>Manter saldo atual: <strong>${formatMoney(current)}</strong></span></label></fieldset><p class="form-note">Os gastos antigos não serão descontados novamente. A cópia original continuará disponível em “Meus backups”.</p><p class="feature-error" role="alert"></p><button class="btn primary wide" type="submit">Trazer meus registros para a dupla</button></form><button class="btn ghost wide" data-feature="cloud-open">Voltar</button>`,'cloud-restore');
 }
 function openJoin(){
   if(!user)return open();
@@ -193,7 +211,7 @@ function showConflicts(){const result=mergeStates(conflict.base,app.getState(),c
 window.addEventListener('junto:state-changed',event=>{if(!checkpoint||!user)return;checkpoint.pending=clone(event.detail);checkpoint.dirty=!equal(checkpoint.pending,checkpoint.base);try{saveCheckpoint();setMessage(conflict?'Alterações para conferir':checkpoint.dirty?'Mudanças aguardando sincronização':message);if(!conflict)syncSoon();}catch{setMessage('Não foi possível salvar a fila. Exporte um backup.');}});
 document.addEventListener('click',async event=>{const button=event.target.closest('[data-feature]');if(!button?.dataset.feature.startsWith('cloud-'))return;event.preventDefault();try{const action=button.dataset.feature;
   if(action==='cloud-retry'){if(!client)return startClient();const{data,error}=await client.auth.getSession();if(error)throw error;return handleSession(data.session);}
-  if(action==='cloud-open')return open();if(action==='cloud-join-open')return openJoin();if(action==='cloud-export')return app.exportBackup();if(action==='cloud-export-personal'){const previous=parse(archiveKey())||await rpc('junto_read_personal_archive')||parse(PERSONAL_KEY);if(!previous)throw new Error('Não há um espaço individual anterior para exportar.');await download(previous,'Junto-dados-anteriores.json');return;}
+  if(action==='cloud-open')return open();if(action==='cloud-join-open')return openJoin();if(action==='cloud-restore-open')return await openRestore();if(action==='cloud-export')return app.exportBackup();if(action==='cloud-export-personal'){const previous=parse(archiveKey())||await rpc('junto_read_personal_archive')||parse(PERSONAL_KEY);if(!previous)throw new Error('Não há um espaço individual anterior para exportar.');await download(previous,'Junto-dados-anteriores.json');return;}
   if(action==='cloud-auth-toggle'){authView=authView==='login'?'signup':'login';authNotice='';return open();}
   if(action==='cloud-confirmed'){authView='login';authNotice='Entre com seu e-mail e senha para continuar.';return open();}
   if(action==='cloud-resend'){button.disabled=true;try{const{error}=await client.auth.resend({type:'signup',email:pendingEmail,options:{emailRedirectTo:redirectURL()}});if(error)throw error;authNotice='Solicitação enviada. Confira sua caixa de entrada e a pasta de spam.';}catch(e){authNotice=errorMessage(e);}finally{button.disabled=false;}return open();}
@@ -205,7 +223,7 @@ document.addEventListener('click',async event=>{const button=event.target.closes
   if(action==='cloud-signout'){if(checkpoint?.dirty){app.openModal('Alterações ainda neste aparelho','<p class="modal-sub">Sincronize ou exporte uma cópia antes de sair. Assim, seus últimos registros ficam protegidos.</p><button class="btn primary wide" data-feature="cloud-sync">Sincronizar agora</button><button class="btn secondary wide" data-feature="cloud-export">Exportar registros</button><button class="btn ghost wide" data-feature="cloud-signout-confirm">Sair mantendo a fila neste aparelho</button>','cloud-signout');return;}return signOut();}
   if(action==='cloud-signout-confirm')return signOut();if(action==='cloud-export-conflict'){download({base:conflict.base,nesteAparelho:app.getState(),nuvem:conflict.remote},'Junto-conferencia-duas-versoes.json');return;}
 }catch(e){app.toast('Não foi possível concluir.',errorMessage(e));}});
-async function signOut(){lock();if(checkpoint)saveCheckpoint();const{error}=await client.auth.signOut({scope:'local'});if(error)throw error;await handleSession(null);}
+async function signOut(){restoreDraft=null;lock();if(checkpoint)saveCheckpoint();const{error}=await client.auth.signOut({scope:'local'});if(error)throw error;await handleSession(null);}
 document.addEventListener('submit',async event=>{const form=event.target.closest('[data-feature-form]');if(!form?.dataset.featureForm.startsWith('cloud-'))return;event.preventDefault();const error=form.querySelector('.feature-error'),button=form.querySelector('[type=submit]');if(button.disabled)return;button.disabled=true;error.textContent='';const data=new FormData(form),type=form.dataset.featureForm;
   try{
     if(type==='cloud-auth'){backupPersonal();const email=String(data.get('email')).trim(),password=String(data.get('password')),response=form.dataset.mode==='signup'?await client.auth.signUp({email,password,options:{data:{display_name:String(data.get('name')).trim()},emailRedirectTo:redirectURL()}}):await client.auth.signInWithPassword({email,password});if(response.error)throw response.error;if(!response.data.session){pendingEmail=email;localStorage.setItem(PENDING_EMAIL_KEY,email);authView='login';authNotice='Conta criada. Confirme seu e-mail pelo link recebido e depois entre com sua senha.';open();return;}await handleSession(response.data.session);return open();}
@@ -230,11 +248,23 @@ document.addEventListener('submit',async event=>{const form=event.target.closest
       return;
     }
     if(type==='cloud-forgot'){const{error:e}=await client.auth.resetPasswordForEmail(String(data.get('email')).trim(),{redirectTo:redirectURL()});if(e)throw e;error.textContent='Se esse e-mail estiver cadastrado, o link de recuperação será enviado.';return;}
+    if(type==='cloud-restore'){
+      if(!restoreDraft||restoreDraft.generation!==authGeneration||restoreDraft.uid!==user?.id||restoreDraft.spaceId!==checkpoint?.spaceId)throw new Error('LOGIN_REQUIRED');
+      const choice=data.get('restore-balance');if(!['solo','current'].includes(choice))throw new Error('Escolha o saldo para seu perfil.');
+      await synchronize(true);
+      if(!checkpoint||checkpoint.dirty||conflict||checkpoint.revision!==restoreDraft.revision)throw new Error('RESTORE_CHANGED');
+      const generation=authGeneration,uid=user.id;spaceSwitching=true;clearTimeout(syncTimer);
+      app.setAccess(false);document.getElementById('auth-gate').innerHTML='<div class="auth-card"><h1>Juntô</h1><p role="status">Recuperando seus registros…</p></div>';
+      try{const remote=await rpc('junto_restore_personal_archive',{p_revision:restoreDraft.revision,p_restore_balance:choice==='solo'});await adopt(remote,generation,uid);restoreDraft=null;open();app.toast('Seus registros voltaram.','Os dados do modo solo agora estão na dupla.');}
+      catch(e){if(generation===authGeneration&&user?.id===uid){app.setAccess(true);open();app.toast('Não foi possível recuperar.',errorMessage(e));}else throw e;}
+      finally{spaceSwitching=false;if(checkpoint?.dirty)syncSoon();}
+      return;
+    }
     if(type==='cloud-password'){const{error:e}=await client.auth.updateUser({password:String(data.get('password'))});if(e)throw e;passwordRecovery=false;app.toast('Senha atualizada.');return open();}
     if(type==='cloud-conflicts'){const choices={};conflict.conflicts.forEach((c,i)=>{const v=data.get(`choice-${i}`);if(!['local','remote'].includes(v))throw new Error('Escolha um valor para cada alteração.');choices[c.key]=v;});const result=mergeStates(conflict.base,app.getState(),conflict.remote,choices);if(result.conflicts.length)return showConflicts();checkpoint.base=clone(conflict.remote);checkpoint.revision=conflict.revision;checkpoint.pending=result.state;checkpoint.dirty=!equal(result.state,conflict.remote);conflict=null;app.applyState(result.state);saveCheckpoint();await synchronize();return open();}
   }catch(e){error.textContent=errorMessage(e);}finally{button.disabled=false;}
 });
-async function adopt(remote,generation,uid){if(generation!==authGeneration||!user||user.id!==uid||!sessionReady||Date.now()>=sessionExpiresAt)throw new Error('LOGIN_REQUIRED');validateState(remote.payload);checkpoint={spaceId:remote.space_id,slot:remote.slot,revision:remote.revision,base:clone(remote.payload),pending:clone(remote.payload),dirty:false,members:remote.members};app.applyState(remote.payload);app.setSlot(remote.slot);saveCheckpoint();subscribe();app.setAccess(true);setMessage(connectionMessage());}
+async function adopt(remote,generation,uid){if(generation!==authGeneration||!user||user.id!==uid||!sessionReady||Date.now()>=sessionExpiresAt)throw new Error('LOGIN_REQUIRED');validateState(remote.payload);checkpoint={spaceId:remote.space_id,slot:remote.slot,revision:remote.revision,base:clone(remote.payload),pending:clone(remote.payload),dirty:false,members:remote.members,archivePending:Boolean(remote.personal_archive_pending)};app.applyState(remote.payload);app.setSlot(remote.slot);saveCheckpoint();subscribe();app.setAccess(true);setMessage(connectionMessage());}
 const handledURLs=new Set();async function authURL(url){if(!client||handledURLs.has(url))return;const parsed=new URL(url);if(parsed.protocol!=='junto:'||parsed.hostname!=='auth-callback')return;const code=parsed.searchParams.get('code');if(!code)return;handledURLs.add(url);const{data,error}=await client.auth.exchangeCodeForSession(code);if(error){confirmationFallback();return;}if(parsed.searchParams.get('type')==='recovery')passwordRecovery=true;await handleSession(data.session);open();}
 window.addEventListener('junto:auth-url',event=>authURL(event.detail).catch(e=>app.toast('Não foi possível entrar.',errorMessage(e))));
 window.addEventListener('online',()=>synchronize(true));document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncSoon();});setInterval(()=>{if(!document.hidden)syncSoon();},30000);

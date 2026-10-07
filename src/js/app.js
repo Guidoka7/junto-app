@@ -898,7 +898,7 @@
   const NUMW={um:1,uma:1,dois:2,duas:2,tres:3,quatro:4,cinco:5,seis:6,sete:7,oito:8,nove:9,dez:10,onze:11,doze:12,quinze:15,vinte:20,trinta:30,quarenta:40,cinquenta:50,cem:100};
   const CUR=/^(reais|real|conto|contos|pila|pilas|mango|mangos|pratas?|rs|r\$|r)$/;
   const VERBS=/^(gastei|gastamos|gasto|comprei|compramos|paguei|pagamos|pagou|registra|registrar|anota|anotar|lanca|lancar|coloca|bota)$/;
-  const STOP=new Set('com de do da dos das no na nos nas em um uma o a os as pra para pro pelo pela por e foi deu hoje ontem anteontem cada total unidade unidades un eu meu minha mais ai la so tipo'.split(' '));
+  const STOP=new Set('com de do da dos das no na nos nas em um uma o a os as pra para pro pelo pela por e foi deu hoje ontem anteontem cada total unidade unidades un eu meu minha mais ai la so tipo meio metade'.split(' '));
   const FUZZY_STOP=new Set('quanto quantos gastei gastamos gastou gasto gastos mais menos hoje ontem semana posso podemos comprar conta contas saldo sobra sobrar fecha fechar quem onde como parar cortar largar metade guardar guardo economizo economizar dinheiro reais real total valor pagar paguei comprei esse essa isso esta estou ficar todo toda dia dias meses mes'.split(' '));
   const squash=(w)=>w.replace(/(.)\1+/g,'$1');
   function dist(a,b){if(Math.abs(a.length-b.length)>2)return 9;const d=[];for(let i=0;i<=a.length;i++){d[i]=[i];}for(let j=0;j<=b.length;j++)d[0][j]=j;for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++){d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));if(i>1&&j>1&&a[i-1]===b[j-2]&&a[i-2]===b[j-1])d[i][j]=Math.min(d[i][j],d[i-2][j-2]+1);}return d[a.length][b.length];}

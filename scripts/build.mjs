@@ -13,7 +13,7 @@ export async function buildWeb(){
   if(!app.includes('/* JUNTO_APP_API */'))throw new Error('Marcador da integração ausente.');
   await writeFile(appPath,app.replace('/* JUNTO_APP_API */',await readFile(join(src,'features/app-api.js'),'utf8')));
   await rm(join(dist,'features'),{recursive:true,force:true});
-  await build({absWorkingDir:root,entryPoints:['src/js/native.js','src/js/banking.js','src/js/cloud.js'],outdir:join(dist,'js'),bundle:true,format:'iife',platform:'browser',target:['chrome109','safari16'],legalComments:'eof'});
+  await build({absWorkingDir:root,entryPoints:['src/js/native.js','src/js/banking.js','src/js/cloud.js','src/js/budget.js'],outdir:join(dist,'js'),bundle:true,format:'iife',platform:'browser',target:['chrome109','safari16'],legalComments:'eof'});
   const config={url:process.env.SUPABASE_URL||'',publishableKey:process.env.SUPABASE_PUBLISHABLE_KEY||'',appUrl:String(process.env.JUNTO_APP_URL||'').replace(/\/+$/,'')};
   if(Boolean(config.url)!==Boolean(config.publishableKey))throw new Error('Defina SUPABASE_URL e SUPABASE_PUBLISHABLE_KEY juntas.');
   if(config.publishableKey&&config.publishableKey.startsWith('eyJ')){let role;try{role=JSON.parse(Buffer.from(config.publishableKey.split('.')[1],'base64url').toString()).role;}catch{}if(role!=='anon')throw new Error('Use apenas chave publishable ou anon.');}

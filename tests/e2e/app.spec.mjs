@@ -203,11 +203,25 @@ test('bank picker is compact, searchable and keeps branded choices',async({page}
  const selected=await page.evaluate(()=>window.__bankSettings[0].packages);expect(selected).toContain('com.nu.production');expect(selected).toContain('com.picpay');expect(selected).toContain('com.transferwise.android');
 });
 test('bank confirmation is persistent, idempotent and excludes raw text',async({page})=>{
- await fakeNative(page,[event()]);await page.goto('/');await personal(page);await page.locator('#bank-inbox-button').click();await page.locator('[data-feature="bank-review"]').click();await page.locator('#bank-name').fill('Almoço');await page.locator('#bank-category').selectOption('Alimentação');await page.locator('[data-feature-form="bank-confirm"] [type="submit"]').click();
+ await fakeNative(page,[event()]);await page.goto('/');await personal(page);await page.locator('#bank-inbox-button').click();await page.locator('[data-feature="bank-review"]').click();await page.locator('#bank-name').fill('Almoço');await expect(page.locator('#bank-category')).toHaveValue('Restaurantes');await page.locator('[data-feature-form="bank-confirm"] [type="submit"]').click();
  const state=await page.evaluate(()=>window.JuntoApp.getState());expect(state.transactions.length).toBe(1);expect(state.users[0].balance).toBe(7500);expect(JSON.stringify(state)).not.toContain('Aviso privado');expect(await page.evaluate(()=>window.__bankAck.length)).toBe(1);
  const result=await page.evaluate(e=>window.JuntoApp.confirmBankMovement(e,{name:'Almoço',date:new Date().toISOString().slice(0,10),amount:2500,category:'Alimentação'}),event());expect(result.duplicate).toBe(true);expect(await page.evaluate(()=>window.JuntoApp.getState().transactions.length)).toBe(1);await page.reload();expect(await page.evaluate(()=>window.JuntoApp.getState().users[0].balance)).toBe(7500);
  await page.locator('#settings-button').click();await page.locator('#modal [data-feature="cloud-export"]').click();await expect.poll(()=>page.evaluate(()=>window.__exportedBackup?.name)).toMatch(/^Junto-backup-.*\.json$/);const backup=JSON.parse(await page.evaluate(()=>window.__exportedBackup.contents));expect(backup.transactions).toEqual(state.transactions);expect(backup.users[0].balance).toBe(7500);
 });
+
+test('bank review links an exact open bill automatically',async({page})=>{
+ await fakeNative(page,[event('7','pix')]);await page.goto('/');await personal(page,10000);
+ await page.evaluate(()=>{const s=window.JuntoApp.getState();s.bills=[{id:'bill-internet',name:'Internet',item:'Internet',icon:'wifi',amount:2500,category:'Assinaturas',payer:'a',due:new Date().toISOString().slice(0,10),recurring:true,status:'open'}];window.JuntoApp.applyState(s);});
+ await page.locator('#bank-inbox-button').click();
+ await page.locator('[data-feature="bank-review"]').click();
+ await expect(page.locator('#bank-name')).toHaveValue('Internet');
+ await expect(page.locator('#bank-category')).toHaveValue('Assinaturas');
+ await expect(page.locator('#bank-bill')).toHaveValue('bill-internet');
+ await page.locator('[data-feature-form="bank-confirm"] [type="submit"]').click();
+ const state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.bills[0].status).toBe('paid');expect(state.transactions[0].billId).toBe('bill-internet');expect(state.users[0].balance).toBe(7500);
+});
+
 test('card purchases become payable bills without reducing cash',async({page})=>{
  await fakeNative(page,[event('2','card')]);await page.goto('/');await personal(page);await page.locator('#bank-inbox-button').click();await page.locator('[data-feature="bank-review"]').click();await page.locator('#bank-name').fill('Compra no mercado');const due=new Date();due.setDate(due.getDate()+10);await page.locator('#bank-due').fill(due.toISOString().slice(0,10));await page.locator('[data-feature-form="bank-confirm"] [type="submit"]').click();const s=await page.evaluate(()=>window.JuntoApp.getState());expect(s.users[0].balance).toBe(10000);expect(s.transactions.length).toBe(0);expect(s.bills.length).toBe(1);expect(s.bills[0].status).toBe('open');
 });

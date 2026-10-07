@@ -931,7 +931,7 @@
       }
     }
     if(!date){
-      m=t.match(/\b(?:vence(?:\s+no)?|vencimento(?:\s+no)?|pagar(?:\s+no)?|dia)\s+(?:dia\s+)?(\d{1,2})\b/);
+      m=t.match(/\b(?:vence(?:\s+no)?|vencimento(?:\s+no)?|vencer(?:\s+no)?|dia)\s+(?:dia\s+)?(\d{1,2})\b/)||t.match(/\bpagar\s+(?:no\s+)?dia\s+(\d{1,2})\b/);
       if(m){
         const d=Number(m[1]);if(d>=1&&d<=31){let y=today.getFullYear(),mo=today.getMonth(),last=daysInMonth(y,mo),dt=new Date(y,mo,Math.min(d,last));if(dateISO(dt)<todayISO&&(dueHint||recurring)){mo++;dt=new Date(y,mo,Math.min(d,daysInMonth(y,mo)));}date=dateISO(dt);}
       }
@@ -941,9 +941,10 @@
   function parseQuick(text){
     const raw=String(text||'').trim(),meta=naturalDate(raw);let toks=norm(raw).replace(/r\$\s*/g,' r$ ').replace(/(\d)(reais|real|conto|contos|pila|pilas|r\$)\b/g,'$1 $2').split(/\s+/).filter(Boolean).map(t=>NUMW[t]!=null?String(NUMW[t]):t);
     const isNum=(t)=>/^\d+(?:[.,]\d{1,2})?$/.test(t),dateNums=new Set();
+    const markDateNum=(i)=>{const v=Number(toks[i]);if(isNum(toks[i]||'')&&v>=1&&v<=31)dateNums.add(i);};
     toks.forEach((tok,i)=>{
-      if((tok==='dia'||tok==='vence'||tok==='vencimento'||tok==='vencer'||tok==='pagar')&&isNum(toks[i+1]||''))dateNums.add(i+1);
-      if((tok==='vence'||tok==='vencimento'||tok==='vencer'||tok==='pagar')&&toks[i+1]==='dia'&&isNum(toks[i+2]||''))dateNums.add(i+2);
+      if((tok==='dia'||tok==='vence'||tok==='vencimento'||tok==='vencer')&&isNum(toks[i+1]||''))markDateNum(i+1);
+      if((tok==='vence'||tok==='vencimento'||tok==='vencer'||tok==='pagar')&&toks[i+1]==='dia'&&isNum(toks[i+2]||''))markDateNum(i+2);
     });
     const rawNumIdx=toks.map((t,i)=>isNum(t)&&!dateNums.has(i)?i:-1).filter(i=>i>=0);
     if(rawNumIdx.length>1)toks=toks.map((t,i)=>t==='99'&&!dateNums.has(i)?'noventaenove':t);

@@ -2276,3 +2276,74 @@ body[data-route="bills"] .mobile-nav button.active svg{background:#f4ecde;box-sh
  .bills-v3-copy>small{font-size:9px}
  .bills-v3-row>strong{font-size:11.5px}
 }
+/* ===== PLANOS V3 · sonhos / cofre / desafios ===== */
+body[data-route="goals"]{background:linear-gradient(180deg,#fffdfa 0%,#fbfaf7 60%,#f7f8fa 100%)}
+.plans-v3-head,.plans-v3-tabs,.plans-v3-more,.plans-v3-surface{max-width:760px;margin-left:auto;margin-right:auto}
+.plans-v3-head{padding:5px 3px 0;margin-bottom:16px}
+.plans-v3-head>span{font-size:10px;font-weight:800;color:#9a793a;letter-spacing:.05em}
+.plans-v3-head h2{font-size:40px;line-height:1.03;letter-spacing:-1.6px;color:#0b2348;margin-top:8px}
+.plans-v3-head p{font-size:20px;color:#777d8d;margin-top:5px}
+.plans-v3-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;background:#fff;border:1px solid #ebe6df;border-radius:22px;box-shadow:0 8px 22px #13233c08}
+.plans-v3-tabs button{min-height:44px;border-radius:17px;display:flex;align-items:center;justify-content:center;gap:7px;color:#737a88;font-size:12px;font-weight:700}
+.plans-v3-tabs button svg{width:18px;height:18px}
+.plans-v3-tabs button.active{background:linear-gradient(135deg,#f7ecd7,#efdfbf);color:#0b2348}
+.plans-v3-more{display:flex;gap:7px;justify-content:flex-end;padding:9px 1px 0;margin-bottom:10px}
+.plans-v3-more button{min-height:31px;padding:5px 10px;border-radius:999px;background:#fff;border:1px solid #ebe6df;color:#7a808c;font-size:9.5px;font-weight:700}
+.plans-v3-more button.active{color:#9a793a;background:#fffaf0;border-color:#dfc183}
+.plans-v3-surface{display:flex;flex-direction:column;gap:13px}
+.plans-v3-dream{background:#fff;border:1px solid #ece8e2;border-radius:28px;padding:23px;box-shadow:0 14px 34px #13233c09}
+.plans-v3-dream-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.plans-v3-dream-top>div>span{font-size:10px;font-weight:800;letter-spacing:.04em;color:#7a808d}
+.plans-v3-dream-top h3{font-size:28px;line-height:1.05;color:#0b2348;letter-spacing:-1px;margin-top:8px}
+.plans-v3-dream-top p{font-size:12px;color:#777d88;margin-top:5px}
+.plans-v3-illustration{width:77px;height:70px;border-radius:22px;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#fbf1df,#f3e5cd);color:#a07933;transform:rotate(4deg)}
+.plans-v3-illustration svg{width:34px;height:34px}
+.plans-v3-progress{height:8px;border-radius:999px;background:#eef0f3;overflow:hidden;margin-top:22px}
+.plans-v3-progress>span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#d5a84e,#e9c77e)}
+.plans-v3-progress-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px}
+.plans-v3-progress-meta b{font-size:13px;color:#0b2348}
+.plans-v3-progress-meta span{font-size:11px;color:#737a87}
+.plans-v3-people{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:17px}
+.plans-v3-people>div,.plans-v3-person{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:17px;background:#fbfbfc;border:1px solid #f0edf0}
+.plans-v3-people .avatar,.plans-v3-person .avatar{width:36px;height:36px;font-size:13px}
+.plans-v3-people span>small,.plans-v3-person small{display:block;font-size:9.5px;color:#7d8390}
+.plans-v3-people span>b,.plans-v3-person b{display:block;font-size:12px;color:#0b2348;margin-top:2px}
+.plans-v3-previous{font-size:9.5px;line-height:1.4;color:#888e98;margin-top:8px}
+.plans-v3-save{width:100%;min-height:54px;margin-top:16px;border-radius:18px;background:linear-gradient(135deg,#e5bd69,#cda044);color:#0b2348;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:9px}
+.plans-v3-save svg{width:20px;height:20px}
+.plans-v3-other{background:#fff;border:1px solid #ece8e2;border-radius:24px;padding:17px 19px}
+.plans-v3-other .home-section-title h2{font-size:16px;color:#0b2348}
+.plans-v3-other>button{width:100%;display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;gap:10px;text-align:left;padding:10px 0;border-bottom:1px solid #f0ede8}
+.plans-v3-other>button:last-child{border-bottom:0}
+.plans-v3-other>button>span:first-child{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#f7f0e3;color:#a07933}
+.plans-v3-other b{font-size:12px;color:#0b2348}
+.plans-v3-other small{display:block;font-size:9.5px;color:#7d8390;margin-top:2px}
+.plans-v3-other strong{font-size:11px;color:#667080}
+.plans-v3-create{width:100%;display:grid;grid-template-columns:44px minmax(0,1fr) auto;align-items:center;gap:12px;text-align:left;padding:16px 18px;border-radius:22px;background:#fff;border:1px solid #eadfc9;color:#0b2348}
+.plans-v3-create>svg{width:28px;height:28px;color:#a07933}
+.plans-v3-create b{display:block;font-size:13px}
+.plans-v3-create small{display:block;font-size:10.5px;color:#7e8490;margin-top:3px}
+.plans-v3-create strong{font-size:11px;color:#9a793a;white-space:nowrap}
+.plans-v3-love{display:flex;align-items:center;justify-content:center;gap:11px;min-height:65px;padding:14px 18px;border-radius:22px;background:linear-gradient(110deg,#edf8f4,#f4fbf8);color:#416b5d;font-size:11.5px}
+.plans-v3-love svg{width:24px;height:24px}
+.plans-v3-empty{padding:32px 24px;text-align:center;background:#fff;border:1px solid #ece8e2;border-radius:26px}
+.plans-v3-empty>svg{width:35px;height:35px;color:#a07933}
+.plans-v3-empty h3{font-size:20px;color:#0b2348;margin-top:9px}
+.plans-v3-empty p{font-size:11.5px;color:#777d89;line-height:1.5;max-width:430px;margin:6px auto 17px}
+body[data-route="goals"] .mobile-nav button.active{color:#0b2348}
+body[data-route="goals"] .mobile-nav button.active svg{background:#f4ecde;box-shadow:0 0 0 6px #f4ecde}
+@media(max-width:760px){
+ .plans-v3-head h2{font-size:34px}
+ .plans-v3-head p{font-size:18px}
+ .plans-v3-tabs button{min-height:40px;font-size:10.5px}
+ .plans-v3-dream{padding:18px;border-radius:24px}
+ .plans-v3-dream-top h3{font-size:24px}
+ .plans-v3-illustration{width:64px;height:60px}
+}
+@media(max-width:430px){
+ .plans-v3-more{justify-content:flex-start}
+ .plans-v3-dream-top h3{font-size:22px}
+ .plans-v3-illustration{width:58px;height:54px}
+ .plans-v3-create{grid-template-columns:38px minmax(0,1fr);gap:9px}
+ .plans-v3-create strong{grid-column:2;white-space:normal}
+}

@@ -22,10 +22,25 @@ function weekKey(iso){
 }
 function incomePeriod(state,row){
   const inc=(state?.incomes||[]).find(i=>i.id===row.incomeId);
-  if(!inc||!row.date)return row.date||'';
-  return inc.rule==='weekly'?weekKey(row.date):String(row.date).slice(0,7);
+  const date=row.incomeDate||row.date;
+  if(!inc||!date)return date||'';
+  return inc.rule==='weekly'?weekKey(date):String(date).slice(0,7);
 }
-const rowKey=(row,collection,state)=>collection==='received'&&row.incomeId?`income:${row.incomeId}:${incomePeriod(state,row)}`:collection==='saves'&&row.source==='auto'&&row.incomeId?`save:${row.goalId}:${row.incomeId}:${incomePeriod(state,row)}`:row.id;
+function rowKey(row,collection,state){
+  if(collection==='transactions'&&row.billId)return `bill:${row.billId}`;
+  if(collection==='transactions'&&row.requestId)return `request:${row.requestId}`;
+  if(collection==='received'&&row.incomeId)return `income:${row.incomeId}:${incomePeriod(state,row)}`;
+  if(collection==='saves'&&['auto','income'].includes(row.source)&&row.incomeId)return `save:${row.goalId}:${row.incomeId}:${incomePeriod(state,row)}`;
+  return row.id;
+}
+const cashDelta=row=>Number.isSafeInteger(row.balanceDelta)?row.balanceDelta:row.status==='received'?row.amount:-row.amount;
+function sameMoneyEvent(a,b,collection){
+  if(a.amount!==b.amount)return false;
+  if(a.bankSource?.fingerprint&&b.bankSource?.fingerprint&&a.bankSource.fingerprint!==b.bankSource.fingerprint)return false;
+  if(collection==='received')return a.status===b.status&&a.person===b.person&&cashDelta(a)===cashDelta(b);
+  if(collection==='saves')return a.actor===b.actor&&a.goalId===b.goalId;
+  return a.payer===b.payer&&cashDelta(a)===cashDelta(b)&&equal(a.split,b.split);
+}
 function monetaryEffect(state,person){
   let sum=0;for(const t of state.transactions||[]){if(t.payer===person)sum+=Number.isSafeInteger(t.balanceDelta)?t.balanceDelta:-t.amount;else if(['half','prop'].includes(t.payer)){const part=t.split?.find(s=>s.id===person);if(part)sum-=part.amount;}}
   const seen=new Set();for(const r of state.received||[]){if(r.status!=='received')continue;const k=rowKey(r,'received',state);if(seen.has(k))continue;seen.add(k);const owner=r.person||(state.incomes||[]).find(i=>i.id===r.incomeId)?.person;if(owner===person)sum+=Number.isSafeInteger(r.balanceDelta)?r.balanceDelta:r.amount;}
@@ -46,14 +61,22 @@ export function mergeStates(base,local,remote,choices={}){
       }return out;
     }
     if(keyed(l)&&keyed(r)&&(keyed(b)||b===undefined)){
-      const collection=path[0],states=[base,local,remote],maps=[b||[],l,r].map((rows,i)=>new Map(rows.map(row=>[rowKey(row,collection,states[i]),row])));
+      const collection=path[0],states=[base,local,remote];
+      // Existing rows retain their merge identity when the income rule changes
+      // or its source is removed. Never split one historical receipt into two.
+      const oldKeys=new Map((b||[]).map(row=>[row.id,rowKey(row,collection,base)]));
+      const maps=[b||[],l,r].map((rows,i)=>new Map(rows.map(row=>[oldKeys.get(row.id)||rowKey(row,collection,states[i]),row])));
       const out=[];for(const id of new Set([...maps[0].keys(),...maps[1].keys(),...maps[2].keys()])){
         const [old,left,right]=maps.map(m=>m.get(id));
-        // The same scheduled income acknowledged on two devices is one receipt.
-        if(!old&&left&&right&&collection==='received'&&left.incomeId&&left.amount===right.amount&&left.status===right.status&&left.person===right.person){out.push(clone(left.bankSource?left:right));continue;}
-        // Automatic saves produced by the same scheduled income are also one event,
-        // even when two devices computed it from slightly different expected dates.
-        if(!old&&left&&right&&collection==='saves'&&left.source==='auto'&&right.source==='auto'&&left.incomeId===right.incomeId&&left.goalId===right.goalId&&left.amount===right.amount){out.push(clone(left));continue;}
+        const oneEvent=(collection==='transactions'&&(left?.billId||left?.requestId))||
+          (collection==='received'&&left?.incomeId)||
+          (collection==='saves'&&left?.incomeId&&['auto','income'].includes(left.source));
+        if(!old&&left&&right&&oneEvent){
+          // A bill payment, purchase, receipt or attached saving is one event.
+          // Different owners, divisions or cash effects require an explicit choice.
+          out.push(sameMoneyEvent(left,right,collection)?clone(left.bankSource?left:right):conflict([...path,id],old,left,right));
+          continue;
+        }
         const value=merge(old,left,right,[...path,id]);if(value!==undefined)out.push(value);
       }return out;
     }

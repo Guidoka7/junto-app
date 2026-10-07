@@ -272,6 +272,75 @@ test('same-name recurring bills stay separate and stopping one series does not s
  expect(state.bills.find(b=>b.id==='b-cur').recurring).toBe(true);
 });
 
+test('month forecast excludes income before its start and already confirmed schedule periods',async({page})=>{
+ await page.clock.install({time:new Date('2026-10-07T12:00:00')});
+ await page.goto('/');await personal(page,250000);
+ await page.evaluate(()=>{const s=window.JuntoApp.getState();s.incomes=[{id:'future',name:'Renda futura',person:'a',amount:500000,rule:'monthly',day:15,since:'2026-11-01',auto:false}];window.JuntoApp.applyState(s);});
+ await page.locator('#mobile-nav [data-route="future"]').click();
+ await expect(page.locator('.future-v3-total')).toContainText('R$ 2.500');
+ await expect(page.locator('.future-v3-events .future-v3-event small')).toContainText('15 de nov');
+ await page.evaluate(()=>{const s=window.JuntoApp.getState();s.incomes[0].since='2026-09-01';s.received=[{id:'receipt',incomeId:'future',person:'a',date:'2026-10-05',amount:500000,status:'received',balanceDelta:500000}];window.JuntoApp.applyState(s);});
+ await expect(page.locator('.future-v3-total')).toContainText('R$ 2.500');
+ await page.locator('[data-kind="future"][data-value="calendar"]').first().click();
+ await page.locator('[data-action="cal-day"][data-date="2026-10-15"]').click();
+ await expect(page.locator('.cal-detail')).not.toContainText('Renda futura');
+});
+
+test('future calendar counts a materialized recurring bill once',async({page})=>{
+ await page.clock.install({time:new Date('2026-10-07T12:00:00')});
+ await page.goto('/');await personal(page,250000);
+ await page.evaluate(()=>{const s=window.JuntoApp.getState();s.incomes=[{id:'future',name:'Renda futura',person:'a',amount:100000,rule:'monthly',day:1,since:'2027-01-01',auto:false}];s.bills=[{id:'oct',recurringKey:'internet',name:'Internet',amount:10000,payer:'a',category:'Assinaturas',due:'2026-10-10',recurring:true,status:'open'},{id:'nov',recurringKey:'internet',name:'Internet',amount:10000,payer:'a',category:'Assinaturas',due:'2026-11-10',recurring:true,status:'open'}];window.JuntoApp.applyState(s);});
+ await page.locator('#mobile-nav [data-route="future"]').click();
+ await page.locator('[data-kind="future"][data-value="calendar"]').first().click();
+ await page.locator('[data-action="cal-month"][data-delta="1"]').click();
+ const day=page.locator('[data-action="cal-day"][data-date="2026-11-10"]');
+ await expect(day).toHaveAttribute('aria-label',/contas de R\$\s?100/);await day.click();
+ await expect(page.locator('.cal-detail .cal-list li')).toHaveCount(1);
+ await page.locator('.cal-detail [data-action="bill-detail"][data-id="nov"]').click();
+ await expect(page.locator('#modal')).toHaveAttribute('data-kind','ledger-detail');
+ await expect(page.locator('#modal')).toContainText('Internet');
+});
+
+test('saving when confirming income carries its occurrence for offline reconciliation',async({page})=>{
+ await page.clock.install({time:new Date('2026-10-07T12:00:00')});
+ await page.goto('/');await personal(page,100000);
+ await page.evaluate(()=>{const s=window.JuntoApp.getState();s.incomes=[{id:'salary',name:'Salário',person:'a',amount:50000,rule:'monthly',day:5,since:'2026-10-01',auto:false}];s.goals=[{id:'reserve',name:'Reserva',target:100000,saved:0,icon:'shield'}];window.JuntoApp.applyState(s);});
+ await page.locator('#mobile-nav [data-route="future"]').click();await page.locator('.future-v3-tabs [data-route="incomes"]').click();
+ await page.locator('[data-action="income-arrived"]').first().click();
+ await page.locator('#arrival-save').fill('100');await page.locator('[data-form="arrival"] [type="submit"]').click();
+ const s=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(s.received).toHaveLength(1);expect(s.saves).toHaveLength(1);
+ expect(s.saves[0]).toMatchObject({incomeId:'salary',incomeDate:'2026-10-05',date:'2026-10-07',amount:10000,source:'income'});
+ expect(s.users[0].balance).toBe(150000);expect(s.goals[0].saved).toBe(10000);
+});
+
+test('recurrence keeps the requested day through February and later months',async({page})=>{
+ await page.clock.install({time:new Date('2026-01-15T12:00:00')});
+ await page.goto('/');await personal(page,250000);
+ await page.evaluate(()=>{const s=window.JuntoApp.getState();s.bills=[{id:'rent',recurringKey:'rent-series',name:'Aluguel',amount:10000,payer:'a',category:'Casa',due:'2026-01-31',recurring:true,status:'open'}];window.JuntoApp.applyState(s);});
+ for(const [now,due] of [['2026-02-15T12:00:00','2026-02-28'],['2026-03-15T12:00:00','2026-03-31']]){
+   await page.clock.setSystemTime(new Date(now));await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+   const s=await page.evaluate(()=>window.JuntoApp.getState());expect(s.bills.at(-1).due).toBe(due);
+ }
+});
+
+test('approved screens remain usable at mobile, tablet and desktop widths in both modes',async({page})=>{
+ test.setTimeout(90000);await page.goto('/');await personal(page,250000);await page.emulateMedia({reducedMotion:'reduce'});
+ for(const width of [360,390,430,768,1280])for(const couple of [false,true]){
+   await page.setViewportSize({width,height:844});
+   await page.evaluate(couple=>{const s=window.JuntoApp.freshState('Guilherme');s.users[0].balance=250000;if(couple)s.users.push({id:'b',name:'Bia',balance:150000,tone:'pink'});s.incomes=[{id:'salary',name:'Salário',person:'a',amount:100000,rule:'monthly',day:15,since:'2027-01-01',auto:false}];s.goals=[{id:'reserve',name:'Nossa reserva',target:100000,saved:10000,icon:'shield'}];window.JuntoApp.applyState(s);window.JuntoApp.setSlot(null);},couple);
+   for(const route of ['home','future','analysis','bills','goals']){
+     await page.locator(`button[data-route="${route}"]:visible`).first().click();await expect(page.locator('body')).toHaveAttribute('data-route',route);
+     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${width}px ${couple?'dupla':'solo'} ${route}`).toBe(true);
+     const duplicates=await page.locator('[id]').evaluateAll(nodes=>{const ids=nodes.map(n=>n.id);return [...new Set(ids.filter((id,i)=>ids.indexOf(id)!==i))];});expect(duplicates).toEqual([]);
+     if(width<760)expect(await page.locator('#mobile-nav').evaluate(el=>getComputedStyle(el).position)).toBe('fixed');
+   }
+   await page.locator('[data-action="settings"]:visible').first().click();await expect(page.locator('#modal')).toBeVisible();
+   const box=await page.locator('#modal').boundingBox();expect(box.x).toBeGreaterThanOrEqual(-1);expect(box.x+box.width).toBeLessThanOrEqual(width+1);expect(box.y).toBeGreaterThanOrEqual(-1);expect(box.y+box.height).toBeLessThanOrEqual(845);
+   await page.screenshot({path:`test-results/layout-${width}-${couple?'couple':'solo'}.png`});await page.locator('#modal [data-action="close"]').first().click();
+ }
+});
+
 test('editing and reopening a bank-linked paid bill restores the exact balance',async({page})=>{
  await fakeNative(page,[event('9','pix')]);await page.goto('/');await personal(page,10000);
  await page.evaluate(()=>{
@@ -450,6 +519,28 @@ test('Android back closes a dialog, chat, navigation, then exits',async({page})=
  await fakeNative(page,[]);await page.goto('/');await page.locator('#settings-button').click();await expect(page.locator('#modal')).toBeVisible();await page.evaluate(()=>window.__nativeEvents.backButton());await expect(page.locator('#modal')).not.toBeVisible();
  await page.evaluate(()=>document.querySelector('[data-action="chat-open"]').click());await expect(page.locator('#chat-panel')).toBeVisible();await page.evaluate(()=>window.__nativeEvents.backButton());await expect(page.locator('#chat-panel')).not.toBeVisible();
  await page.locator('#mobile-nav [data-route="bills"]').click();await page.evaluate(()=>window.__nativeEvents.backButton());await expect(page.locator('body')).toHaveAttribute('data-route','home');await page.evaluate(()=>window.__nativeEvents.backButton());expect(await page.evaluate(()=>window.__exited)).toBe(true);
+});
+
+test('chat uses current money, retries real failures and can stop a request',async({page})=>{
+ const sent=[];let pending=null;
+ await page.route('**/api/ai',async route=>{
+   sent.push(route.request().postDataJSON());
+   if(sent.length===1)return route.fulfill({status:429,json:{code:'rate_limited',message:'Limite atingido'}});
+   if(sent.length===2)return route.fulfill({json:{candidates:[{content:{role:'model',parts:[{text:'Seu saldo é R$ 1.234,56.'}]}}]}});
+   pending=route;await new Promise(resolve=>{pending.release=resolve;});await route.abort().catch(()=>{});
+ });
+ await page.goto('/');await personal(page,123456);
+ await page.locator('[data-action="chat-open"]:visible').first().click();await page.locator('#chat-input').fill('quanto posso gastar hoje?');await page.locator('#chat-send').click();
+ await expect(page.locator('#chat-log .chat-msg.err')).toContainText('limite disponível');
+ await page.locator('[data-action="chat-retry"]').click();
+ await expect(page.locator('#chat-log')).toContainText('Seu saldo é R$ 1.234,56.');
+ expect(sent).toHaveLength(2);
+ const context=JSON.parse(sent[1].systemInstruction.parts[0].text.split('Dados do app agora (JSON, valores em reais):\n')[1]);
+ expect(context.saldo_dupla).toBe(1234.56);expect(context.pessoas[0].saldo).toBe(1234.56);expect(context.modo).toBe('individual');
+ await page.locator('#chat-input').fill('quanto sobra no mês?');await page.locator('#chat-send').click();
+ await expect(page.locator('#chat-send')).toHaveAttribute('aria-label','Parar resposta');
+ await page.locator('#chat-send').click();await expect(page.locator('#chat-log')).toContainText('Parei aqui');
+ pending?.release();await expect(page.locator('#chat-send')).toHaveAttribute('aria-label','Enviar');
 });
 test('bank picker is compact, searchable and keeps branded choices',async({page})=>{
  await fakeNative(page,[]);await page.goto('/');await personal(page);await page.locator('#settings-button').click();await page.locator('[data-feature="bank-settings"]').click();

@@ -367,11 +367,19 @@
       return keys.length<=200&&keys.every(k=>walk(value[k],depth+1));
     };
     if(!walk(s))return false;
-    const lists=['bills','goals','transactions','incomes','received','saves','requests','activity','notifications','bankImports','commitments','challenges'];
-    for(const key of lists){const arr=Array.isArray(s[key])?s[key]:[];const ids=arr.map(x=>x&&x.id).filter(Boolean);if(new Set(ids).size!==ids.length)return false;}
     if(new Set(s.users.map(u=>u.id)).size!==s.users.length)return false;
+    if(s.users.length===1&&s.users[0].id!=='a')return false;
+    if(s.users.length===2&&!s.users.some(u=>u.id==='a')||s.users.length===2&&!s.users.some(u=>u.id==='b'))return false;
+    if(s.users.some(u=>u.name.trim().length<1||u.name.length>24||Math.abs(u.balance)>99999999999))return false;
+    const lists=['bills','goals','transactions','incomes','received','saves','requests','activity','notifications','bankImports','commitments','challenges'];
+    for(const key of lists){
+      const arr=Array.isArray(s[key])?s[key]:[];
+      if(arr.length>20000||arr.some(x=>!x||typeof x!=='object'||Array.isArray(x)||typeof x.id!=='string'||x.id.length<1||x.id.length>250))return false;
+      const ids=arr.map(x=>x.id);if(new Set(ids).size!==ids.length)return false;
+    }
     const cents=['amount','balance','saved','target','monthly','balanceDelta'];
-    let ok=true;const scan=(value)=>{if(!ok||value===null||typeof value!=='object')return;for(const [k,v] of Object.entries(value)){if(cents.includes(k)&&v!==undefined&&(!Number.isSafeInteger(v)||Math.abs(v)>99999999999)){ok=false;return;}if(v&&typeof v==='object')scan(v);}};
+    const nonNegative=new Set(['amount','saved','target','monthly']);
+    let ok=true;const scan=(value)=>{if(!ok||value===null||typeof value!=='object')return;for(const [k,v] of Object.entries(value)){if(cents.includes(k)&&v!==undefined&&(!Number.isSafeInteger(v)||Math.abs(v)>99999999999||nonNegative.has(k)&&v<0)){ok=false;return;}if(v&&typeof v==='object')scan(v);}};
     scan(s);return ok;
   }
   let state;try{const s=JSON.parse(localStorage.getItem(KEY));state=migrate(validBackup(s)?s:freshPersonalState());}catch{state=freshPersonalState();}

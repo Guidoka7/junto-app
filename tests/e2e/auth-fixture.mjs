@@ -6,7 +6,7 @@ export function sessionResponse(expiresIn=3600){
  const token=[Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url'),Buffer.from(JSON.stringify({sub:uid,role:'authenticated',aud:'authenticated',exp:expires_at})).toString('base64url'),'test'].join('.');
  return {access_token:token,refresh_token:'test-refresh',expires_in:expiresIn,expires_at,token_type:'bearer',user};
 }
-export async function mockCloud(page,{authenticated=false,space=true,signupSession=true,missingConfig=false,expiresIn=3600,denyRefresh=false}={}){
+export async function mockCloud(page,{authenticated=false,space=true,members=1,signupSession=true,missingConfig=false,expiresIn=3600,denyRefresh=false}={}){
  const session=sessionResponse(expiresIn);let remote=null;
  await page.route('**/js/config.js',route=>route.fulfill({contentType:'application/javascript',body:`window.JuntoCloudConfig=${JSON.stringify(missingConfig?{}:testConfig)};`}));
  if(authenticated)await page.addInitScript(session=>localStorage.setItem('sb-junto-test-auth-token',JSON.stringify(session)),session);
@@ -18,7 +18,7 @@ export async function mockCloud(page,{authenticated=false,space=true,signupSessi
   if(url.pathname.endsWith('/user'))return route.fulfill({json:session.user});
   if(url.pathname.endsWith('/logout'))return route.fulfill({json:{}});
   if(url.pathname.endsWith('/junto_read_space')){
-   if(space&&!remote)remote={space_id:'44444444-4444-4444-8444-444444444444',slot:'a',revision:1,members:1,payload:await page.evaluate(()=>window.JuntoApp.freshState('Teste'))};
+   if(space&&!remote){const payload=await page.evaluate(()=>window.JuntoApp.freshState('Teste'));if(members===2)payload.users.push({id:'b',name:'Bia',balance:0,tone:'pink'});remote={space_id:'44444444-4444-4444-8444-444444444444',slot:'a',revision:1,members,payload};}
    return route.fulfill({json:remote});
   }
   if(url.pathname.endsWith('/junto_create_space')||url.pathname.endsWith('/junto_join_space')){remote={space_id:'44444444-4444-4444-8444-444444444444',slot:'a',revision:1,members:1,payload:data.p_payload||await page.evaluate(()=>window.JuntoApp.freshState('Teste'))};return route.fulfill({json:remote});}

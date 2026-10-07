@@ -6,7 +6,7 @@ function allowOrigin(origin){
     const url=new URL(origin);
     const host=url.hostname.toLowerCase();
     if(origin==='capacitor://localhost'||origin==='https://localhost'||origin==='http://localhost')return origin;
-    if(url.protocol==='https:'&&(host==='junto-app-juntoapp.vercel.app'||host==='junto-app-tan.vercel.app'||host.endsWith('-juntoapp.vercel.app')))return origin;
+    if(url.protocol==='https:'&&(host==='guidoka7.github.io'||host==='junto-app-juntoapp.vercel.app'||host==='junto-app-tan.vercel.app'||host.endsWith('-juntoapp.vercel.app')))return origin;
   }catch{}
   return null;
 }

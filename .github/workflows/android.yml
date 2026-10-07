@@ -22,6 +22,7 @@ jobs:
       # Mantidas no workflow para que todo APK gerado na main seja funcional.
       SUPABASE_URL: https://sbquedasoydfsvbarvos.supabase.co
       SUPABASE_PUBLISHABLE_KEY: sb_publishable_hld9OVwKT7nJ0xEzYr71KA_ZE9GAuhp
+      JUNTO_APP_URL: https://junto-app-tan.vercel.app
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

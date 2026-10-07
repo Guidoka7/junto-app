@@ -337,6 +337,37 @@ test('manual backup restore validates, confirms and preserves a pre-restore copy
  expect(await page.evaluate(()=>Boolean(localStorage.getItem('junto-before-restore-v1')))).toBe(true);
 });
 
+
+test('goals open details, can be edited and safely stop an attached saving plan',async({page})=>{
+ await page.goto('/');await personal(page,100000);
+ await page.locator('#mobile-nav [data-route="goals"]').click();
+ await page.locator('[data-action="new-goal"]').first().click();
+ await page.locator('#goal-title').fill('Viagem');
+ await page.locator('#goal-target').fill('1000');
+ await page.locator('[data-form="goal"] [type="submit"]').click();
+
+ let state=await page.evaluate(()=>window.JuntoApp.getState());
+ const goalId=state.goals[0].id;
+ await page.evaluate(id=>{const s=window.JuntoApp.getState();s.plan={key:'leve',name:'Leve',monthly:10000,goalId:id,cut:.1,auto:true,startedAt:Date.now()};window.JuntoApp.applyState(s);},goalId);
+
+ await page.locator('[data-action="goal-detail"]').first().click();
+ await expect(page.locator('dialog[data-kind="goal-detail"]')).toBeVisible();
+ await page.locator('[data-action="edit-goal"]').click();
+ await page.locator('#edit-goal-title').fill('Viagem 2027');
+ await page.locator('#edit-goal-target').fill('1500');
+ await page.locator('[data-form="edit-goal"] [type="submit"]').click();
+ state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.goals[0].name).toBe('Viagem 2027');
+ expect(state.goals[0].target).toBe(150000);
+
+ await page.locator('[data-action="goal-detail"]').first().click();
+ await page.locator('[data-action="release-goal"]').click();
+ await page.locator('[data-form="release-goal"] [type="submit"]').click();
+ state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.goals).toHaveLength(0);
+ expect(state.plan).toBeNull();
+});
+
 test.describe('offline PWA',()=>{
  test.use({serviceWorkers:'allow'});
  test('PWA reloads offline with its bundled fonts and scripts',async({page,context})=>{

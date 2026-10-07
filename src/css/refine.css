@@ -29,6 +29,11 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{cursor:not-allo
 .num{font-variant-numeric:tabular-nums lining-nums}
 .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
 
+/* A single header row keeps the profile and couple invitation together. */
+#mobile-user-switch{display:none}
+.top-heading{min-width:0}
+.profile-unread-dot{position:absolute;top:0;right:0;width:10px;height:10px;border:2px solid #fff;border-radius:50%;background:#d93362}
+
 /* One visual hierarchy across the primary routes. */
 :is(.home-greeting-v3,.future-v3-head,.income-v3-head,.analysis-v3-head,.bills-v3-head,.plans-v3-head) h2{
   color:var(--junto-navy);
@@ -108,6 +113,16 @@ dialog .modal-head .icon-btn{min-width:44px;min-height:44px}
 @media(max-width:760px){
   body{background:linear-gradient(180deg,#fffdfa 0%,var(--junto-canvas) 56%,#f6f7f9 100%)}
   .workspace{max-width:100%;overflow-x:clip}
+  .topbar{grid-template-columns:minmax(0,1fr) auto!important;align-items:center!important;gap:8px!important;margin-bottom:8px!important}
+  .topbar .mobile-brand{display:flex!important;min-width:0;min-height:44px!important;margin:0!important}
+  .topbar .top-heading{grid-column:1 / -1;grid-row:2}
+  body[data-route="home"] .top-heading{display:none}
+  .topbar .top-tools{margin-left:0;gap:8px!important}
+  .topbar #desktop-user-switch{display:none}
+  .topbar #mobile-user-switch{display:flex}
+  .topbar .couple-top-cta{width:auto;min-height:44px;padding:8px 11px;font-size:11px;gap:5px}
+  .topbar .couple-top-cta span{display:inline}
+  .cloud-account-pill{background:transparent;border-radius:0;padding:4px 0;margin:0 8px 8px 0;font-size:11px;line-height:1.4}
   :is(.home-greeting-v3,.future-v3-head,.income-v3-head,.analysis-v3-head,.bills-v3-head,.plans-v3-head) h2{
     font-size:32px;
     line-height:1.06;

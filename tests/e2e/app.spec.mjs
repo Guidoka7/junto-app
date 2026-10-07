@@ -368,6 +368,22 @@ test('goals open details, can be edited and safely stop an attached saving plan'
  expect(state.plan).toBeNull();
 });
 
+
+test('automatic income and recurring maintenance run again when the app resumes',async({page})=>{
+ await page.goto('/');await personal(page,10000);
+ await page.evaluate(()=>{
+   const s=window.JuntoApp.getState(),d=new Date(),iso=x=>String(x.getFullYear())+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
+   s.incomes=[{id:'auto-today',name:'Semanal',person:'a',amount:2500,rule:'monthly',day:d.getDate(),since:iso(d),auto:true}];
+   s.received=[];
+   window.JuntoApp.applyState(s);
+ });
+ await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+ await expect.poll(()=>page.evaluate(()=>window.JuntoApp.getState().received.length)).toBe(1);
+ const state=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(state.users[0].balance).toBe(12500);
+ expect(state.received[0].auto).toBe(true);
+});
+
 test.describe('offline PWA',()=>{
  test.use({serviceWorkers:'allow'});
  test('PWA reloads offline with its bundled fonts and scripts',async({page,context})=>{

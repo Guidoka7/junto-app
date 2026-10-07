@@ -2496,3 +2496,10 @@ dialog[data-kind="ledger-detail"] .modal-wrap,dialog[data-kind="ledger-edit"] .m
  .ledger-detail-grid{grid-template-columns:1fr}
  .ledger-split-detail{grid-template-columns:1fr}
 }
+/* ===== PEER CONECTADO ===== */
+.peer-live-card{display:flex;align-items:flex-start;gap:12px;padding:17px;border:1px solid #e8e3da;border-radius:20px;background:linear-gradient(135deg,#fffdfa,#f8fbf9);box-shadow:0 10px 25px #13233c08}
+.peer-live-card>.avatar{flex:0 0 auto}
+.peer-live-card h3{font-size:14px;line-height:1.25;color:#0b2348}
+.peer-live-card p{font-size:11px;line-height:1.45;color:#657080;margin-top:4px}
+.peer-live-card small{display:block;font-size:9.5px;line-height:1.45;color:#898f98;margin-top:8px}
+dialog[data-kind="peer-info"]{width:min(520px,calc(100vw - 24px));border-radius:26px}

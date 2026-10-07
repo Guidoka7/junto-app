@@ -2374,3 +2374,28 @@ dialog[data-kind="ask"] .form>button[type="submit"]{min-height:55px;border-radiu
  .ask-v3-intro{margin-bottom:14px}
  .ask-v3-form .field-pair{grid-template-columns:1fr}
 }
+/* ===== JUNTÔ A DOIS V3 ===== */
+dialog[data-kind="connect-intro"]{width:min(560px,calc(100vw - 24px));border-radius:30px}
+dialog[data-kind="connect-intro"] .modal-wrap{padding:24px 26px 22px;background:#fffdfa}
+dialog[data-kind="connect-intro"] .modal-head h2{font-size:28px;line-height:1.08;letter-spacing:-.8px;color:#0b2348}
+.connect-v3-hero{text-align:center;padding:8px 8px 17px}
+.connect-v3-pair{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:13px}
+.connect-v3-pair>.avatar{width:59px;height:59px;font-size:21px}
+.connect-v3-pair>span:nth-child(2){color:#b58b3e}
+.connect-v3-pair>span:nth-child(2) svg{width:28px;height:28px}
+.connect-v3-pair>.ghost{background:#fdebf1;color:#a54662;border:0}
+.connect-v3-hero>p{font-size:13px;color:#747b88;line-height:1.45}
+.connect-v3-perks{list-style:none;margin:0;padding:0;border-top:1px solid #f0ece6}
+.connect-v3-perks li{display:grid;grid-template-columns:38px minmax(0,1fr);gap:11px;align-items:center;padding:13px 5px;border-bottom:1px solid #f0ece6}
+.connect-v3-perks li>svg{width:25px;height:25px;color:#a07933}
+.connect-v3-perks b{display:block;font-size:12.5px;color:#0b2348}
+.connect-v3-perks small{display:block;font-size:10.5px;line-height:1.4;color:#7b818d;margin-top:2px}
+.connect-v3-main{width:100%;min-height:54px;margin-top:17px;border-radius:18px;background:linear-gradient(135deg,#e5bd69,#cda044);color:#0b2348;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:9px}
+.connect-v3-main svg{width:20px;height:20px}
+.connect-v3-later{width:100%;min-height:38px;margin-top:4px;color:#0b2348;font-size:11px;font-weight:700}
+.connect-v3-history{text-align:center;border-top:1px solid #f0ece6;padding-top:12px;margin-top:4px;color:#8a8f98;font-size:9.5px}
+@media(max-width:620px){
+ dialog[data-kind="connect-intro"]{width:calc(100vw - 28px)}
+ dialog[data-kind="connect-intro"] .modal-wrap{padding:20px 18px 18px}
+ dialog[data-kind="connect-intro"] .modal-head h2{font-size:25px}
+}

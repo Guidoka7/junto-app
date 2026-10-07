@@ -60,6 +60,38 @@ test('new Home stays functional in solo and couple modes',async({page})=>{
  await expect(page.locator('#couple-cta .couple-top-cta')).toHaveCount(0);
 });
 
+
+test('smart entry understands natural due dates, recurring bills and who paid',async({page})=>{
+ await page.goto('/');await personal(page,300000);
+ await page.locator('.home-register-cta').click();
+
+ // "vence dia 15" não pode confundir o dia com o valor.
+ await page.locator('#expense-title').fill('internet 100 vence dia 15');
+ await expect(page.locator('#expense-amount')).toHaveValue('100,00');
+ await expect(page.locator('#expense-category')).toHaveValue('Assinaturas');
+ await expect(page.locator('input[name="expense-type"][value="bill"]')).toBeChecked();
+ await expect(page.locator('#expense-date')).toHaveValue(/-15$/);
+ await page.locator('#modal [data-action="close"]').click();
+
+ // Recorrência escrita do jeito do usuário muda o fluxo para conta fixa.
+ await page.locator('.home-register-cta').click();
+ await page.locator('#expense-title').fill('aluguel 900 todo mes dia 10');
+ await expect(page.locator('#expense-amount')).toHaveValue('900,00');
+ await expect(page.locator('#expense-category')).toHaveValue('Casa');
+ await expect(page.locator('input[name="expense-type"][value="fixed"]')).toBeChecked();
+ await expect(page.locator('#expense-date')).toHaveValue(/-10$/);
+ await page.locator('#modal [data-action="close"]').click();
+
+ // Em dupla, "meu amor pagou" escolhe a outra pessoa sem mexer no nome do item.
+ await page.evaluate(()=>{const s=window.JuntoApp.getState();s.users.push({id:'b',name:'Bia',balance:200000,tone:'pink'});window.JuntoApp.applyState(s);});
+ await page.locator('.home-register-cta').click();
+ await page.locator('#expense-title').fill('pizza 45 meu amor pagou');
+ await expect(page.locator('#expense-amount')).toHaveValue('45,00');
+ await expect(page.locator('#expense-category')).toHaveValue('Delivery');
+ await expect(page.locator('#expense-payer')).toHaveValue('b');
+ await expect(page.locator('#expense-read')).toContainText('Pizza');
+});
+
 test('critical money flow stays coherent: spend, edit, delete, bill, pay and reopen',async({page})=>{
  await page.goto('/');await personal(page,10000);
  await page.locator('#mobile-nav [data-route="bills"]').click();

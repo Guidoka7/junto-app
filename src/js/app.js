@@ -118,17 +118,17 @@
     if(!inc)return null;const key=incomePeriodKey(inc,date);
     return state.received.find(r=>r.incomeId===incId&&incomePeriodKey(inc,r.date)===key)||null;
   };
-  function adjustedMonthIncome(y,m,id){
+  function adjustedMonthIncome(y,m,id=financePerson()){
     const f=dateISO(new Date(y,m,1)),t=dateISO(new Date(y,m+1,0));let total=0;
     state.incomes.filter(i=>!id||i.person===id).forEach(i=>occurrences(i,f,t).filter(d=>d>=(i.since||'0000')).forEach(d=>{
       const h=handled(i.id,d);if(h?.status==='skipped')return;total+=h?.status==='received'?h.amount:forecastIncome(i,d);
     }));
     return total;
   }
-  function pendingArrivals(lookbackDays=45){const T=dateISO(),from=dateISO(addDays(new Date(),-Math.max(1,lookbackDays))),out=[];state.incomes.forEach(i=>occurrences(i,from,T).forEach(d=>{if(d>=(i.since||'0000')&&!handled(i.id,d))out.push({inc:{...i,amount:forecastIncome(i,d)},date:d});}));return out.sort((a,b)=>a.date.localeCompare(b.date)||b.inc.amount-a.inc.amount);}
+  function pendingArrivals(lookbackDays=45,person=financePerson()){const T=dateISO(),from=dateISO(addDays(new Date(),-Math.max(1,lookbackDays))),out=[];state.incomes.filter(i=>!person||i.person===person).forEach(i=>occurrences(i,from,T).forEach(d=>{if(d>=(i.since||'0000')&&!handled(i.id,d))out.push({inc:{...i,amount:forecastIncome(i,d)},date:d});}));return out.sort((a,b)=>a.date.localeCompare(b.date)||b.inc.amount-a.inc.amount);}
   const forecastIncome=(i,date=dateISO())=>window.JuntoBudget.weeklyBenefitEstimate(i,date,[...holidays(pd(date).getFullYear()),...holidays(pd(date).getFullYear()-1),...holidays(pd(date).getFullYear()+1)])??window.JuntoBudget.incomeEstimate(i,state.received,dateISO());
-  function nextArrivals(days=60){const f=dateISO(addDays(new Date(),1)),t=dateISO(addDays(new Date(),days)),out=[];state.incomes.forEach(i=>occurrences(i,f,t).filter(d=>!handled(i.id,d)).forEach(d=>out.push({inc:{...i,amount:forecastIncome(i,d)},date:d})));return out.sort((a,b)=>a.date.localeCompare(b.date)||b.inc.amount-a.inc.amount);}
-  function monthIncome(y,m,id){const f=dateISO(new Date(y,m,1)),t=dateISO(new Date(y,m+1,0));return state.incomes.filter(i=>!id||i.person===id).reduce((s,i)=>s+occurrences(i,f,t).filter(d=>d>=(i.since||'0000')).reduce((sum,d)=>sum+forecastIncome(i,d),0),0);}
+  function nextArrivals(days=60,person=financePerson()){const f=dateISO(addDays(new Date(),1)),t=dateISO(addDays(new Date(),days)),out=[];state.incomes.filter(i=>!person||i.person===person).forEach(i=>occurrences(i,f,t).filter(d=>!handled(i.id,d)).forEach(d=>out.push({inc:{...i,amount:forecastIncome(i,d)},date:d})));return out.sort((a,b)=>a.date.localeCompare(b.date)||b.inc.amount-a.inc.amount);}
+  function monthIncome(y,m,id=financePerson()){const f=dateISO(new Date(y,m,1)),t=dateISO(new Date(y,m+1,0));return state.incomes.filter(i=>!id||i.person===id).reduce((s,i)=>s+occurrences(i,f,t).filter(d=>d>=(i.since||'0000')).reduce((sum,d)=>sum+forecastIncome(i,d),0),0);}
   function incomeShare(){const n=new Date(),a=monthIncome(n.getFullYear(),n.getMonth(),'a'),b=monthIncome(n.getFullYear(),n.getMonth(),'b');return a+b?a/(a+b):.5;}
   function remainingMonthOcc(){const ym=dateISO().slice(0,7);return pendingArrivals().filter(p=>p.date.slice(0,7)===ym).concat(nextArrivals(31).filter(x=>x.date.slice(0,7)===ym));}
   // ===== Quem paga: um, meio a meio ou proporcional =====
@@ -176,24 +176,31 @@
   }
   // ===== Leitura dos gastos =====
   let memo={};
-  function cached(name,fn){const k=state.updatedAt+'|'+dateISO();if(memo.k!==k)memo={k};return name in memo?memo[name]:(memo[name]=fn());}
+  let financeView='shared',personalCache=null;
+  function withFinanceView(view,fn){const previous=financeView;financeView=cloudSlot?view:'shared';try{return fn();}finally{financeView=previous;}}
+  const isPersonalView=()=>financeView==='personal'&&Boolean(cloudSlot);
+  function personalState(){if(!cloudSlot)return state;const key=state.updatedAt+'|'+dateISO()+'|'+active;if(!personalCache||personalCache.source!==state||personalCache.key!==key)personalCache={source:state,key,data:window.JuntoPersonal.personalFinance(state,active,incomeShare())};return personalCache.data;}
+  const financeState=()=>isPersonalView()?personalState():state;
+  const financePerson=()=>isPersonalView()?active:undefined;
+  function personalBudgetCaps(){state.settings.personalBudgets=state.settings.personalBudgets||{};return state.settings.personalBudgets[active]||(state.settings.personalBudgets[active]={...state.budgets});}
+  function cached(name,fn){const k=state.updatedAt+'|'+dateISO()+'|'+financeView+'|'+active;if(memo.k!==k)memo={k};return name in memo?memo[name]:(memo[name]=fn());}
   const CUSHION=15000;
   const CUT_WEIGHT={Hábitos:.9,Delivery:.65,Lazer:.55,Compras:.6,Lanches:.5,Outros:.4,Alimentação:.15,Transporte:.15,Assinaturas:.4,Casa:.1,Saúde:0};
   const CUT_UNIT={Hábitos:['compra','compras'],Delivery:['pedido','pedidos'],Lazer:['saída','saídas'],Compras:['compra','compras'],Lanches:['lanche','lanches']};
   const isVariable=(t)=>window.JuntoBudget.isEverydayExpense(t);
-  function transportRoutine(date){return state.users.reduce((sum,u)=>sum+window.JuntoBudget.routineTransportAmount(state.settings.personalBudget?.[u.id],date,[...holidays(pd(date).getFullYear())]),0);}
+  function transportRoutine(date){return financeState().users.reduce((sum,u)=>sum+window.JuntoBudget.routineTransportAmount(financeState().settings.personalBudget?.[u.id],date,[...holidays(pd(date).getFullYear())]),0);}
   function shareOf(t,id){if(Array.isArray(t.split))return(t.split.find(s=>s.id===id)||{}).amount||0;if(t.payer===id)return t.amount;if(['half','prop'].includes(t.payer))return(splitShares(t.amount,t.payer).find(s=>s.id===id)||{}).amount||0;return 0;}
   function history(){return cached('hist',()=>{
-    const T=new Date(),firstData=state.transactions.reduce((m,t)=>t.date<m?t.date:m,dateISO(T)),months=[];
+    const T=new Date(),firstData=financeState().transactions.reduce((m,t)=>t.date<m?t.date:m,dateISO(T)),months=[];
     for(let k=6;k>=0;k--){const f=new Date(T.getFullYear(),T.getMonth()-k,1),ym=dateISO(f).slice(0,7);if(k>0&&dateISO(f)<firstData)continue;
       const m={ym,date:f,partial:k===0,income:0,fixed:0,variable:0,saved:0,byCat:{},byPerson:{a:0,b:0}};
-      state.transactions.forEach(t=>{if(t.date.slice(0,7)!==ym)return;if(!isVariable(t))m.fixed+=t.amount;else{m.variable+=t.amount;m.byCat[t.category]=(m.byCat[t.category]||0)+t.amount;m.byPerson.a+=shareOf(t,'a');m.byPerson.b+=shareOf(t,'b');}});
-      state.received.forEach(r=>{if(r.status==='received'&&r.date.slice(0,7)===ym)m.income+=r.amount;});
+      financeState().transactions.forEach(t=>{if(t.date.slice(0,7)!==ym)return;if(!isVariable(t))m.fixed+=t.amount;else{m.variable+=t.amount;m.byCat[t.category]=(m.byCat[t.category]||0)+t.amount;m.byPerson.a+=shareOf(t,'a');m.byPerson.b+=shareOf(t,'b');}});
+      financeState().received.forEach(r=>{if(r.status==='received'&&r.date.slice(0,7)===ym)m.income+=r.amount;});
       m.saved=savedInMonth(ym);m.result=m.income-m.fixed-m.variable;months.push(m);}
     return months;});}
   function model(){return cached('model',()=>{
-    const T=new Date(),today=dateISO(T),vars=state.transactions.filter(isVariable),sum=(l)=>l.reduce((a,t)=>a+t.amount,0);
-    const baseline=window.JuntoBudget.spendingBaseline(state.transactions,today,state.settings.variableEstimate),{age,coverage}=baseline;
+    const T=new Date(),today=dateISO(T),vars=financeState().transactions.filter(isVariable),sum=(l)=>l.reduce((a,t)=>a+t.amount,0);
+    const baseline=window.JuntoBudget.spendingBaseline(financeState().transactions,today,financeState().settings.variableEstimate),{age,coverage}=baseline;
     const from=dateISO(addDays(T,-(coverage-1))),last=vars.filter(t=>t.date>=from&&t.date<=today);
     const prev=vars.filter(t=>t.date>=dateISO(addDays(T,-59))&&t.date<=dateISO(addDays(T,-30)));
     const measured=last.length?sum(last)/baseline.denominator:0;
@@ -210,18 +217,18 @@
       if(hist.length>=2){const n=hist.length;let sw=0,sv=0;hist.forEach((v,i)=>{sw+=i+1;sv+=v*(i+1);});wma=sv/sw;const mx=(n-1)/2;avg=hist.reduce((a,b)=>a+b,0)/n;let num=0,den=0;hist.forEach((v,i)=>{num+=(i-mx)*(v-avg);den+=(i-mx)**2;});slope=den?num/den:0;const hf=Math.max(0,wma+slope*.5);f=n>=3?.55*hf+.45*l30:.4*hf+.6*l30;band=Math.max(Math.sqrt(hist.reduce((a,v)=>a+(v-avg)**2,0)/n),f*.06);}
       fc[c]={c,hist,l30,wma,slope,f,band,avg};fTotal+=f;});
     const rawDaily=complete.length>=2?fTotal/30.4:baseline.daily,transportTotal=byCat.Transporte||0;
-    const routinePeople=state.users.filter(u=>state.settings.personalBudget?.[u.id]?.fare>0);
+    const routinePeople=financeState().users.filter(u=>financeState().settings.personalBudget?.[u.id]?.fare>0);
     const transportBase=routinePeople.reduce((sum,u)=>sum+(complete.length>=2?(fc.Transporte?.f||0)/30.4*(transportTotal?(catPerson.Transporte?.[u.id]||0)/transportTotal:0):(catPerson.Transporte?.[u.id]||0)/baseline.denominator),0);
     const routineMonth=Array.from({length:daysInMonth(T.getFullYear(),T.getMonth())},(_,i)=>transportRoutine(dateISO(new Date(T.getFullYear(),T.getMonth(),i+1)))).reduce((a,b)=>a+b,0);
     const daily=Math.max(0,rawDaily-transportBase)+routineMonth/30.4;
     const weekAvg=[1,2,3,4,5].reduce((a,i)=>a+(avg[i]||0),0)/5,weekendAvg=((avg[0]||0)+(avg[6]||0))/2;
     return {fc,fTotal,months:complete.length,daily,ordinaryDaily:Math.max(0,rawDaily-transportBase),routineMonth,measured,coverage,age,factor,byCat,byCatPrev,byPerson,byPersonPrev,catPerson,count,small,scale:scale0,spentToday:sum(vars.filter(t=>t.date===today)),weekAvg,weekendAvg,hasPrev:age>=55,confidence:baseline.confidence,monthlyVar:daily*30.4};
   });}
-  function templates(){const map={};state.bills.filter(b=>b.recurring).forEach(b=>{const k=recurringKey(b);if(!map[k]||b.due>map[k].due)map[k]=b;});return Object.values(map);}
+  function templates(){const map={};financeState().bills.filter(b=>b.recurring).forEach(b=>{const k=recurringKey(b);if(!map[k]||b.due>map[k].due)map[k]=b;});return Object.values(map);}
   const seriesHasMonth=(bill,ym)=>state.bills.some(b=>recurringKey(b)===recurringKey(bill)&&b.due.slice(0,7)===ym);
   const fixedMonthly=(id)=>templates().reduce((s,b)=>s+(id?((splitShares(b.amount,b.payer).find(x=>x.id===id)||{}).amount||0):b.amount),0);
   const avgIncome=()=>{const n=new Date();return (monthIncome(n.getFullYear(),n.getMonth())+monthIncome(n.getFullYear(),n.getMonth()+1)+monthIncome(n.getFullYear(),n.getMonth()+2))/3;};
-  const savedInMonth=(ym)=>state.saves.filter(s=>s.date.slice(0,7)===ym).reduce((a,s)=>a+s.amount,0);
+  const savedInMonth=(ym)=>financeState().saves.filter(s=>s.date.slice(0,7)===ym).reduce((a,s)=>a+s.amount,0);
   const prevYM=()=>{const n=new Date();return dateISO(new Date(n.getFullYear(),n.getMonth()-1,1)).slice(0,7);};
   // ===== Projeção dia a dia =====
   function simulate(o={}){
@@ -229,20 +236,20 @@
     const add=(d,k,v)=>{const e=ev[d]||(ev[d]={inc:0,bill:0,save:0,extra:0});e[k]+=v;};
     pendingArrivals(45).filter(p=>Math.max(0,-daysUntil(p.date))<=3).forEach(p=>add(today,'inc',p.inc.amount));
     nextArrivals(days).forEach(x=>add(x.date,'inc',x.inc.amount));
-    state.bills.filter(b=>b.status==='open').forEach(b=>{const d=b.due<today?today:b.due;if(d<=end)add(d,'bill',b.amount);});
+    financeState().bills.filter(b=>b.status==='open').forEach(b=>{const d=b.due<today?today:b.due;if(d<=end)add(d,'bill',b.amount);});
     const tpl=templates();
     for(let k=1;;k++){const f=new Date(T.getFullYear(),T.getMonth()+k,1);if(dateISO(f)>end)break;const y=f.getFullYear(),m=f.getMonth();tpl.forEach(b=>{if(seriesHasMonth(b,dateISO(f).slice(0,7)))return;const d=dateISO(new Date(y,m,Math.min(recurringDay(b),daysInMonth(y,m))));if(d<=end)add(d,'bill',b.amount);});if(extra){const d=dateISO(new Date(y,m,10));if(d<=end)add(d,'extra',extra);}}
     if(save){for(let k=0;;k++){const f=new Date(T.getFullYear(),T.getMonth()+k,1);if(dateISO(f)>end)break;const y=f.getFullYear(),m=f.getMonth();
-      const occ=(k===0?remainingMonthOcc():state.incomes.flatMap(i=>occurrences(i,dateISO(f),dateISO(new Date(y,m+1,0))).filter(d=>!handled(i.id,d)).map(d=>({inc:i,date:d})))).filter(x=>Math.max(0,-daysUntil(x.date))<=3);
+      const occ=(k===0?remainingMonthOcc():financeState().incomes.flatMap(i=>occurrences(i,dateISO(f),dateISO(new Date(y,m+1,0))).filter(d=>!handled(i.id,d)).map(d=>({inc:i,date:d})))).filter(x=>Math.max(0,-daysUntil(x.date))<=3);
       const totalInc=occ.reduce((s,x)=>s+x.inc.amount,0),target=k===0?Math.max(0,save-savedInMonth(today.slice(0,7))):save;if(!totalInc)continue;
       occ.forEach(x=>{const d=x.date<today?today:x.date;if(d<=end)add(d,'save',target*x.inc.amount/totalInc);});}}
-    let bal=total()-approvedTotal(),cofre=protectedTotal();const pts=[];
+    let bal=financeState().users.reduce((sum,u)=>sum+u.balance,0)-financeState().requests.filter(r=>r.status==='approved').reduce((sum,r)=>sum+r.amount,0),cofre=financeState().goals.reduce((sum,g)=>sum+g.saved,0);const pts=[];
     for(let i=0;i<=days;i++){const d=addDays(T,i),iso=dateISO(d),e=ev[iso]||{inc:0,bill:0,save:0,extra:0};
       let v=(o.noVar?0:M.ordinaryDaily*M.factor[d.getDay()]*(1-cut))+transportRoutine(iso);if(i===0)v=Math.max(0,v-M.spentToday*(1-cut));
       bal+=e.inc+e.extra-e.bill-v;cofre+=e.save;pts.push({date:iso,bal,cofre,free:bal-cofre,inc:e.inc+e.extra,bill:e.bill,save:e.save});}
     return pts;
   }
-  function dailyCap(){return cached('cap',()=>{const days=daysUntil(endOfMonthISO()),pts=simulate({days,noVar:true,save:state.plan?.monthly||0});let cap=Infinity;pts.forEach((p,i)=>{cap=Math.min(cap,(p.free-CUSHION)/(i+1));});return Math.max(0,Math.floor(cap/100)*100);});}
+  function dailyCap(){return cached('cap',()=>{const days=daysUntil(endOfMonthISO()),pts=simulate({days,noVar:true,save:financeState().plan?.monthly||0});let cap=Infinity;pts.forEach((p,i)=>{cap=Math.min(cap,(p.free-CUSHION)/(i+1));});return Math.max(0,Math.floor(cap/100)*100);});}
   function monthSamples(pts){const byDate={};pts.forEach(p=>byDate[p.date]=p);const n=new Date(),out=[pts[0]];for(let k=0;k<12;k++){const iso=dateISO(new Date(n.getFullYear(),n.getMonth()+k+1,0));out.push(byDate[iso]||pts[pts.length-1]);}return out;}
   // ===== Plano "guardar primeiro" =====
   function planOptions(){return cached('plans',()=>{
@@ -268,7 +275,7 @@
     return `<li><span><b>${esc(x.c)}</b> ${cashR(x.v)} → ${cashR(x.v-x.r)}</span><small>${n>=1?`≈ ${n} ${n===1?unit[0]:unit[1]} a menos`:`−${cashR(x.r)} por mês`}${lead&&share>=.6?` · ${esc(first(user(lead).name))} faz ${pct(share)}`:''}</small></li>`;}
   // ===== Leitura individual =====
   function personReading(id){
-    const M=model(),n=new Date(),inc=monthIncome(n.getFullYear(),n.getMonth(),id),incO=monthIncome(n.getFullYear(),n.getMonth(),other(id));
+    const M=model(),n=new Date(),inc=monthIncome(n.getFullYear(),n.getMonth(),id),incO=isPersonalView()?0:monthIncome(n.getFullYear(),n.getMonth(),other(id));
     const v=M.byPerson[id]*M.scale,vo=M.byPerson[other(id)]*M.scale,fixed=fixedMonthly(id),incShareV=inc+incO?inc/(inc+incO):.5,varShare=v+vo?v/(v+vo):.5;
     const fairV=(v+vo)*incShareV,excess=v-fairV,net=inc-fixed-v,prevRatio=M.hasPrev&&M.byPersonPrev[id]>0?M.byPerson[id]/M.byPersonPrev[id]-1:null;
     const cats=Object.entries(M.catPerson).map(([c,o])=>[c,o[id]*M.scale]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,3);
@@ -279,8 +286,8 @@
   function tips(){return cached('tips',()=>{
     const M=model(),out=[],T=new Date();if(M.measured<=0)return out;
     if(M.small.n>=8){const mth=M.small.sum*M.scale;out.push({icon:'coffee',title:`${M.small.n} gastinhos de até R$ 40 em ${M.coverage} dias.`,body:`Somaram ${cashR(M.small.sum)}. Um por um parece nada, mas no ano dá ${cashR(mth*12)}. Cortar metade guarda ${cashR(mth/2)} por mês.`,impact:mth/2});}
-    const sal=state.incomes.filter(i=>i.rule==='business'),dates=[...new Set(sal.flatMap(i=>occurrences(i,dateISO(addDays(T,-60)),dateISO(addDays(T,-3)))))];
-    if(dates.length){let s=0,n=0;dates.forEach(d=>{for(let k=0;k<3;k++){const iso=dateISO(addDays(pd(d),k));s+=state.transactions.filter(t=>isVariable(t)&&t.date===iso).reduce((a,t)=>a+t.amount,0);n++;}});const avg=s/n,r=avg/M.measured;
+    const sal=financeState().incomes.filter(i=>i.rule==='business'),dates=[...new Set(sal.flatMap(i=>occurrences(i,dateISO(addDays(T,-60)),dateISO(addDays(T,-3)))))];
+    if(dates.length){let s=0,n=0;dates.forEach(d=>{for(let k=0;k<3;k++){const iso=dateISO(addDays(pd(d),k));s+=financeState().transactions.filter(t=>isVariable(t)&&t.date===iso).reduce((a,t)=>a+t.amount,0);n++;}});const avg=s/n,r=avg/M.measured;
       if(r>1.35){const perMonth=Math.max(1,dates.length/2),impact=(avg-M.measured)*3*perMonth*.6;out.push({icon:'bolt',title:'Quando o salário cai, o gasto dispara.',body:`Nos 3 dias depois do pagamento, a dupla gasta ${ratioText(r)}x o normal: ${cashR(avg)} por dia, contra ${cashR(M.measured)}. Guardar no mesmo dia em que o dinheiro entra corta esse pico pela raiz.`,impact});}}
     if(M.weekAvg>0&&M.weekendAvg/M.weekAvg>1.5){const cap=Math.ceil(M.weekendAvg*.75/1000)*1000,impact=(M.weekendAvg-cap)*8.7;if(impact>0)out.push({icon:'calendar',title:`Fim de semana custa ${ratioText(M.weekendAvg/M.weekAvg)}x um dia útil.`,body:`Sábado e domingo saem, em média, ${cashR(M.weekendAvg)} por dia. Combinar um teto de ${cashR(cap)} por dia de folga guarda ${cashR(impact)} por mês.`,impact});}
     Object.entries(M.catPerson).forEach(([c,o])=>{if(isSolo())return;const tot=(o.a+o.b)*M.scale;if(tot<30000||(CUT_WEIGHT[c]??.3)<.4)return;const lead=o.a>=o.b?'a':'b',share=o[lead]/(o.a+o.b);if(share<.72)return;const mine=o[lead]*M.scale,impact=mine*.4;out.push({icon:categoryIcon(c),title:`${c}: ${pct(share)} é de ${first(user(lead).name)}.`,body:`${esc(first(user(lead).name))} gastou ${cashR(o[lead])} em ${c.toLowerCase()} nos últimos ${M.coverage} dias${M.count[c]?`, em ${Math.round(M.count[c]*share)} vezes`:''}. Reduzir 40% disso guarda ${cashR(impact)} por mês sem mexer no resto da dupla.`,impact,person:lead});});
@@ -292,12 +299,12 @@
   // ===== Leitura das entradas =====
   function incomeInsights(){
     const out=[],now=new Date(),y=now.getFullYear(),m=now.getMonth(),mi=monthIncome(y,m);
-    const weekly=state.incomes.filter(i=>i.rule==='weekly');
+    const weekly=financeState().incomes.filter(i=>i.rule==='weekly');
     weekly.forEach(w=>{const five=[];for(let k=0;k<6;k++){const f=new Date(y,m+k,1);if(occurrences(w,dateISO(f),dateISO(new Date(f.getFullYear(),f.getMonth()+1,0))).length===5)five.push(f);}
       if(five.length)out.push({icon:'sparkle',title:`Meses com 5 ${WEEKDAYS[w.weekday]}s: ${five.map(monthName).join(', ')}.`,body:`Nesses meses, ${esc(w.name.toLowerCase())} de ${esc(first(user(w.person).name))} entra 5 vezes em vez de 4: ${cashR(w.amount)} a mais que nunca foi contado. Mandar essa entrada inteira pro cofre não faz falta no orçamento.`});});
-    if(mi){const early=state.incomes.reduce((s,i)=>s+occurrences(i,dateISO(new Date(y,m,1)),dateISO(new Date(y,m,10))).length*i.amount,0)/mi;
+    if(mi){const early=financeState().incomes.reduce((s,i)=>s+occurrences(i,dateISO(new Date(y,m,1)),dateISO(new Date(y,m,10))).length*i.amount,0)/mi;
       if(early>.55)out.push({icon:'calendar',title:`${pct(early)} da renda chega até o dia 10.`,body:`Depois disso, ${weekly.length?`só ${WEEKDAYS[weekly[0].weekday]==='sábado'||WEEKDAYS[weekly[0].weekday]==='domingo'?'os':'as'} ${WEEKDAYS[weekly[0].weekday]}s`:'quase nada'}. Por isso o fim do mês aperta: o que não é separado no começo some no meio. Guardar e pagar as contas grandes logo que o salário cai protege o resto do mês.`});}
-    state.incomes.filter(i=>i.rule==='business').slice(0,1).forEach(i=>{const pushes=[];for(let k=0;k<6;k++){const yy=new Date(y,m+k,1).getFullYear(),mm=new Date(y,m+k,1).getMonth(),a=nthBusinessDay(yy,mm,i.nth||5,i.countSat!==false),b=nthBusinessDay(yy,mm,i.nth||5,i.countSat!==false,true);if(dateISO(a)!==dateISO(b))pushes.push(`${monthName(a)} (dia ${a.getDate()}, não ${b.getDate()})`);}
+    financeState().incomes.filter(i=>i.rule==='business').slice(0,1).forEach(i=>{const pushes=[];for(let k=0;k<6;k++){const yy=new Date(y,m+k,1).getFullYear(),mm=new Date(y,m+k,1).getMonth(),a=nthBusinessDay(yy,mm,i.nth||5,i.countSat!==false),b=nthBusinessDay(yy,mm,i.nth||5,i.countSat!==false,true);if(dateISO(a)!==dateISO(b))pushes.push(`${monthName(a)} (dia ${a.getDate()}, não ${b.getDate()})`);}
       if(pushes.length)out.push({icon:'clock',title:'Feriado atrasa o salário em alguns meses.',body:`O ${i.nth||5}º dia útil anda pra frente em ${pushes.join(', ')}. A previsão já considera isso: as contas que vencem antes disso precisam de dinheiro guardado do mês anterior.`});});
     return out;
   }
@@ -471,19 +478,19 @@
   function activityRows(items){return items.map(a=>`<div class="activity-row">${avatar(a.actor)}<div><p><b>${esc(first(user(a.actor).name))}</b> ${esc(a.message)}</p><time>${timeText(a.createdAt)}</time></div></div>`).join('');}
   function homeView(){
     const available=free(),request=pending()[0],g=state.goals[0],solo=isSolo();
-    const now=new Date(),expectedIncome=adjustedMonthIncome(now.getFullYear(),now.getMonth()),spent=monthSpend();
+    const now=new Date(),expectedIncome=adjustedMonthIncome(now.getFullYear(),now.getMonth(),cloudSlot||undefined),spent=personalState().transactions.filter(t=>t.date.slice(0,7)===dateISO().slice(0,7)).reduce((sum,t)=>sum+t.amount,0);
     const spendPct=expectedIncome?Math.min(100,Math.round(spent/expectedIncome*100)):null;
     let insightTitle,insightBody;
     if(available<0){insightTitle=solo?'Seu mês pediu um ajuste.':'O mês pediu uma conversa.';insightBody=`Faltam ${cash(-available)} para cobrir contas, planos e valores reservados. Vale revisar antes do próximo gasto.`;}
     else if(request&&!solo){insightTitle=request.amount<=available?'Esse pedido cabe no mês.':'Esse pedido pede uma conversa.';insightBody=request.amount<=available?`Se vocês combinarem “${request.title}”, ainda sobram ${cash(available-request.amount)} livres.`:`“${request.title}” passa ${cash(request.amount-available)} do livre atual.`;}
-    else{const tip=tips()[0];if(tip){insightTitle=tip.title;insightBody=tip.body.replace(/<[^>]+>/g,'');}else{insightTitle=solo?'Seu dinheiro está organizado para hoje.':'O dinheiro de vocês está organizado para hoje.';insightBody=`Depois das contas e dos planos, ${solo?'você tem':'vocês têm'} ${cash(Math.max(0,available))} livres.`;}}
+    else{const tip=withFinanceView('personal',()=>tips()[0]);if(tip){insightTitle=tip.title;insightBody=tip.body.replace(/<[^>]+>/g,'');}else{insightTitle=solo?'Seu dinheiro está organizado para hoje.':'O dinheiro de vocês está organizado para hoje.';insightBody=`Depois das contas e dos planos, ${solo?'você tem':'vocês têm'} ${cash(Math.max(0,available))} livres.`;}}
     const goalPct=g?Math.min(100,Math.round(g.saved/g.target*100)):0;
-    const alerts=radar().slice(0,2),latest=state.transactions.slice().sort((a,b)=>(b.createdAt||pd(b.date).getTime())-(a.createdAt||pd(a.date).getTime())).slice(0,3);
+    const alerts=withFinanceView('personal',radar).slice(0,2),latest=personalState().transactions.slice().sort((a,b)=>(b.createdAt||pd(b.date).getTime())-(a.createdAt||pd(a.date).getTime())).slice(0,3);
     const spendAction=solo?'can-spend':'ask',spendLabel=solo?'Posso gastar?':'Amor, posso gastar?',quickCats=quickCategorySuggestions();
     return `<div class="home-v2 home-v3">
       <div class="home-greeting home-greeting-v3"><div><span class="home-mode-badge">${solo?`${icon('wallet')}Modo solo`:`${icon('heart')}Juntô a dois`}</span><h2>Oi, ${esc(first(user().name))}.</h2><p>${solo?'Bora cuidar do seu hoje?':'Bora cuidar do nosso hoje?'}</p></div></div>
       ${incoming().length?`<div class="pending-banner">${icon('chat')}<p>${esc(first(user(other()).name))} quer combinar ${incoming().length===1?'um gasto.':`${incoming().length} gastos.`} Bora responder?</p><button data-action="route" data-route="requests">Ver pedido</button></div>`:''}
-      ${(()=>{const arr=pendingArrivals();if(!arr.length)return '';const a=arr[0];return `<div class="pending-banner arrival">${icon('coins')}<p><b>${esc(a.inc.name)} de ${esc(first(user(a.inc.person).name))}</b> ${a.date===dateISO()?'cai hoje':`era pra ter caído ${dayMonth(a.date)}`}. Confirma e a previsão se ajusta.${arr.length>1?` (+${arr.length-1})`:''}</p><button data-action="income-arrived" data-id="${a.inc.id}" data-date="${a.date}">Confirmar</button></div>`;})()}
+      ${(()=>{const arr=pendingArrivals(45,cloudSlot||undefined);if(!arr.length)return '';const a=arr[0];return `<div class="pending-banner arrival">${icon('coins')}<p><b>${esc(a.inc.name)} de ${esc(first(user(a.inc.person).name))}</b> ${a.date===dateISO()?'cai hoje':`era pra ter caído ${dayMonth(a.date)}`}. Confirma e a previsão se ajusta.${arr.length>1?` (+${arr.length-1})`:''}</p><button data-action="income-arrived" data-id="${a.inc.id}" data-date="${a.date}">Confirmar</button></div>`;})()}
       ${contestBanner()}
       <section class="home-money-card home-money-card-v3" aria-label="Resumo financeiro">
         <div class="home-money-v3-top"><div class="home-money-v3-copy"><span class="home-money-eyebrow">LIVRE PRA CURTIR</span><div class="home-money-v3-value"><strong class="num" id="free-amount">${available<0?'− ':''}${cash(Math.abs(available))}</strong><button class="icon-btn" data-action="hide" aria-label="${hidden?'Mostrar':'Ocultar'} valores">${icon(hidden?'eyeOff':'eye')}</button></div><p>${available<0?'O mês está acima do livre atual.':'Contas e planos já separados.'}</p></div><div class="home-money-people">${state.users.map(u=>`<span class="home-money-person">${avatar(u.id)}<small>${u.id===active?'Você':solo?'Você':u.id==='b'?'Meu amor':esc(first(u.name))}</small></span>`).join('')}</div></div>
@@ -545,7 +552,7 @@
     if(planTab==='sim')body=`<section class="block"><div class="block-head"><h2>E se…?</h2><p>Teste corte de gasto e renda extra. O Juntô recalcula o próximo ano sem mudar o plano real até você decidir.</p></div><div class="panel sim"><div class="sim-controls"><label class="range"><span>Cortar do gasto do dia a dia <b id="sim-cut-out">${simCut}%</b></span><input type="range" id="sim-cut" min="0" max="40" step="5" value="${simCut}"></label><label class="range"><span>Renda extra por mês <b id="sim-extra-out">${brl(simExtra*100)}</b></span><input type="range" id="sim-extra" min="0" max="2000" step="50" value="${simExtra}"></label></div><div id="sim-out">${simOut()}</div></div></section>`;
     return head+`<div class="plans-v3-surface">${body}</div>`;
   }
-  function activityView(){return `<div class="page-title-row"><div><h2>O que a gente fez acontecer.</h2><p>Gastos, respostas e planos. Tudo com quem fez e quando.</p></div></div><section class="panel activity-v3">${state.activity.length?activityRows(state.activity):`<div class="empty">${icon('activity')}<p>O primeiro passo da dupla aparece aqui.</p></div>`}</section>`;}
+  function activityView(){return `<div class="page-title-row"><div><h2>O que a gente fez acontecer.</h2><p>Gastos, respostas e planos. Tudo com quem fez e quando.</p></div></div><section class="panel activity-v3">${financeState().activity.length?activityRows(financeState().activity):`<div class="empty">${icon('activity')}<p>O primeiro passo da dupla aparece aqui.</p></div>`}</section>`;}
   function peerHTML(){
     const id=other(),u=user(id),list=incoming(id),r=list[list.length-1];
     const latest=state.notifications.find(n=>n.to===id&&!n.read&&Date.now()-n.createdAt<30000);
@@ -607,13 +614,13 @@
     return `<div class="sim-stats"><div><span>Sobra por mês</span><strong class="num ${sobra<0?'neg':''}">${sobra<0?'−':''}${cashR(Math.abs(sobra))}</strong></div><div><span>Em 12 meses</span><strong class="num ${gS<0?'neg':''}">${gS<0?'−':''}${cashR(Math.abs(gS))}</strong><small>no ritmo atual: ${gB<0?'−':''}${cashR(Math.abs(gB))}</small></div><div><span>${g?esc(g.name):'Primeiro plano'}</span><strong>${g?etaText(g.target-g.saved,Math.max(0,sobra-CUSHION)):'—'}</strong></div></div><div class="year-chart">${yearChart(base,scen,chartWidth(46))}<div class="legend"><span class="lg scen">Esse cenário</span><span class="lg base">Se continuar assim</span></div></div>`;
   }
   function futureView(){
-    const solo=isSolo(),M=model(),n=new Date(),mName=monthName(n),dE=daysUntil(endOfMonthISO());
-    const hasIncome=state.incomes.length>0,pts=hasIncome?simulate({days:Math.max(45,dE+10)}):[],eomP=pts.length?pts[dE]:null,cap=hasIncome?dailyCap():0;
+    const solo=(isSolo()||isPersonalView()),M=model(),n=new Date(),mName=monthName(n),dE=daysUntil(endOfMonthISO());
+    const hasIncome=financeState().incomes.length>0,pts=hasIncome?simulate({days:Math.max(45,dE+10)}):[],eomP=pts.length?pts[dE]:null,cap=hasIncome?dailyCap():0;
     const incomeEvents=[...pendingArrivals(),...nextArrivals(45)].map(x=>({id:x.inc.id,date:x.date,name:x.inc.name,amount:x.inc.amount,kind:'in',person:x.inc.person}));
-    const billEvents=state.bills.filter(b=>b.status==='open'&&b.due>=dateISO()).map(b=>({id:b.id,date:b.due,name:b.name,amount:b.amount,kind:'out',payer:b.payer}));
+    const billEvents=financeState().bills.filter(b=>b.status==='open'&&b.due>=dateISO()).map(b=>({id:b.id,date:b.due,name:b.name,amount:b.amount,kind:'out',payer:b.payer}));
     const events=[...incomeEvents,...billEvents].sort((a,b)=>a.date.localeCompare(b.date)||(a.kind==='in'?-1:1)).slice(0,3);
     const ym=dateISO().slice(0,7),disc=['Delivery','Restaurantes','Lanches','Lazer','Compras','Hábitos'];
-    const byDisc={};state.transactions.filter(t=>!t.billId&&t.date.slice(0,7)===ym&&disc.includes(t.category)).forEach(t=>byDisc[t.category]=(byDisc[t.category]||0)+t.amount);
+    const byDisc={};financeState().transactions.filter(t=>!t.billId&&t.date.slice(0,7)===ym&&disc.includes(t.category)).forEach(t=>byDisc[t.category]=(byDisc[t.category]||0)+t.amount);
     const topDisc=Object.entries(byDisc).sort((a,b)=>b[1]-a[1])[0];
     const smartCat=topDisc?.[0]||'Delivery',smartSave=topDisc?Math.max(1000,Math.round(topDisc[1]*.2/100)*100):0;
     const mainTabs=`<nav class="future-v3-tabs" aria-label="Futuro"><button class="${futureTab==='forecast'?'active':''}" data-action="topic-tab" data-kind="future" data-value="forecast">Previsão</button><button class="${futureTab==='tips'?'active':''}" data-action="topic-tab" data-kind="future" data-value="tips">Simular</button><button data-action="route" data-route="incomes">Entradas</button></nav>`;
@@ -633,22 +640,22 @@
     return head;
   }
     function incomesView(){
-    const solo=isSolo(),n=new Date(),ym=dateISO().slice(0,7),expected=adjustedMonthIncome(n.getFullYear(),n.getMonth()),got=state.received.filter(r=>r.status==='received'&&r.date.slice(0,7)===ym).reduce((sum,r)=>sum+r.amount,0),pend=pendingArrivals(),next=nextArrivals(62),M=model();
+    const solo=(isSolo()||isPersonalView()),n=new Date(),ym=dateISO().slice(0,7),expected=adjustedMonthIncome(n.getFullYear(),n.getMonth()),got=financeState().received.filter(r=>r.status==='received'&&r.date.slice(0,7)===ym).reduce((sum,r)=>sum+r.amount,0),pend=pendingArrivals(),next=nextArrivals(62),M=model();
     const monthFuture=next.filter(x=>x.date.slice(0,7)===ym),rest=Math.max(0,expected-got),nextOne=pend[0]||monthFuture[0]||next[0];
     const groups={};next.forEach(x=>(groups[x.date.slice(0,7)]=groups[x.date.slice(0,7)]||[]).push(x));
     const pendingHTML=rows=>rows.length?`<section class="income-v3-list"><div class="home-section-title"><h2>Confirmar recebimentos</h2>${pend.length>rows.length?'<button class="text-link" data-action="topic-tab" data-kind="income" data-value="calendar">Ver todos</button>':''}</div>${rows.map(x=>`<button class="income-v3-row" data-action="income-arrived" data-id="${x.inc.id}" data-date="${x.date}" aria-label="Confirmar ${esc(x.inc.name)} de ${esc(first(user(x.inc.person).name))}"><span class="income-v3-icon">${icon('coins')}</span><span><b>${esc(x.inc.name)}</b><small>${esc(first(user(x.inc.person).name))} · previsto ${dateText(x.date)}</small></span><strong class="num">${cashR(x.inc.amount)}</strong><em>›</em></button>`).join('')}</section>`:'';
     const tabs=`<nav class="income-v3-tabs" aria-label="Entradas"><button class="${incomeTab==='overview'?'active':''}" data-action="topic-tab" data-kind="income" data-value="overview">Resumo</button><button class="${incomeTab==='sources'?'active':''}" data-action="topic-tab" data-kind="income" data-value="sources">Entradas</button><button class="${incomeTab==='calendar'?'active':''}" data-action="topic-tab" data-kind="income" data-value="calendar">Calendário</button><button class="${incomeTab==='base'?'active':''}" data-action="topic-tab" data-kind="income" data-value="base">Ajustes</button></nav>`;
     const head=`<div class="income-v3-head"><button class="income-v3-back" data-action="route" data-route="future">‹ <span>Futuro</span></button><span>${solo?'MEU PLANEJAMENTO':'NOSSO PLANEJAMENTO'}</span><h2>O que vai cair?</h2><p>Pra planejar antes do Pix.</p></div>${tabs}`;
     if(incomeTab==='overview'){
-      return head+`<div class="income-v3-surface"><section class="income-v3-total"><div><span>PREVISTO NO MÊS</span><strong class="num">${cashR(expected)}</strong><p>${solo?'Entradas que você configurou.':'Entradas configuradas pela dupla.'}</p></div><span class="income-v3-month">${esc(monthName(n))} ${n.getFullYear()}⌄</span></section>${pendingHTML(pend.slice(0,3))}<section class="income-v3-list"><div class="home-section-title"><h2>Entradas configuradas</h2><button class="text-link" data-action="topic-tab" data-kind="income" data-value="sources">Gerenciar</button></div>${state.incomes.length?state.incomes.map(i=>{const nx=next.find(x=>x.inc.id===i.id);return `<button class="income-v3-row" data-action="income-edit" data-id="${i.id}"><span class="income-v3-icon ${i.person==='b'?'pink':''}">${icon('wallet')}</span><span><b>${esc(i.name)}</b><small>${esc(first(user(i.person).name))} · ${esc(ruleText(i))}${nx?`<br>Próximo: ${dateText(nx.date)}`:''}</small></span><strong class="num">${cashR(i.amount)}${i.rule==='weekly'?'<small>por semana</small>':''}</strong><em>›</em></button>`;}).join(''):`<div class="home-empty-row">${icon('wallet')}<span><b>Nenhuma entrada configurada.</b><small>Adicione salário, renda semanal, comissão ou outro recebimento.</small></span></div>`}<div class="income-v3-confirm">${icon('bell')}<span>${nextOne?`Próxima confirmação: ${esc(nextOne.inc.name)} · ${dateText(nextOne.date)}.`:'Você confirma quando cada valor cair.'}</span></div></section><section class="income-v3-insight">${icon('sparkle')}<div><b>${rest>0?`${cashR(rest)} ainda estão previstos para ${monthName(n)}.`:'As entradas previstas deste mês já foram confirmadas.'}</b><p>${M.coverage>=14?'A previsão já usa seu ritmo real de gastos para ajustar o que sobra.':'Continue registrando gastos: quanto mais histórico, mais precisa fica a previsão.'}</p></div></section><button class="income-v3-add" data-action="income-new">${icon('plus')}Adicionar entrada</button><button class="income-v3-link" data-action="topic-tab" data-kind="income" data-value="calendar">Ver recebimentos ›</button></div>`;
+      return head+`<div class="income-v3-surface"><section class="income-v3-total"><div><span>PREVISTO NO MÊS</span><strong class="num">${cashR(expected)}</strong><p>${solo?'Entradas que você configurou.':'Entradas configuradas pela dupla.'}</p></div><span class="income-v3-month">${esc(monthName(n))} ${n.getFullYear()}⌄</span></section>${pendingHTML(pend.slice(0,3))}<section class="income-v3-list"><div class="home-section-title"><h2>Entradas configuradas</h2><button class="text-link" data-action="topic-tab" data-kind="income" data-value="sources">Gerenciar</button></div>${financeState().incomes.length?financeState().incomes.map(i=>{const nx=next.find(x=>x.inc.id===i.id);return `<button class="income-v3-row" data-action="income-edit" data-id="${i.id}"><span class="income-v3-icon ${i.person==='b'?'pink':''}">${icon('wallet')}</span><span><b>${esc(i.name)}</b><small>${esc(first(user(i.person).name))} · ${esc(ruleText(i))}${nx?`<br>Próximo: ${dateText(nx.date)}`:''}</small></span><strong class="num">${cashR(i.amount)}${i.rule==='weekly'?'<small>por semana</small>':''}</strong><em>›</em></button>`;}).join(''):`<div class="home-empty-row">${icon('wallet')}<span><b>Nenhuma entrada configurada.</b><small>Adicione salário, renda semanal, comissão ou outro recebimento.</small></span></div>`}<div class="income-v3-confirm">${icon('bell')}<span>${nextOne?`Próxima confirmação: ${esc(nextOne.inc.name)} · ${dateText(nextOne.date)}.`:'Você confirma quando cada valor cair.'}</span></div></section><section class="income-v3-insight">${icon('sparkle')}<div><b>${rest>0?`${cashR(rest)} ainda estão previstos para ${monthName(n)}.`:'As entradas previstas deste mês já foram confirmadas.'}</b><p>${M.coverage>=14?'A previsão já usa seu ritmo real de gastos para ajustar o que sobra.':'Continue registrando gastos: quanto mais histórico, mais precisa fica a previsão.'}</p></div></section><button class="income-v3-add" data-action="income-new">${icon('plus')}Adicionar entrada</button><button class="income-v3-link" data-action="topic-tab" data-kind="income" data-value="calendar">Ver recebimentos ›</button></div>`;
     }
     if(incomeTab==='sources'){
-      return head+`<div class="income-v3-surface"><div class="income-v3-toolbar"><div><h2>Suas regras de entrada</h2><p>Edite frequência, valor e quem recebe.</p></div><button class="btn primary" data-action="income-new">${icon('plus')}Nova entrada</button></div>${state.incomes.length?state.incomes.map(i=>{const nx=next.find(x=>x.inc.id===i.id);return `<article class="list-card"><div class="category-icon">${icon(i.rule==='weekly'?'repeat':'coins')}</div><div class="list-data"><h3>${esc(i.name)} · ${esc(first(user(i.person).name))}</h3><p>${esc(ruleText(i))}${nx?` · próxima: ${dateText(nx.date)}`:''}${i.auto?' · confirma sozinho':''}</p></div><div><div class="list-amount num">${cashR(i.amount)}</div><div class="list-buttons"><button class="btn secondary" data-action="income-edit" data-id="${i.id}">Ajustar</button><button class="icon-btn" data-action="income-remove" data-id="${i.id}" aria-label="Remover ${esc(i.name)}">${icon('trash')}</button></div></div></article>`;}).join(''):`<div class="future-v3-empty">${icon('coins')}<h3>Quando o dinheiro cai?</h3><p>Cadastre uma entrada para o Juntô calcular o mês.</p><button class="btn primary" data-action="income-new">Adicionar entrada</button></div>`}</div>`;
+      return head+`<div class="income-v3-surface"><div class="income-v3-toolbar"><div><h2>Suas regras de entrada</h2><p>Edite os valores e a frequência dos seus recebimentos.</p></div><button class="btn primary" data-action="income-new">${icon('plus')}Nova entrada</button></div>${financeState().incomes.length?financeState().incomes.map(i=>{const nx=next.find(x=>x.inc.id===i.id);return `<article class="list-card"><div class="category-icon">${icon(i.rule==='weekly'?'repeat':'coins')}</div><div class="list-data"><h3>${esc(i.name)} · ${esc(first(user(i.person).name))}</h3><p>${esc(ruleText(i))}${nx?` · próxima: ${dateText(nx.date)}`:''}${i.auto?' · confirma sozinho':''}</p></div><div><div class="list-amount num">${cashR(i.amount)}</div><div class="list-buttons"><button class="btn secondary" data-action="income-edit" data-id="${i.id}">Ajustar</button><button class="icon-btn" data-action="income-remove" data-id="${i.id}" aria-label="Remover ${esc(i.name)}">${icon('trash')}</button></div></div></article>`;}).join(''):`<div class="future-v3-empty">${icon('coins')}<h3>Quando o dinheiro cai?</h3><p>Cadastre uma entrada para o Juntô calcular o mês.</p><button class="btn primary" data-action="income-new">Adicionar entrada</button></div>`}</div>`;
     }
     if(incomeTab==='calendar'){
       return head+`<div class="income-v3-surface">${pendingHTML(pend)}${next.length?`<section class="income-v3-calendar"><div class="home-section-title"><h2>Próximos 60 dias</h2><span>${cashR(next.reduce((sum,x)=>sum+x.inc.amount,0))} previstos</span></div><div class="panel timeline">${Object.entries(groups).map(([k,list])=>`<div class="tl-month"><h3>${monthName(pd(k+'-01'))}<span class="num">${cashR(list.reduce((sum,x)=>sum+x.inc.amount,0))}</span></h3>${list.map(x=>`<button class="tl-row" data-action="income-edit" data-id="${x.inc.id}" aria-label="Editar entrada ${esc(x.inc.name)}"><time><b>${pd(x.date).getDate()}</b>${wdShort(x.date)}</time>${avatar(x.inc.person)}<span><strong>${esc(x.inc.name)}</strong><small>${esc(ruleText(x.inc))}</small></span><b class="num">${cashR(x.inc.amount)}</b></button>`).join('')}</div>`).join('')}</div></section>`:`<div class="future-v3-empty">${icon('calendar')}<h3>Nenhuma entrada prevista.</h3><p>Cadastre uma entrada recorrente para montar o calendário.</p></div>`}</div>`;
     }
-    return head+`<div class="income-v3-surface">${personalBudgetPanel()}<section class="income-v3-adjust"><div><h2>Como a previsão aprende</h2><p>Hoje o Juntô usa ${M.coverage} dias de gastos registrados e compara isso com as entradas configuradas.</p></div><form class="panel form estimate-form" data-form="estimate">${field('estimate-amount','Estimativa de gasto do dia a dia por mês','0,00',state.settings.variableEstimate?moneyNumber(state.settings.variableEstimate):'',true)}<p class="form-note">A estimativa perde peso conforme entram gastos reais. Você pode corrigir sem apagar o histórico.</p><p class="form-error" role="alert" id="form-error"></p><button class="btn secondary" type="submit">Salvar estimativa</button></form></section></div>`;
+    return head+`<div class="income-v3-surface">${personalBudgetPanel()}<section class="income-v3-adjust"><div><h2>Como a previsão aprende</h2><p>Hoje o Juntô usa ${M.coverage} dias de gastos registrados e compara isso com as entradas configuradas.</p></div><form class="panel form estimate-form" data-form="estimate">${field('estimate-amount','Estimativa de gasto do dia a dia por mês','0,00',financeState().settings.variableEstimate?moneyNumber(financeState().settings.variableEstimate):'',true)}<p class="form-note">A estimativa perde peso conforme entram gastos reais. Você pode corrigir sem apagar o histórico.</p><p class="form-error" role="alert" id="form-error"></p><button class="btn secondary" type="submit">Salvar estimativa</button></form></section></div>`;
   }
     function planOptionByKey(key){
     if(key==='cortes'){const {monthly}=cutTotals(),base=planOptions()[0].base,M=model();return {key:'cortes',name:'Cortes',pct:M.monthlyVar?monthly/M.monthlyVar:0,monthly:Math.max(5000,Math.floor((base+monthly-CUSHION)/5000)*5000),variable:M.monthlyVar,dailyLimit:(M.monthlyVar-monthly)/30.4};}
@@ -667,15 +674,16 @@
     openModal(`Caiu ${inc.name.toLowerCase()} de ${first(user(inc.person).name)}?`,`<p class="modal-sub">${dateLong(date)} · previsto ${money(inc.amount)}. Confirme quanto entrou de verdade.</p><form class="form" data-form="arrival" data-id="${incId}" data-date="${date}">${field('arrival-amount','Quanto entrou?','0,00',moneyNumber(inc.amount),true)}${goals.length?`<div class="save-first"><div class="save-first-head">${icon('coins')}<div><strong>Guardar primeiro</strong><p>${state.plan?`Pelo plano ${esc(state.plan.name)}, a parte desta entrada é ${money(share)}.`:'Sugestão: 10% desta entrada, antes de qualquer gasto.'}</p></div></div><div class="field-pair">${field('arrival-save','Separar agora','0,00',moneyNumber(share),true)}<div class="field"><label for="arrival-goal">Para qual plano?</label><select id="arrival-goal" name="arrival-goal">${goals.map(g=>`<option value="${g.id}" ${g.id===state.plan?.goalId?'selected':''}>${esc(g.name)}</option>`).join('')}</select></div></div></div>`:''}${formEnd('Confirmar entrada')}<button type="button" class="btn ghost wide" data-action="income-skip" data-id="${incId}" data-date="${date}">Não entrou desta vez</button></form>`,'arrival');
   }
   let budgetProfileDraft=null;
-  function personalBudgetReading(){
-    const p=state.settings.personalBudget?.[active]||{},today=dateISO(),food=window.JuntoBudget.benefitEnvelope(state,active,'food',today,shareOf),transport=window.JuntoBudget.benefitEnvelope(state,active,'transport',today,shareOf);
-    const points=simulate({days:daysUntil(endOfMonthISO()),save:state.plan?.monthly||0}),floor=Math.min(...points.map(x=>x.free));
+  function personalBudgetReading(){return withFinanceView('personal',personalBudgetData);}
+  function personalBudgetData(){
+    const p=financeState().settings.personalBudget?.[active]||{},today=dateISO(),food=window.JuntoBudget.benefitEnvelope(state,active,'food',today,shareOf),transport=window.JuntoBudget.benefitEnvelope(state,active,'transport',today,shareOf);
+    const points=simulate({days:daysUntil(endOfMonthISO()),save:financeState().plan?.monthly||0}),floor=Math.min(...points.map(x=>x.free));
     // Benefits paid as cash are envelopes, not an extra balance or a second deduction.
-    const cash=Math.max(0,user().balance-protectedTotal()-approvedTotal()),reliable=model().coverage>=14||state.settings.variableEstimate>0,available=reliable?Math.max(0,Math.floor(Math.min(cash,floor)-CUSHION)):0;
+    const cash=Math.max(0,user().balance-financeState().goals.reduce((sum,g)=>sum+g.saved,0)-financeState().requests.filter(r=>r.status==='approved').reduce((sum,r)=>sum+r.amount,0)),reliable=model().coverage>=14||financeState().settings.variableEstimate>0,available=reliable?Math.max(0,Math.floor(Math.min(cash,floor)-CUSHION)):0;
     const weekTransport=window.JuntoBudget.weeklyTransportBudget(state,active,today,p,[...holidays(pd(today).getFullYear())],shareOf);
     const days=p.debtSince?Math.max(0,daysUntil(today)-daysUntil(p.debtSince)):0;
     const debt=p.debtPrincipal>0&&p.debtSince?window.JuntoBudget.debtSuggestion({principal:p.debtPrincipal,monthlyRate:p.debtRate,days,minimum:p.debtMinimum,available}):null;
-    const month=state.transactions.filter(t=>t.date.slice(0,7)===today.slice(0,7)&&t.date<=today),transportToday=month.filter(t=>t.date===today&&t.category==='Transporte').reduce((s,t)=>s+shareOf(t,active),0),habits=month.filter(t=>['Hábitos','Lanches','Delivery','Restaurantes'].includes(t.category)).reduce((s,t)=>s+shareOf(t,active),0);
+    const month=financeState().transactions.filter(t=>t.date.slice(0,7)===today.slice(0,7)&&t.date<=today),transportToday=month.filter(t=>t.date===today&&t.category==='Transporte').reduce((s,t)=>s+shareOf(t,active),0),habits=month.filter(t=>['Hábitos','Lanches','Delivery','Restaurantes'].includes(t.category)).reduce((s,t)=>s+shareOf(t,active),0);
     return {p,food,transport,weekTransport,available,reliable,debt,transportToday,habits,transportLimit:(p.fare||550)*(p.trips||2),saveNow:Math.max(0,available-(debt?.payment||0))};
   }
   function personalBudgetPanel(){
@@ -688,9 +696,9 @@
     openModal('Meu orçamento pessoal',`<form class="form" data-form="personal-budget"><p class="form-note">As regras acompanham apenas o perfil ${esc(user().name)}. Não criam entradas, dívidas ou pagamentos no saldo.</p><h3>Transporte</h3>${field('budget-fare','Passagem de ônibus','5,50',moneyNumber(p.fare||550),true)}<div class="field"><label for="budget-trips">Passagens por dia</label><input id="budget-trips" name="budget-trips" type="number" min="1" max="10" value="${p.trips||2}" required></div><h3>Dívida flexível</h3>${field('budget-principal','Saldo devedor atual (sem repetir pagamentos passados)','0,00',moneyNumber(p.debtPrincipal||0),true)}<div class="field"><label for="budget-rate">Juros mensais (%)</label><input id="budget-rate" name="budget-rate" type="number" min="0" max="100" step="0.01" value="${p.debtRate??7}" required></div><div class="field"><label for="budget-since">Data em que esse saldo foi confirmado</label><input id="budget-since" name="budget-since" type="date" max="${dateISO()}" value="${p.debtSince||dateISO()}" required></div>${field('budget-minimum','Pagamento mínimo desejado por mês','300,00',moneyNumber(p.debtMinimum??30000),true)}<p class="form-note">A simulação considera juros simples proporcionais a 30 dias. Não substitui o valor confirmado da dívida. Informe zero no saldo devedor para desativar.</p>${formEnd('Salvar meu orçamento')}</form>`,'personal-budget');
   }
   function incomeModal(id){
-    const inc=id?state.incomes.find(i=>i.id===id):{name:'',person:active,amount:0,rule:'business',nth:5,countSat:true,weekday:5,day:20};if(!inc)return;
+    const inc=id?state.incomes.find(i=>i.id===id&&(!cloudSlot||i.person===cloudSlot)):{name:'',person:active,amount:0,rule:'business',nth:5,countSat:true,weekday:5,day:20};if(!inc)return;
     const rf=(r)=>inc.rule!==r?'hidden':'';
-    openModal(id?'Ajustar entrada':'Nova entrada prevista',`<p class="modal-sub">Como esse dinheiro cai? A previsão se ajusta na hora.</p><form class="form" data-form="income" ${id?`data-id="${id}"`:''}>${field('income-name','Nome','Ex.: salário, semanal, freela',inc.name)}<div class="field-pair">${field('income-amount','Valor de cada entrada','0,00',inc.amount?moneyNumber(inc.amount):'',true)}<div class="field"><label for="income-person">De quem?</label><select id="income-person" name="income-person">${state.users.map(u=>`<option value="${u.id}" ${u.id===inc.person?'selected':''}>${esc(u.name)}</option>`).join('')}</select></div></div>
+    openModal(id?'Ajustar entrada':'Nova entrada prevista',`<p class="modal-sub">Como esse dinheiro cai? A previsão se ajusta na hora.</p><form class="form" data-form="income" ${id?`data-id="${id}"`:''}>${field('income-name','Nome','Ex.: salário, semanal, freela',inc.name)}<div class="field-pair">${field('income-amount','Valor de cada entrada','0,00',inc.amount?moneyNumber(inc.amount):'',true)}<div class="field"><label for="income-person">De quem?</label><select id="income-person" name="income-person">${state.users.filter(u=>!cloudSlot||u.id===cloudSlot).map(u=>`<option value="${u.id}" ${u.id===inc.person?'selected':''}>${esc(u.name)}</option>`).join('')}</select></div></div>
       <div class="segmented" aria-label="Quando cai">${[['business','Dia útil'],['weekly','Toda semana'],['monthly','Dia fixo']].map(([v,l])=>`<label><input type="radio" name="income-rule" value="${v}" ${inc.rule===v?'checked':''}>${l}</label>`).join('')}</div>
       <div class="rule-field" data-rule="business" ${rf('business')}><div class="field"><label for="income-nth">Qual dia útil do mês?</label><select id="income-nth" name="income-nth">${Array.from({length:10},(_,k)=>k+1).map(k=>`<option value="${k}" ${Number(inc.nth||5)===k?'selected':''}>${k}º dia útil</option>`).join('')}</select></div><label class="check"><input type="checkbox" name="income-sat" ${inc.countSat!==false?'checked':''}><span>Sábado conta como dia útil<small>É a regra da CLT para salário. Desmarque se a empresa conta só de segunda a sexta. Domingos e feriados nacionais nunca contam.</small></span></label></div>
       <div class="rule-field" data-rule="weekly" ${rf('weekly')}><div class="field"><label for="income-weekday">Em qual dia da semana?</label><select id="income-weekday" name="income-weekday">${WEEKDAYS.map((w,k)=>`<option value="${k}" ${Number(inc.weekday)===k?'selected':''}>${w}</option>`).join('')}</select></div></div>
@@ -703,7 +711,7 @@
   }
   function readIncomeForm(form){
     const d=new FormData(form),rule=d.get('income-rule')||'business';
-    return {name:String(d.get('income-name')||'').trim(),person:d.get('income-person'),amount:parseMoney(d.get('income-amount')),rule,nth:Number(d.get('income-nth'))||5,countSat:d.get('income-sat')==='on',auto:d.get('income-auto')==='on',weekday:Number(d.get('income-weekday')),day:Math.min(31,Math.max(1,Number(d.get('income-day'))||1))};
+    return {name:String(d.get('income-name')||'').trim(),person:cloudSlot||d.get('income-person'),amount:parseMoney(d.get('income-amount')),rule,nth:Number(d.get('income-nth'))||5,countSat:d.get('income-sat')==='on',auto:d.get('income-auto')==='on',weekday:Number(d.get('income-weekday')),day:Math.min(31,Math.max(1,Number(d.get('income-day'))||1))};
   }
   function updateIncomePreview(){
     const form=document.querySelector('[data-form="income"]'),el=$('#income-preview');if(!form||!el)return;
@@ -720,11 +728,11 @@
   const daysLeftIncl=()=>{const T=new Date();return daysInMonth(T.getFullYear(),T.getMonth())-T.getDate()+1;};
   function budgets(){return cached('budgets',()=>{
     const M=model(),ym=dateISO().slice(0,7),left=daysLeftIncl(),inc=avgIncome()||1,T0=new Date(),elapsed=T0.getDate()/daysInMonth(T0.getFullYear(),T0.getMonth());
-    const pctCut=state.plan?state.plan.cut??.2:((planOptions().find(o=>o.key===recommendedKey())||{pct:.2}).pct);
+    const pctCut=financeState().plan?financeState().plan.cut??.2:((planOptions().find(o=>o.key===recommendedKey())||{pct:.2}).pct);
     const list=Object.values(M.fc).filter(x=>x.f>0||x.l30>0),W=(c)=>CUT_WEIGHT[c]??.3,C=list.reduce((s,x)=>s+x.f*W(x.c),0),total=list.reduce((s,x)=>s+x.f,0),cutAmt=Math.min(total*pctCut,C);
-    const mtd={};state.transactions.forEach(t=>{if(!t.billId&&t.date.slice(0,7)===ym)mtd[t.category]=(mtd[t.category]||0)+t.amount;});
+    const mtd={};financeState().transactions.forEach(t=>{if(!t.billId&&t.date.slice(0,7)===ym)mtd[t.category]=(mtd[t.category]||0)+t.amount;});
     return list.map(x=>{
-      const sugg=Math.max(0,Math.round((x.f-(C?cutAmt*x.f*W(x.c)/C:0))/1000)*1000),custom=state.budgets[x.c],budget=Number.isSafeInteger(custom)?custom:sugg,spent=mtd[x.c]||0,proj=spent+x.f/30.4*(left-1);
+      const sugg=Math.max(0,Math.round((x.f-(C?cutAmt*x.f*W(x.c)/C:0))/1000)*1000),custom=financeState().budgets[x.c],budget=Number.isSafeInteger(custom)?custom:sugg,spent=mtd[x.c]||0,proj=spent+x.f/30.4*(left-1);
       const pace=budget*elapsed,status=spent>budget?'over':spent>pace*1.15+1500?'tight':'ok';
       const avg3=x.hist.length?x.hist.slice(-3).reduce((a,v)=>a+v,0)/Math.min(3,x.hist.length):x.l30;
       return {...x,pace,elapsed,sugg,custom:Number.isSafeInteger(custom),budget,mtd:spent,proj,status,left,remaining:budget-spent,perDay:Math.max(0,budget-spent)/left,save:Math.max(0,x.f-budget),savePct:x.f?Math.max(0,x.f-budget)/x.f:0,ref:(REF[x.c]??.03)*inc,refPct:x.f/inc,avg3,change:avg3?x.f/avg3-1:0};
@@ -732,7 +740,7 @@
   });}
   function fixedReading(){return cached('fixed',()=>{
     const inc=avgIncome()||1,T=new Date();
-    const rows=templates().map(b=>{const hist=[],series=recurringKey(b);for(let k=6;k>=1;k--){const ym=dateISO(new Date(T.getFullYear(),T.getMonth()-k,1)).slice(0,7),t=state.transactions.find(t=>t.billId&&t.date.slice(0,7)===ym&&(t.recurringKey?String(t.recurringKey)===series:t.name.toLowerCase()===b.name.toLowerCase()));if(t)hist.push({ym,v:t.amount});}
+    const rows=templates().map(b=>{const hist=[],series=recurringKey(b);for(let k=6;k>=1;k--){const ym=dateISO(new Date(T.getFullYear(),T.getMonth()-k,1)).slice(0,7),t=financeState().transactions.find(t=>t.billId&&t.date.slice(0,7)===ym&&(t.recurringKey?String(t.recurringKey)===series:t.name.toLowerCase()===b.name.toLowerCase()));if(t)hist.push({ym,v:t.amount});}
       const n=b.name.toLowerCase(),type=/internet|celular|telefone|streaming|netflix|spotify|tv|prime|disney|max|globoplay|youtube/.test(n)?'plano':/luz|energia|água|agua|gás|gas/.test(n)?'consumo':/aluguel|condom|financiamento|presta/.test(n)?'moradia':/academia|gym|seguro|plano de saúde/.test(n)?'servico':'outro';
       const savePct={plano:.2,consumo:.1,moradia:0,servico:.15,outro:.05}[type],vals=hist.map(h=>h.v),avg=vals.length?vals.reduce((a,v)=>a+v,0)/vals.length:b.amount,prev=vals.length?vals[vals.length-1]:null,change=prev?b.amount/prev-1:0;
       const firstUp=hist.findIndex((h,i)=>i>0&&h.v>hist[i-1].v*1.03),since=firstUp>0?monthName(pd(hist[firstUp].ym+'-01')):null,sd=vals.length>1?Math.sqrt(vals.reduce((a,v)=>a+(v-avg)**2,0)/vals.length):0;
@@ -742,7 +750,7 @@
       else if(type==='moradia')action='Custo de moradia não se corta no mês. O que importa é a proporção da renda, logo abaixo.';
       else if(type==='servico')action='Plano anual ou horário alternativo costuma sair 15% mais barato.';
       else action='Vale revisar se ainda faz sentido pagar todo mês.';
-      const recent=hist.length&&hist.length<4&&state.transactions[0]&&state.transactions[0].date<dateISO(new Date(T.getFullYear(),T.getMonth()-hist.length-1,1));
+      const recent=hist.length&&hist.length<4&&financeState().transactions[0]&&financeState().transactions[0].date<dateISO(new Date(T.getFullYear(),T.getMonth()-hist.length-1,1));
       return {b,hist,type,avg,change,save:b.amount*savePct,savePct,pctInc:b.amount/inc,action,recent,months:hist.length};});
     const housing=rows.filter(r=>r.type==='moradia').reduce((s,r)=>s+r.b.amount,0);
     return {rows:rows.sort((a,b)=>b.b.amount-a.b.amount),housing,housingPct:housing/inc,save:rows.reduce((s,r)=>s+r.save,0)};
@@ -750,11 +758,11 @@
   function monthLedger(){
     const H=history(),M=model(),T=new Date(),ym=dateISO(T).slice(0,7),left=daysLeftIncl()-1,out=H.filter(m=>!m.partial).map(m=>({...m,kind:'past'}));
     const cur=H.find(m=>m.partial)||{ym,date:new Date(T.getFullYear(),T.getMonth(),1),income:0,fixed:0,variable:0,saved:0,byCat:{},byPerson:{a:0,b:0}};
-    const remInc=remainingMonthOcc().reduce((s,x)=>s+x.inc.amount,0),openB=state.bills.filter(b=>b.status==='open'&&b.due.slice(0,7)<=ym).reduce((s,b)=>s+b.amount,0),pv=cur.variable+M.daily*left;
+    const remInc=remainingMonthOcc().reduce((s,x)=>s+x.inc.amount,0),openB=financeState().bills.filter(b=>b.status==='open'&&b.due.slice(0,7)<=ym).reduce((s,b)=>s+b.amount,0),pv=cur.variable+M.daily*left;
     const byCatP={};Object.values(M.fc).forEach(x=>byCatP[x.c]=(cur.byCat[x.c]||0)+x.f/30.4*left);
     out.push({...cur,kind:'current',actual:{income:cur.income,fixed:cur.fixed,variable:cur.variable},income:cur.income+remInc,fixed:cur.fixed+openB,variable:pv,byCat:byCatP,result:cur.income+remInc-cur.fixed-openB-pv});
     for(let k=1;k<=2;k++){const f=new Date(T.getFullYear(),T.getMonth()+k,1),byCat={};let v=0,b2=0;Object.values(M.fc).forEach(x=>{const val=Math.max(0,x.f+x.slope*.35*k);byCat[x.c]=val;v+=val;b2+=x.band**2;});const income=monthIncome(f.getFullYear(),f.getMonth()),fixed=fixedMonthly();
-      out.push({ym:dateISO(f).slice(0,7),date:f,kind:'forecast',income,fixed,variable:v,band:Math.sqrt(b2),byCat,saved:state.plan?state.plan.monthly:0,result:income-fixed-v});}
+      out.push({ym:dateISO(f).slice(0,7),date:f,kind:'forecast',income,fixed,variable:v,band:Math.sqrt(b2),byCat,saved:financeState().plan?financeState().plan.monthly:0,result:income-fixed-v});}
     return out;
   }
   function historyChart(L,w,sel){
@@ -784,7 +792,7 @@
   }
   function miniBars(vals,fcv,budget){const w=232,h=64,mx=Math.max(...vals,fcv,budget,1),bw=w/(vals.length+1)*.6,step=w/(vals.length+1);return `<svg class="chart mini" viewBox="0 0 ${w} ${h+14}" aria-hidden="true">${vals.map((v,i)=>`<rect x="${(i*step+step*.2).toFixed(1)}" y="${(h-h*v/mx).toFixed(1)}" width="${bw.toFixed(1)}" height="${(h*v/mx).toFixed(1)}" rx="2" class="mb-past"/>`).join('')}<rect x="${(vals.length*step+step*.2).toFixed(1)}" y="${(h-h*fcv/mx).toFixed(1)}" width="${bw.toFixed(1)}" height="${(h*fcv/mx).toFixed(1)}" rx="2" class="mb-fc"/>${budget?`<line x1="0" x2="${w}" y1="${(h-h*budget/mx).toFixed(1)}" y2="${(h-h*budget/mx).toFixed(1)}" class="mb-budget"/>`:''}<text x="${w}" y="${h+12}" text-anchor="end" class="mb-lbl">previsto</text><text x="0" y="${h+12}" class="mb-lbl">${vals.length} meses</text></svg>`;}
   function catCard(b){
-    const T=new Date(),from=dateISO(addDays(T,-89)),tx=state.transactions.filter(t=>!t.billId&&t.category===b.c&&t.date>=from),sum=tx.reduce((s,t)=>s+t.amount,0),age=Math.min(90,model().age),perMonth=tx.length/(Math.max(1,age)/30.4),ticket=tx.length?sum/tx.length:0;
+    const T=new Date(),from=dateISO(addDays(T,-89)),tx=financeState().transactions.filter(t=>!t.billId&&t.category===b.c&&t.date>=from),sum=tx.reduce((s,t)=>s+t.amount,0),age=Math.min(90,model().age),perMonth=tx.length/(Math.max(1,age)/30.4),ticket=tx.length?sum/tx.length:0;
     const names={};tx.forEach(t=>{const k=t.name.trim();names[k]=(names[k]||0)+t.amount;});const top=Object.entries(names).sort((a,b)=>b[1]-a[1]).slice(0,3);
     const pa=tx.reduce((s,t)=>s+shareOf(t,'a'),0),pb=tx.reduce((s,t)=>s+shareOf(t,'b'),0),lead=pa>=pb?'a':'b',leadShare=pa+pb?Math.max(pa,pb)/(pa+pb):0;
     const fill=b.budget?Math.min(100,b.mtd/b.budget*100):100,paceMark=b.budget?Math.min(100,b.elapsed*100):100,label={over:'Meta estourada',tight:'Acima do ritmo',ok:'No ritmo da meta'}[b.status];
@@ -798,7 +806,7 @@
       <span class="cat-save">${b.save>0?`Economia possível <b>${cashR(b.save)}/mês</b> · ${pct(b.savePct)}`:'Sem corte sugerido'}</span>
     </summary><div class="cat-body">
       <div class="cat-grid"><div class="cat-chart">${miniBars(b.hist.length?b.hist:[b.l30],b.f,b.budget)}</div>
-      <dl class="cat-facts"><div><dt>Média 3 meses</dt><dd>${cashR(b.avg3)}</dd></div><div><dt>Tendência</dt><dd class="${b.slope>0?'neg':'pos'}">${Math.abs(b.slope)<500?'estável':`${b.slope>0?'+':'−'}${cashR(Math.abs(b.slope))}/mês`}</dd></div><div><dt>Frequência</dt><dd>${perMonth>=1?`${Math.round(perMonth)}x por mês`:'raro'}</dd></div><div><dt>Ticket médio</dt><dd>${cashR(ticket)}</dd></div>${isSolo()?'':`<div><dt>Quem mais gasta</dt><dd>${pa+pb?`${esc(first(user(lead).name))} · ${pct(leadShare)}`:'—'}</dd></div>`}<div><dt>Referência saudável</dt><dd class="${b.f>b.ref?'neg':''}">até ${cashR(b.ref)}</dd></div></dl></div>
+      <dl class="cat-facts"><div><dt>Média 3 meses</dt><dd>${cashR(b.avg3)}</dd></div><div><dt>Tendência</dt><dd class="${b.slope>0?'neg':'pos'}">${Math.abs(b.slope)<500?'estável':`${b.slope>0?'+':'−'}${cashR(Math.abs(b.slope))}/mês`}</dd></div><div><dt>Frequência</dt><dd>${perMonth>=1?`${Math.round(perMonth)}x por mês`:'raro'}</dd></div><div><dt>Ticket médio</dt><dd>${cashR(ticket)}</dd></div>${(isSolo()||isPersonalView())?'':`<div><dt>Quem mais gasta</dt><dd>${pa+pb?`${esc(first(user(lead).name))} · ${pct(leadShare)}`:'—'}</dd></div>`}<div><dt>Referência saudável</dt><dd class="${b.f>b.ref?'neg':''}">até ${cashR(b.ref)}</dd></div></dl></div>
       ${top.length?`<p class="cat-top">Onde mais vai: ${top.map(([n,v])=>`${esc(n)} <b>${cashR(v)}</b>`).join(' · ')} <span>(90 dias)</span></p>`:''}
       <div class="cat-goal"><label for="bud-${esc(b.c)}"><span>Meta mensal pra ${esc(b.c.toLowerCase())}</span><output class="num" id="out-${esc(b.c)}">${cashR(b.budget)}</output></label><input type="range" id="bud-${esc(b.c)}" data-budget="${esc(b.c)}" data-f="${Math.round(b.f)}" min="0" max="${max}" step="1000" value="${b.budget}"><p class="cat-goal-note" id="note-${esc(b.c)}">${b.save>0?`Guarda ${cashR(b.save)} por mês, ${cashR(b.save*12)} por ano.`:'Meta no nível do previsto: não guarda nada aqui.'}</p>${b.custom?`<button class="btn ghost" data-action="budget-reset" data-cat="${esc(b.c)}">Voltar pra sugestão do Juntô (${cashR(b.sugg)})</button>`:`<small class="muted">Sugestão do Juntô, calculada pelo histórico e pelo plano.</small>`}</div>
     </div></details>`;
@@ -808,9 +816,9 @@
     return `<article class="fixed-card"><span class="cat-ic ${categoryColor(b.category)}">${icon(categoryIcon(b.category))}</span><div class="fixed-main"><div class="fixed-top"><h3>${esc(b.name)}</h3><b class="num">${cashR(b.amount)}</b></div><p class="fixed-meta">${pct(r.pctInc)} da renda · ${esc(payerLabel(b.payer))} · dia ${pd(b.due).getDate()}${Math.abs(r.change)>=.03?` · <span class="${r.change>0?'neg':'pos'}">${r.change>0?'subiu':'caiu'} ${pct(Math.abs(r.change))} no último mês</span>`:''}${r.recent?` · <span class="neg">entrou há ${r.months} ${r.months===1?'mês':'meses'}: ${cashR(b.amount*12)} por ano</span>`:''}</p><p class="fixed-action">${esc(r.action)}</p></div><div class="fixed-side"><span class="spark" aria-hidden="true">${vals.map(v=>`<i style="height:${Math.max(8,v/mx*100).toFixed(0)}%"></i>`).join('')}</span><small>${r.save>0?`até <b>${cashR(r.save)}</b>/mês`:'—'}</small></div></article>`;
   }
   function analysisView(){
-    const solo=isSolo(),perspective=solo?'a':analysisPerson,ym=dateISO().slice(0,7);
+    const solo=(isSolo()||isPersonalView()),perspective=isPersonalView()?active:solo?'a':analysisPerson,ym=dateISO().slice(0,7);
     const perspectiveLabel=perspective==='both'?'Nós':perspective===active?'Você':first(user(perspective).name);
-    const tx=state.transactions.filter(t=>t.date.slice(0,7)===ym).map(t=>({...t,viewAmount:perspective==='both'?t.amount:shareOf(t,perspective)})).filter(t=>t.viewAmount>0);
+    const tx=financeState().transactions.filter(t=>t.date.slice(0,7)===ym).map(t=>({...t,viewAmount:perspective==='both'?t.amount:shareOf(t,perspective)})).filter(t=>t.viewAmount>0);
     const total=tx.reduce((sum,t)=>sum+t.viewAmount,0),groups={};tx.forEach(t=>groups[t.category]=(groups[t.category]||0)+t.viewAmount);
     const cats=Object.entries(groups).sort((a,b)=>b[1]-a[1]),topCats=cats.slice(0,3),otherTotal=cats.slice(3).reduce((sum,x)=>sum+x[1],0);
     const colors=['#d8b15f','#efc9d5','#b9d8f1','#dfe3e8'];let cursor=0;
@@ -820,9 +828,9 @@
     const top=topCats[0],topPct=top&&total?Math.round(top[1]/total*100):0,cutSave=top?Math.max(100,Math.round(top[1]*.2/100)*100):0;
     const latest=tx.slice().sort((a,b)=>(b.createdAt||pd(b.date).getTime())-(a.createdAt||pd(a.date).getTime()))[0];
     const phrase=top?({Delivery:'O delivery tá recebendo muito carinho.',Compras:'As comprinhas estão ganhando bastante espaço.',Transporte:'O transporte tá puxando uma boa parte do mês.',Lanches:'Os lanchinhos estão aparecendo bastante.',Restaurantes:'Os dates e restaurantes estão marcando presença.',Hábitos:'Os hábitos pequenos estão pesando mais do que parecem.'}[top[0]]||`${top[0]} está puxando uma parte importante do mês.`):'Ainda estamos conhecendo seu ritmo.';
-    const people=solo?`<button class="active" data-action="analysis-person" data-person="a">Você</button>`:`<button class="${perspective==='both'?'active':''}" data-action="analysis-person" data-person="both">Nós</button><button class="${perspective==='a'?'active':''}" data-action="analysis-person" data-person="a">${active==='a'?'Você':esc(first(user('a').name))}</button><button class="${perspective==='b'?'active':''}" data-action="analysis-person" data-person="b">${active==='b'?'Você':'Meu amor'}</button>`;
+    const people=solo?`<button class="active" data-action="analysis-person" data-person="${active}">Você</button>`:`<button class="${perspective==='both'?'active':''}" data-action="analysis-person" data-person="both">Nós</button><button class="${perspective==='a'?'active':''}" data-action="analysis-person" data-person="a">${active==='a'?'Você':esc(first(user('a').name))}</button><button class="${perspective==='b'?'active':''}" data-action="analysis-person" data-person="b">${active==='b'?'Você':'Meu amor'}</button>`;
     const head=`<div class="analysis-v3-head"><span>${solo?'MEU RAIO-X':'NOSSO RAIO-X'}</span><h2>Pra onde foi?</h2><p>Sem julgamento. Só clareza.</p></div><nav class="analysis-v3-people" aria-label="Perspectiva">${people}</nav><nav class="analysis-v3-tabs"><button class="${analysisTab==='overview'?'active':''}" data-action="topic-tab" data-kind="analysis" data-value="overview">Visão geral</button><button class="${analysisTab==='history'?'active':''}" data-action="topic-tab" data-kind="analysis" data-value="history">Histórico</button><button class="${analysisTab==='spend'?'active':''}" data-action="topic-tab" data-kind="analysis" data-value="spend">Limites</button><button class="${analysisTab==='fixed'?'active':''}" data-action="topic-tab" data-kind="analysis" data-value="fixed">Fixas</button></nav>`;
-    if(!state.transactions.length&&analysisTab==='overview')return head+`<div class="future-v3-empty">${icon('scan')}<h3>Ainda não tem gastos do dia a dia.</h3><p>Você já pode conferir contas fixas e histórico; registre gastos para liberar a leitura de categorias e hábitos.</p><button class="btn primary" data-action="expense">Registrar um gasto</button></div>`;
+    if(!financeState().transactions.length&&analysisTab==='overview')return head+`<div class="future-v3-empty">${icon('scan')}<h3>Ainda não tem gastos do dia a dia.</h3><p>Você já pode conferir contas fixas e histórico; registre gastos para liberar a leitura de categorias e hábitos.</p><button class="btn primary" data-action="expense">Registrar um gasto</button></div>`;
     if(analysisTab==='overview'){
       return head+`<div class="analysis-v3-surface"><section class="analysis-v3-card"><div class="analysis-v3-donut-wrap"><div class="analysis-v3-donut" style="background:conic-gradient(${donut})"><div><b class="num">${cashR(total)}</b><span>no mês</span></div></div><div class="analysis-v3-legend">${topCats.map(([c,v],i)=>`<div><span class="analysis-v3-dot" style="background:${colors[i]}"></span><span><b>${esc(c)}</b><small>${total?Math.round(v/total*100):0}%</small></span><strong class="num">${cashR(v)}</strong></div>`).join('')}${otherTotal?`<div><span class="analysis-v3-dot" style="background:${colors[3]}"></span><span><b>Outros</b><small>${Math.round(otherTotal/total*100)}%</small></span><strong class="num">${cashR(otherTotal)}</strong></div>`:''}</div></div><button class="analysis-v3-all" data-action="topic-tab" data-kind="analysis" data-value="history">Ver todos os gastos <span>›</span></button></section>${top?`<section class="analysis-v3-insight"><span>${icon('sparkle')}</span><div><h3>${esc(phrase)}</h3><p>${esc(perspectiveLabel)} colocou ${topPct}% dos gastos em ${esc(top[0].toLowerCase())}. Um corte de 20% libera cerca de ${cashR(cutSave)}.</p><button data-action="analysis-cut">Simular um corte ›</button></div></section>`:''}<section class="analysis-v3-latest"><div class="home-section-title"><h2>Aconteceu por aqui</h2><button class="text-link" data-action="topic-tab" data-kind="analysis" data-value="history">Ver histórico ›</button></div>${latest?`<button class="analysis-v3-latest-row" data-action="tx-detail" data-id="${latest.id}" aria-label="Ver detalhes de ${esc(latest.name)}"><span class="category-icon ${categoryColor(latest.category)}">${icon(itemOf(latest).icon)}</span><span><b>${perspective==='both'?(latest.by===active?'Você':esc(first(user(latest.by||latest.payer).name))):esc(perspectiveLabel)} · ${esc(latest.name)}</b><small>${dateText(latest.date)} · ${esc(latest.category)}</small></span><strong class="num">− ${cashR(latest.viewAmount)}</strong></button>`:`<div class="home-empty-row">${icon('wallet')}<span><b>Nenhum gasto neste mês.</b><small>O próximo lançamento aparece aqui.</small></span></div>`}</section><button class="analysis-v3-add" data-action="expense">${icon('plus')}Registrar gasto</button></div>`;
     }
@@ -834,9 +842,9 @@
   function radar(){
     const out=[],today=dateISO(),lim=dateISO(addDays(new Date(),4)),mN=monthName(new Date());
     budgets().filter(b=>b.status!=='ok').sort((a,b)=>(b.mtd-b.pace)-(a.mtd-a.pace)).slice(0,2).forEach(b=>out.push({kind:b.status==='over'?'bad':'warn',icon:categoryIcon(b.c),title:b.status==='over'?`${b.c} já passou da meta de ${mN}.`:`${b.c} está acima do ritmo da meta.`,body:b.status==='over'?`Foram ${brl(b.mtd)} de ${brl(b.budget)}. Daqui pra frente, cada real aqui sai do que iria pro cofre.`:`Já foram ${brl(b.mtd)}; o ritmo da meta até hoje era ${brl(b.pace)}. Pra fechar em ${brl(b.budget)}: até ${brl(b.perDay)} por dia.`,route:'analysis'}));
-    state.bills.filter(b=>b.status==='open'&&b.due<=lim).sort((a,b)=>a.due.localeCompare(b.due)).slice(0,2).forEach(b=>{const short=splitShares(b.amount,b.payer).find(s=>s.amount>user(s.id).balance);out.push({kind:short?'bad':'warn',icon:'calendar',title:`${b.name} ${b.due<today?'venceu':b.due===today?'vence hoje':`vence ${wdShort(b.due)}, ${dayMonth(b.due)}`}.`,body:short?`O saldo de ${first(user(short.id).name)} não cobre os ${brl(short.amount)} da parte. Confirmem uma entrada ou mudem a divisão.`:`${brl(b.amount)}, ${payerLabel(b.payer).toLowerCase()}. O saldo cobre.`,route:'bills'});});
-    (state.commitments||[]).filter(c=>c.active).forEach(c=>{const s=commitStatus(c);if(!s.ok)out.unshift({kind:'warn',icon:(recognize(c.item)||{icon:'cut'}).icon,title:`${c.person==='both'?'A dupla':first(user(c.person).name)} passou do combinado com ${c.item.toLowerCase()}.`,body:`Desde ${dayMonth(c.since)}, foram ${brl(s.spent)}${c.level==='half'?` (o combinado era até ${brl(s.target)})`:' (o combinado era cortar)'}. Mesmo assim, ${brl(s.saved)} ficaram no bolso.`,route:'future',anchor:'cortes'});});
-    if(out.length<3&&!(state.commitments||[]).some(c=>c.active)){const st=itemStats(active).filter(o=>o.sug!=='keep').slice(0,2);if(st.length){const v=st.reduce((s,o)=>s+o.monthly*CUT_FACTOR[o.sug],0);out.push({kind:'info',icon:'cut',title:`Cortando ${st.map(o=>o.item.toLowerCase()).join(' e ')}, ${first(user(active).name)} guarda ${brl(v)} por mês.`,body:`Em um ano, ${brl(fvMonthly(v,12,Number(state.settings.yieldRate??10)))} com rendimento. Toque pra simular.`,route:'future',anchor:'cortes'});}}
+    financeState().bills.filter(b=>b.status==='open'&&b.due<=lim).sort((a,b)=>a.due.localeCompare(b.due)).slice(0,2).forEach(b=>{const short=splitShares(b.amount,b.payer).find(s=>s.amount>user(s.id).balance);out.push({kind:short?'bad':'warn',icon:'calendar',title:`${b.name} ${b.due<today?'venceu':b.due===today?'vence hoje':`vence ${wdShort(b.due)}, ${dayMonth(b.due)}`}.`,body:short?`O saldo de ${first(user(short.id).name)} não cobre os ${brl(short.amount)} da parte. Confirmem uma entrada ou mudem a divisão.`:`${brl(b.amount)}, ${payerLabel(b.payer).toLowerCase()}. O saldo cobre.`,route:'bills'});});
+    (financeState().commitments||[]).filter(c=>c.active).forEach(c=>{const s=commitStatus(c);if(!s.ok)out.unshift({kind:'warn',icon:(recognize(c.item)||{icon:'cut'}).icon,title:`${c.person==='both'?'A dupla':first(user(c.person).name)} passou do combinado com ${c.item.toLowerCase()}.`,body:`Desde ${dayMonth(c.since)}, foram ${brl(s.spent)}${c.level==='half'?` (o combinado era até ${brl(s.target)})`:' (o combinado era cortar)'}. Mesmo assim, ${brl(s.saved)} ficaram no bolso.`,route:'future',anchor:'cortes'});});
+    if(out.length<3&&!(financeState().commitments||[]).some(c=>c.active)){const st=itemStats(active).filter(o=>o.sug!=='keep').slice(0,2);if(st.length){const v=st.reduce((s,o)=>s+o.monthly*CUT_FACTOR[o.sug],0);out.push({kind:'info',icon:'cut',title:`Cortando ${st.map(o=>o.item.toLowerCase()).join(' e ')}, ${first(user(active).name)} guarda ${brl(v)} por mês.`,body:`Em um ano, ${brl(fvMonthly(v,12,Number(financeState().settings.yieldRate??10)))} com rendimento. Toque pra simular.`,route:'future',anchor:'cortes'});}}
     return out.slice(0,3);
   }
   function processAuto(){
@@ -1077,7 +1085,7 @@
   function historyPrefill(text){
     const p=parseQuick(text),r=recognizeP(p),key=norm(p.label||p.name).trim();
     if(key.length<2)return null;
-    const matches=state.transactions.filter(t=>!t.billId).filter(t=>{
+    const matches=personalState().transactions.filter(t=>!t.billId).filter(t=>{
       const nameKey=norm(t.name||''),itemKey=norm(t.item||itemOf(t).item||'');
       if(r&&itemKey===norm(r.item))return true;
       return nameKey===key||(firstWord(nameKey).length>3&&firstWord(nameKey)===firstWord(key));
@@ -1100,7 +1108,7 @@
   }
   function billHistoryPrefill(text){
     const p=parseQuick(text),r=recognizeP(p),key=norm(p.label||p.name).trim();if(key.length<2)return null;
-    const matches=state.bills.filter(b=>{
+    const matches=personalState().bills.filter(b=>{
       const nk=norm(b.name||''),ik=norm(b.item||'');
       if(r&&ik&&ik===norm(r.item))return true;
       return nk===key||(firstWord(nk).length>3&&firstWord(nk)===firstWord(key));
@@ -1161,9 +1169,9 @@
   }
   function contestBanner(){const open=[...state.bills.map(b=>({o:b,kind:'bill'})),...state.transactions.map(t=>({o:t,kind:'tx'}))].filter(x=>x.o.contest&&x.o.contest.status==='open'&&x.o.contest.by!==active);if(!open.length)return '';const x=open[0];return `<div class="pending-banner contest-banner">${icon('flag')}<p><b>${esc(first(user(x.o.contest.by).name))} contestou ${esc(x.o.name)}</b> (${cash(x.o.amount)}): “${esc(x.o.contest.note.slice(0,70))}${x.o.contest.note.length>70?'…':''}”${open.length>1?` (+${open.length-1})`:''}</p><button data-action="contest-view">Ver e responder</button></div>`;}
   function billsView(){
-    const solo=isSolo(),ym=dateISO().slice(0,7),allBills=state.bills.filter(b=>b.due.slice(0,7)===ym||b.status==='open'),openBills=allBills.filter(b=>b.status==='open'),nOpen=[...state.bills,...state.transactions].filter(x=>x.contest&&x.contest.status==='open').length;
-    const bills=billFilter==='contested'?state.bills.filter(b=>b.contest):allBills.filter(b=>billFilter==='all'||billFilter==='fixed'&&b.recurring||billFilter==='open'&&b.status==='open'||billFilter==='paid'&&b.status==='paid');
-    const txs=billFilter==='month'?state.transactions.filter(t=>t.date.slice(0,7)===ym&&!t.billId):[];
+    const solo=(isSolo()||isPersonalView()),ym=dateISO().slice(0,7),allBills=financeState().bills.filter(b=>b.due.slice(0,7)===ym||b.status==='open'),openBills=allBills.filter(b=>b.status==='open'),nOpen=[...financeState().bills,...financeState().transactions].filter(x=>x.contest&&x.contest.status==='open').length;
+    const bills=billFilter==='contested'?financeState().bills.filter(b=>b.contest):allBills.filter(b=>billFilter==='all'||billFilter==='fixed'&&b.recurring||billFilter==='open'&&b.status==='open'||billFilter==='paid'&&b.status==='paid');
+    const txs=billFilter==='month'?financeState().transactions.filter(t=>t.date.slice(0,7)===ym&&!t.billId):[];
     const openTotal=openBills.reduce((sum,b)=>sum+b.amount,0),shared=openBills.filter(b=>['half','prop'].includes(b.payer));
     const parts=shared.reduce((acc,b)=>{splitShares(b.amount,b.payer).forEach(x=>acc[x.id]=(acc[x.id]||0)+x.amount);return acc;},{a:0,b:0});
     const billRow=(b)=>{const it=recognize(b.name)||{icon:categoryIcon(b.category)};const shares=splitShares(b.amount,b.payer);return `<div class="bills-v3-row-wrap"><button class="bills-v3-row ${b.contest?'has-contest':''}" data-action="bill-detail" data-id="${b.id}" aria-label="Ver detalhes de ${esc(b.name)}"><span class="bills-v3-icon ${categoryColor(b.category)}">${icon(it.icon)}</span><span class="bills-v3-copy"><b>${esc(b.name)}</b><small>${b.status==='paid'?'Paga '+dateText(b.paidAt?dateISO(new Date(b.paidAt)):b.due):b.due<dateISO()?'Venceu '+dateText(b.due):'Vence '+dateText(b.due)} · ${esc(payerLabel(b.payer))}${b.recurring?' · mensal':''}</small>${shares.length>1?`<span class="bills-v3-avatars">${shares.map(x=>avatar(x.id)).join('')}</span>`:''}</span><strong class="num">${cash(b.amount)}</strong><span class="bills-v3-chevron">${b.status==='paid'?icon('check'):'›'}</span></button>${b.contest?`<div class="bills-v3-contest-wrap">${contestBlock(b.contest,'bill',b.id)}</div>`:''}</div>`;};
@@ -1240,7 +1248,8 @@
     return html+(list?'</ul>':'');
   }
   // ---- contexto enviado ao Gemini ----
-  function chatContext(){
+  function chatContext(){return withFinanceView('personal',chatPersonalContext);}
+  function chatPersonalContext(){
     const M=model(),o=planOptions()[0]||{},eomISO=endOfMonthISO(),pts=simulate({days:daysUntil(eomISO)}),eom=pts[pts.length-1],minP=pts.reduce((a,p)=>p.free<a.free?p:a,pts[0]),n=new Date();
     const items=(id)=>itemStats(id).slice(0,10).map(x=>({item:x.item,categoria:x.category,por_mes:R(x.monthly),frequencia:x.freq,valor_medio:R(x.unit),sugestao:{keep:'manter',half:'reduzir pela metade',cut:'cortar'}[x.sug]}));
     return {
@@ -1250,14 +1259,14 @@
       historico_mensal:monthLedger().map(m=>({mes:m.ym,tipo:m.kind==='past'?'fechado':m.kind==='current'?'atual (projetado)':'previsão',entrou:R(m.income),fixas:R(m.fixed),dia_a_dia:R(m.variable),resultado:R(m.result)})),
       entradas:{pendentes:pendingArrivals().map(p=>({data:p.date,nome:p.inc.name,pessoa:user(p.inc.person).name,valor:R(p.inc.amount)})),proximas:nextArrivals(35).slice(0,8).map(x=>({data:x.date,nome:x.inc.name,pessoa:user(x.inc.person).name,valor:R(x.inc.amount)}))},
       contas_fixas:templates().map(b=>({nome:b.name,valor:R(b.amount),dia:pd(b.due).getDate(),quem_paga:payerLabel(b.payer)})),
-      contas_abertas:state.bills.filter(b=>b.status==='open').map(b=>({nome:b.name,valor:R(b.amount),vence:b.due})),
+      contas_abertas:financeState().bills.filter(b=>b.status==='open').map(b=>({nome:b.name,valor:R(b.amount),vence:b.due})),
       metas_por_categoria:budgets().map(b=>({categoria:b.c,previsto_mes:R(b.f),meta:R(b.budget),gasto_no_mes:R(b.mtd),cabe_ainda:R(b.remaining),status:{ok:'no ritmo',tight:'acima do ritmo',over:'estourada'}[b.status],economia_possivel:R(b.save)})),
-      leitura_individual:state.users.map(u=>u.id).map(id=>{const r=personReading(id);return {pessoa:user(id).name,renda_mes:R(r.inc),dia_a_dia_mes:R(r.v),parte_nas_fixas:R(r.fixed),sobra_individual:R(r.net),fatia_da_renda:pct(r.incShare),fatia_do_gasto:pct(r.varShare)};}),
-      itens_que_mais_pesam:Object.fromEntries(state.users.map(u=>[u.name,items(u.id)])),modo:isSolo()?'individual':'dupla',
-      planos:state.goals.map(g=>({nome:g.name,guardado:R(g.saved),meta:R(g.target)})),plano_de_guardar:state.plan?{nome:state.plan.name,por_mes:R(state.plan.monthly),guardado_no_mes:R(savedInMonth(dateISO().slice(0,7)))}:null,
-      compromissos:(state.commitments||[]).filter(c=>c.active).map(c=>{const s=commitStatus(c);return {pessoa:c.person==='both'?'dupla':user(c.person).name,item:c.item,nivel:c.level==='cut'?'cortar':'metade',desde:c.since,economizado:R(s.saved),dentro_do_combinado:s.ok};}),
-      contestacoes_abertas:[...state.bills,...state.transactions].filter(x=>x.contest&&x.contest.status==='open').map(x=>({gasto:x.name,valor:R(x.amount),por:user(x.contest.by).name,motivo:x.contest.reason,comentario:x.contest.note})),
-      dicas:tips().map(t=>t.title),desafios_ativos:(state.challenges||[]).filter(c=>c.status==='active').map(c=>{const st=challengeStatus(c);return {desafio:c.title,quem:whoLabel(c.person),dia:st.elapsed,de:c.days,economizado:R(st.saved),situacao:st.phase};}),desafios_sugeridos:challengeSuggestions().slice(0,3).map(x=>({desafio:x.title,quem:whoLabel(x.person),vale:R(x.value)})),rendimento_estimado_ao_ano_pct:Number(state.settings.yieldRate??10)
+      leitura_individual:financeState().users.filter(u=>!cloudSlot||u.id===active).map(u=>u.id).map(id=>{const r=personReading(id);return {pessoa:user(id).name,renda_mes:R(r.inc),dia_a_dia_mes:R(r.v),parte_nas_fixas:R(r.fixed),sobra_individual:R(r.net),fatia_da_renda:pct(r.incShare),fatia_do_gasto:pct(r.varShare)};}),
+      itens_que_mais_pesam:Object.fromEntries(financeState().users.filter(u=>!cloudSlot||u.id===active).map(u=>[u.name,items(u.id)])),modo:isSolo()?'individual':'dupla',
+      planos:state.goals.map(g=>({nome:g.name,guardado:R(g.saved),meta:R(g.target)})),plano_de_guardar:financeState().plan?{nome:financeState().plan.name,por_mes:R(financeState().plan.monthly),guardado_no_mes:R(savedInMonth(dateISO().slice(0,7)))}:null,
+      compromissos:(financeState().commitments||[]).filter(c=>c.active).map(c=>{const s=commitStatus(c);return {pessoa:c.person==='both'?'dupla':user(c.person).name,item:c.item,nivel:c.level==='cut'?'cortar':'metade',desde:c.since,economizado:R(s.saved),dentro_do_combinado:s.ok};}),
+      contestacoes_abertas:[...financeState().bills,...financeState().transactions].filter(x=>x.contest&&x.contest.status==='open').map(x=>({gasto:x.name,valor:R(x.amount),por:user(x.contest.by).name,motivo:x.contest.reason,comentario:x.contest.note})),
+      dicas:tips().map(t=>t.title),desafios_ativos:(financeState().challenges||[]).filter(c=>c.status==='active').map(c=>{const st=challengeStatus(c);return {desafio:c.title,quem:whoLabel(c.person),dia:st.elapsed,de:c.days,economizado:R(st.saved),situacao:st.phase};}),desafios_sugeridos:challengeSuggestions().slice(0,3).map(x=>({desafio:x.title,quem:whoLabel(x.person),vale:R(x.value)})),rendimento_estimado_ao_ano_pct:Number(financeState().settings.yieldRate??10)
     };
   }
   function instructions(){
@@ -1324,7 +1333,7 @@ ${JSON.stringify(chatContext())}`;
       if(!d.amount||d.amount<=0){toast('Falta o valor.','Preencha quanto foi antes de registrar.','info');return;}
       const ch=charge(d.amount,d.payer);if(ch.error){toast('Não deu pra registrar.',ch.error,'info');return;}
       learnFrom(d.text,d.category,!!d.catTouched);state.transactions.push({id:uid(),name:d.name,amount:d.amount,category:d.category,payer:d.payer,date:d.date,item:d.item,icon:d.icon,...(d.qty?{qty:d.qty}:{}),by:active,createdAt:Date.now(),...(ch.shares.length>1?{split:ch.shares}:{})});
-      log(active,`registrou ${d.name}: ${money(d.amount)}, pela conversa com o Juntô.`);notify(other(),'Conta atualizada.',`${first(user().name)} registrou ${d.name} por ${money(d.amount)}.`);note=`registrou ${d.name} (${money(d.amount)}, ${['half','prop'].includes(d.payer)?payerLabel(d.payer).toLowerCase():'na conta de '+payerLabel(d.payer)})`;
+      log(active,`registrou ${d.name}: ${money(d.amount)}, pela conversa com o Juntô.`);if(!cloudSlot||['half','prop'].includes(payer))notify(other(),'Conta atualizada.',`${first(user().name)} registrou ${d.name} por ${money(d.amount)}.`);note=`registrou ${d.name} (${money(d.amount)}, ${['half','prop'].includes(d.payer)?payerLabel(d.payer).toLowerCase():'na conta de '+payerLabel(d.payer)})`;
       const cm=(state.commitments||[]).find(x=>x.active&&x.item===d.item&&(x.person==='both'||x.person===d.payer));if(cm)setTimeout(()=>addBot(`Anotado. Lembrete carinhoso: tem um compromisso de ${cm.level==='cut'?'cortar':'reduzir'} ${cm.item.toLowerCase()} desde ${dayMonth(cm.since)}. Mesmo com esse, já foram **${brl(commitStatus(cm).saved)}** economizados.`),50);
     }else if(c.type==='commit'){
       state.commitments=state.commitments||[];d.items.forEach(x=>{if(!state.commitments.some(k=>k.active&&k.person===d.person&&k.item===x.item))state.commitments.push({id:uid(),person:d.person,item:x.item,level:x.level,baseline:x.baseline,since:dateISO(),active:true});});
@@ -1541,12 +1550,12 @@ ${JSON.stringify(chatContext())}`;
   function calendarData(offset){
     const T=new Date(),f=new Date(T.getFullYear(),T.getMonth()+offset,1),y=f.getFullYear(),m=f.getMonth(),dim=daysInMonth(y,m),today=dateISO(),M=model(),from=dateISO(f),to=dateISO(new Date(y,m,dim)),byDay={};
     const day=(iso)=>byDay[iso]||(byDay[iso]={spent:0,tx:[],inc:0,incList:[],bill:0,billList:[]});
-    state.transactions.forEach(t=>{if(t.date<from||t.date>to)return;const d=day(t.date);if(t.billId){d.bill+=t.amount;d.billList.push({id:t.billId,transactionId:t.id,name:t.name,amount:t.amount,paid:true});}else{d.spent+=t.amount;d.tx.push(t);}});
-    state.received.forEach(r=>{if(r.status!=='received'||r.date<from||r.date>to)return;const inc=state.incomes.find(i=>i.id===r.incomeId),d=day(r.date);d.inc+=r.amount;d.incList.push({name:inc?inc.name:'Entrada',person:inc?.person,amount:r.amount,state:'done'});});
+    financeState().transactions.forEach(t=>{if(t.date<from||t.date>to)return;const d=day(t.date);if(t.billId){d.bill+=t.amount;d.billList.push({id:t.billId,transactionId:t.id,name:t.name,amount:t.amount,paid:true});}else{d.spent+=t.amount;d.tx.push(t);}});
+    financeState().received.forEach(r=>{if(r.status!=='received'||r.date<from||r.date>to)return;const inc=financeState().incomes.find(i=>i.id===r.incomeId),d=day(r.date);d.inc+=r.amount;d.incList.push({name:inc?inc.name:'Entrada',person:inc?.person,amount:r.amount,state:'done'});});
     if(to>=today){
       pendingArrivals().filter(p=>p.date>=from&&p.date<=to).forEach(p=>{const d=day(p.date);d.inc+=p.inc.amount;d.incList.push({name:p.inc.name,person:p.inc.person,amount:p.inc.amount,state:'pending'});});
-      const start=from>today?from:dateISO(addDays(T,1));state.incomes.forEach(i=>occurrences(i,start,to).filter(dt=>!handled(i.id,dt)).forEach(dt=>{const d=day(dt);d.inc+=i.amount;d.incList.push({name:i.name,person:i.person,amount:i.amount,state:'future'});}));
-      state.bills.filter(b=>b.status==='open'&&b.due>=from&&b.due<=to).forEach(b=>{const d=day(b.due<today?today:b.due);d.bill+=b.amount;d.billList.push({id:b.id,name:b.name,amount:b.amount,paid:false,late:b.due<today});});
+      const start=from>today?from:dateISO(addDays(T,1));financeState().incomes.forEach(i=>occurrences(i,start,to).filter(dt=>!handled(i.id,dt)).forEach(dt=>{const d=day(dt);d.inc+=i.amount;d.incList.push({name:i.name,person:i.person,amount:i.amount,state:'future'});}));
+      financeState().bills.filter(b=>b.status==='open'&&b.due>=from&&b.due<=to).forEach(b=>{const d=day(b.due<today?today:b.due);d.bill+=b.amount;d.billList.push({id:b.id,name:b.name,amount:b.amount,paid:false,late:b.due<today});});
       if(offset>0)templates().forEach(b=>{if(seriesHasMonth(b,from.slice(0,7)))return;const d=day(dateISO(new Date(y,m,Math.min(recurringDay(b),dim))));d.bill+=b.amount;d.billList.push({name:b.name,amount:b.amount,paid:false});});
     }
     const days=[];for(let i=1;i<=dim;i++){const dt=new Date(y,m,i),iso=dateISO(dt),d=byDay[iso]||{spent:0,tx:[],inc:0,incList:[],bill:0,billList:[]},future=iso>today;days.push({iso,i,dow:dt.getDay(),future,today:iso===today,...d,fc:future?M.ordinaryDaily*M.factor[dt.getDay()]+transportRoutine(iso):0});}
@@ -1652,11 +1661,11 @@ ${JSON.stringify(chatContext())}`;
     const head={ok:['Pode, sem apertar.','O mês aguenta tranquilo.'],tight:['Cabe, mas aperta.','Dá, mas o resto do mês fica mais curto.'],no:['Melhor esperar.','Hoje isso passa do que está livre.']}[level];
     return `<div class="can-card ${level}"><div class="can-head"><span>${icon(level==='ok'?'circleCheck':level==='tight'?'info':'x')}</span><div><b>${head[0]}</b><small>${head[1]}</small></div></div><ul>${lines.map(l=>`<li>${l}</li>`).join('')}</ul><div class="can-actions"><button type="button" class="btn ${level==='no'?'secondary':'primary'}" data-action="can-buy">${icon('cart')}Comprei, registrar</button><button type="button" class="btn ${level==='no'?'primary':'secondary'}" data-action="can-wait">Vou esperar</button></div></div>`;
   }
-  function render(){if(!appAccess)return;if(cloudSlot)active=cloudSlot;if(isSolo()){active='a';if(route==='requests')route='home';if(futureTab==='people')futureTab='forecast';}document.body.classList.toggle('solo',isSolo());renderNav();document.body.dataset.route=route;for(const k in chartStore)delete chartStore[k];$('#app-content').innerHTML=({home:homeView,future:futureView,analysis:analysisView,incomes:incomesView,bills:billsView,requests:requestsView,goals:goalsView,activity:activityView}[route]||homeView)();arrangeContextBar();renderPeer();if(chatOpen)renderChat();soloizeAll();}
+  function render(){if(!appAccess)return;if(cloudSlot){active=cloudSlot;if(futureTab==='people')futureTab='forecast';}if(isSolo()){active='a';if(route==='requests')route='home';if(futureTab==='people')futureTab='forecast';}document.body.classList.toggle('solo',isSolo());renderNav();document.body.dataset.route=route;for(const k in chartStore)delete chartStore[k];$('#app-content').innerHTML=withFinanceView(['future','analysis','incomes','bills','activity'].includes(route)?'personal':'shared',()=>({home:homeView,future:futureView,analysis:analysisView,incomes:incomesView,bills:billsView,requests:requestsView,goals:goalsView,activity:activityView}[route]||homeView)());arrangeContextBar();renderPeer();if(chatOpen)renderChat();soloizeAll();}
   let modalReturnFocus=null;
   function modalHead(title){return `<div class="modal-head"><h2 id="modal-title">${esc(title)}</h2><button class="icon-btn" data-action="close" aria-label="Fechar">${icon('x')}</button></div>`;}
   function openModal(title,body,kind=''){if(!appAccess){if(!kind.startsWith('cloud-'))return;document.querySelector('#auth-gate').innerHTML=`<div class="auth-card"><h1>${esc(title)}</h1>${body}${kind==='cloud-forgot'?'<button class="btn ghost wide" data-feature="cloud-auth-login">Voltar ao login</button>':''}</div>`;return;}const d=$('#modal');if(!d.open)modalReturnFocus=document.activeElement;d.dataset.kind=kind;d.classList.toggle('peer-modal',kind==='peer');$('#modal-content').innerHTML=modalHead(title)+body;soloize($('#modal-content'));if(!d.open)d.showModal();d.querySelector('input:not([type="hidden"]),textarea,select,button:not([data-action="close"])')?.focus({preventScroll:true});}
-  const optionUsers=(selected=active)=>state.users.map(u=>`<option value="${u.id}" ${u.id===selected?'selected':''}>${esc(u.name)}</option>`).join('');
+  const optionUsers=(selected=active)=>state.users.filter(u=>!cloudSlot||u.id===cloudSlot).map(u=>`<option value="${u.id}" ${u.id===selected?'selected':''}>${esc(u.name)}</option>`).join('');
   const optionCategories=(selected='Outros')=>categories.map(c=>`<option ${c===selected?'selected':''}>${c}</option>`).join('');
   const field=(name,label,placeholder='',value='',moneyField=false)=>`<div class="field"><label for="${name}">${label}</label>${moneyField?'<div class="money-input"><span>R$</span>':''}<input id="${name}" name="${name}" type="text" ${moneyField?'inputmode="decimal" autocomplete="off"':'maxlength="60"'} placeholder="${esc(placeholder)}" value="${esc(value)}" required>${moneyField?'</div>':''}</div>`;
   const formEnd=(text)=>'<p class="form-error" role="alert" id="form-error"></p><button class="btn primary wide" type="submit">'+text+'</button>';
@@ -1774,6 +1783,10 @@ ${JSON.stringify(chatContext())}`;
     const el=event.target.closest('[data-action]');if(!el)return;event.preventDefault();
     const action=el.dataset.action,id=el.dataset.id,actor=el.dataset.actor||active;
     if(cloudSlot&&el.dataset.actor&&actor!==cloudSlot){toast('Use seu próprio perfil.','Os combinados da outra pessoa são respondidos na conta dela.');return;}
+    if(cloudSlot){
+      const income=state.incomes.find(i=>i.id===id),tx=state.transactions.find(t=>t.id===id),bill=state.bills.find(b=>b.id===id);
+      if((action==='balance'&&el.dataset.user&&el.dataset.user!==cloudSlot)||(['income-edit','income-remove','income-arrived','income-skip'].includes(action)&&income&&income.person!==cloudSlot)||(['tx-detail','tx-edit','tx-delete'].includes(action)&&tx&&shareOf(tx,cloudSlot)<=0)||(['bill-detail','bill-edit','bill-delete','pay-bill','reopen-bill'].includes(action)&&bill&&shareOf(bill,cloudSlot)<=0)){toast('Esse registro pertence ao outro perfil.','Cada pessoa organiza as próprias entradas e gastos.');return;}
+    }
     if(action==='close')return close();
     if(cloudSlot&&['switch','profile-photo-switch','reset-solo','reset-couple','reset-confirm','onboard'].includes(action)){toast('Seu perfil está conectado.','Use sua própria conta para registrar movimentos. Exporte um backup antes de sair.');return;}
     if(action==='route'){route=el.dataset.route;render();const anchor=el.dataset.anchor;if(anchor)setTimeout(()=>document.getElementById(anchor)?.scrollIntoView({behavior:'smooth',block:'start'}),60);else window.scrollTo({top:0,behavior:'smooth'});return;}
@@ -1897,7 +1910,7 @@ ${JSON.stringify(chatContext())}`;
     if(action==='plan-from-budgets')return planModal('metas');
     if(action==='plan-auto'){if(!state.plan)return;state.plan.auto=state.plan.auto===false;log(active,`${state.plan.auto?'ligou':'desligou'} o piloto automático do plano.`);persist();toast(state.plan.auto?'Piloto automático ligado.':'Piloto automático desligado.',state.plan.auto?'Entradas automáticas já caem guardando a parte do plano.':'O Juntô pergunta antes de guardar.','coins');return;}
     if(action==='month-pick'){pickedMonth=el.dataset.ym;const y=window.scrollY;render();window.scrollTo(0,y);return;}
-    if(action==='budget-reset'){const c=el.dataset.cat;delete state.budgets[c];openCats.add(c);log(active,`voltou a meta de ${c.toLowerCase()} pra sugestão do Juntô.`);const y=window.scrollY;persist();window.scrollTo(0,y);return;}
+    if(action==='budget-reset'){const c=el.dataset.cat;delete (cloudSlot?personalBudgetCaps():state.budgets)[c];openCats.add(c);log(active,`voltou a meta de ${c.toLowerCase()} pra sugestão do Juntô.`);const y=window.scrollY;persist();window.scrollTo(0,y);return;}
     if(action==='plan-change'){planPicker=!planPicker;render();setTimeout(()=>document.getElementById('plano')?.scrollIntoView({behavior:'smooth',block:'start'}),40);return;}
     if(action==='plan-off'){if(!state.plan)return;const n=state.plan.name;state.plan=null;planPicker=false;log(active,`pausou o plano ${n} de guardar primeiro.`);persist();toast('Plano pausado.','O que já foi guardado continua protegido.','info');return;}
     if(action==='reset-confirm')return openModal('Recomeçar a demonstração',`<p class="modal-sub">Escolha qual exemplo carregar. Os dados atuais desta demonstração serão substituídos.</p><div class="start-choice"><button class="start-option" data-action="reset-solo"><span>${icon('wallet')}</span><span><b>Exemplo individual</b><small>Gui sozinho, antes de conectar alguém: seis meses de gastos, salário e um valor semanal.</small></span></button><button class="start-option" data-action="reset-couple"><span>${icon('heart')}</span><span><b>Exemplo em dupla</b><small>Gui & Bia com contas divididas, pedidos e contestação.</small></span></button></div>`,'reset');
@@ -1949,7 +1962,7 @@ ${JSON.stringify(chatContext())}`;
     if(event.target.id==='yield-rate'){state.settings.yieldRate=Math.min(30,Math.max(0,Number(String(event.target.value).replace(',','.'))||0));const y=window.scrollY;persist();window.scrollTo(0,y);return;}
     if(event.target.id==='expense-category'||event.target.id==='request-category'){event.target.dataset.touched='1';const h=$('#'+(event.target.id==='expense-category'?'expense-cat-hint':'request-cat-hint'));if(h)h.textContent='';smartRead(event.target.id==='expense-category'?'expense':'request');updateBudgetNote();updateRequestCat();}
     if(event.target.name==='expense-type'){const form=event.target.closest('form');if(form)form.dataset.typeTouched='1';syncExpenseKind(event.target.value);setTimeout(updateBudgetNote,0);}
-    if(event.target.dataset?.budget){const c=event.target.dataset.budget,v=Number(event.target.value);state.budgets[c]=v;openCats.add(c);log(active,`definiu a meta de ${c.toLowerCase()} em ${money(v)} por mês.`);const y=window.scrollY;persist();window.scrollTo(0,y);toast('Meta salva.',`${c}: ${money(v)} por mês. Previsão e plano recalculados.`,'scan');return;}if(event.target.closest?.('[data-form="income"]'))updateIncomePreview();
+    if(event.target.dataset?.budget){const c=event.target.dataset.budget,v=Number(event.target.value);(cloudSlot?personalBudgetCaps():state.budgets)[c]=v;openCats.add(c);log(active,`definiu a meta de ${c.toLowerCase()} em ${money(v)} por mês.`);const y=window.scrollY;persist();window.scrollTo(0,y);toast('Meta salva.',`${c}: ${money(v)} por mês. Previsão e plano recalculados.`,'scan');return;}if(event.target.closest?.('[data-form="income"]'))updateIncomePreview();
 
   });
   document.addEventListener('toggle',(event)=>{const d=event.target;if(d.matches?.('details.cat')){if(d.open)openCats.add(d.dataset.cat);else openCats.delete(d.dataset.cat);}},true);
@@ -2027,6 +2040,7 @@ ${JSON.stringify(chatContext())}`;
       if(wasRecurring)state.bills.forEach(x=>{if(x.recurring&&recurringKey(x)===key)x.recurring=false;});
       state.bills=state.bills.filter(x=>x.id!==b.id);log(active,`excluiu a conta ${b.name}${related.length?' e estornou o pagamento':''}${wasRecurring?'; repetição encerrada':''}.`);close();persist();toast('Conta excluída.',wasRecurring?'A repetição também foi encerrada.':related.length?'O pagamento também foi estornado.':'Ela saiu do planejamento.');return;
     }
+    if(type==='balance'&&cloudSlot&&form.dataset.user!==cloudSlot){error('Atualize apenas o saldo do seu perfil.');return;}
     if(type==='balance'){
       const amount=amountValue(d,'balance-amount',true),who=form.dataset.user;if(amount==null||!hasUser(who))return;
       user(who).balance=amount;log(who,`atualizou o saldo atual para ${money(amount)}.`);notify(other(who),'O saldo da dupla mudou.',`${first(user(who).name)} atualizou o saldo atual.`);close();persist();toast('Saldo atualizado.','O livre do mês também foi recalculado.');return;
@@ -2096,12 +2110,13 @@ ${JSON.stringify(chatContext())}`;
       notify(other(),'Novo objetivo no Juntô 💚',`${first(user().name)} criou “${name}”, com meta de ${money(target)}.`);
       close();route='goals';planTab='goals';persist();window.scrollTo({top:0,behavior:'smooth'});toast('Objetivo criado.',`${name} · meta de ${money(target)}.`,'heart');return;
     }
+    if(type==='arrival'&&cloudSlot&&state.incomes.find(i=>i.id===id)?.person!==cloudSlot){error('Confirme apenas os seus recebimentos.');return;}
     if(type==='arrival'){
       const inc=state.incomes.find(i=>i.id===id),date=form.dataset.date;if(!inc||handled(id,date))return;const amount=amountValue(d,'arrival-amount');if(amount==null)return;
       let save=0,g=null;if(d.has('arrival-save')){save=amountValue(d,'arrival-save',true);if(save==null)return;if(save>amount){error('Não dá pra guardar mais do que entrou.');return;}g=state.goals.find(x=>x.id===d.get('arrival-goal'));if(save&&!g){error('Escolha um plano pra guardar.');return;}}
       user(inc.person).balance+=amount;state.received.push({id:uid(),incomeId:id,person:inc.person,date,amount,status:'received',at:Date.now(),balanceDelta:amount});
       if(save){g.saved+=save;state.saves.push({id:uid(),goalId:g.id,amount:save,date:dateISO(),actor:inc.person,source:'income',incomeId:inc.id,incomeDate:date});}
-      log(inc.person,`recebeu ${inc.name.toLowerCase()} (${money(amount)})${save?` e guardou ${money(save)} primeiro, em ${g.name}`:''}.`);notify(other(inc.person),save?'Entrou e já foi guardado. 💚':'Dinheiro na conta.',`${first(user(inc.person).name)} confirmou ${inc.name.toLowerCase()}: ${money(amount)}${save?`. ${money(save)} foram direto pra ${g.name}`:''}.`);close();persist();toast(save?'Entrou e já guardou primeiro.':'Entrada confirmada.',save?`${money(save)} protegidos em ${g.name}. O resto é pra viver.`:`${money(amount)} somados ao saldo de ${first(user(inc.person).name)}.`,'coins');return;
+      log(inc.person,`recebeu ${inc.name.toLowerCase()} (${money(amount)})${save?` e guardou ${money(save)} primeiro, em ${g.name}`:''}.`);if(save)notify(other(inc.person),'Nosso plano andou. 💚',`${first(user(inc.person).name)} guardou ${money(save)} em ${g.name}.`);close();persist();toast(save?'Entrou e já guardou primeiro.':'Entrada confirmada.',save?`${money(save)} protegidos em ${g.name}. O resto é pra viver.`:`${money(amount)} somados ao saldo de ${first(user(inc.person).name)}.`,'coins');return;
     }
     if(type==='budget-profile-apply'){
       if(!budgetProfileDraft||budgetProfileDraft.person!==active){error('Abra o perfil de orçamento novamente.');return;}
@@ -2117,6 +2132,7 @@ ${JSON.stringify(chatContext())}`;
       if(!Number.isInteger(trips)||trips<1||trips>10||!Number.isFinite(rate)||rate<0||rate>100||!/^\d{4}-\d{2}-\d{2}$/.test(since)||since>dateISO()||Math.max(0,-daysUntil(since))>366){error('Confira passagens, taxa e data de referência (até 366 dias atrás).');return;}
       state.settings.personalBudget=state.settings.personalBudget||{};state.settings.personalBudget[active]={fare,trips,debtPrincipal:principal,debtRate:rate,debtMinimum:minimum,debtSince:since};close();persist();toast('Orçamento ajustado.','A previsão e as sugestões usam os dados deste perfil.','trend');return;
     }
+    if(cloudSlot&&['income','remove-income'].includes(type)&&id&&state.incomes.find(i=>i.id===id)?.person!==cloudSlot){error('Configure apenas os seus recebimentos.');return;}
     if(type==='income'){
       const v=readIncomeForm(form);if(v.name.length<2||v.name.length>40){error('Dê um nome com 2 a 40 caracteres.');return;}if(!Number.isFinite(v.amount)||v.amount<=0){error('Informe um valor maior que zero. Ex.: 3.200,00.');return;}if(!hasUser(v.person)){error('Escolha de quem é a entrada.');return;}
       let variable=d.has('income-variable');const purpose=String(d.get('income-purpose')||'general');
@@ -2128,7 +2144,7 @@ ${JSON.stringify(chatContext())}`;
       close();route='incomes';persist();toast(id?'Entrada ajustada.':'Entrada na previsão.','O futuro do mês já foi recalculado.','trend');return;
     }
     if(type==='remove-income'){const inc=state.incomes.find(i=>i.id===id);if(!inc)return;state.incomes=state.incomes.filter(i=>i.id!==id);log(active,`tirou ${inc.name.toLowerCase()} da previsão.`);close();persist();toast('Entrada removida da previsão.');return;}
-    if(type==='estimate'){const v=amountValue(d,'estimate-amount',true);if(v==null)return;state.settings.variableEstimate=v;persist();toast('Estimativa salva.',v?'Ela pesa menos conforme os gastos reais entram.':'A previsão usa só os gastos registrados.','trend');return;}
+    if(type==='estimate'){const v=amountValue(d,'estimate-amount',true);if(v==null)return;if(cloudSlot){state.settings.personalEstimates=state.settings.personalEstimates||{};state.settings.personalEstimates[active]=v;}else state.settings.variableEstimate=v;persist();toast('Estimativa salva.',v?'Ela pesa menos conforme os gastos reais entram.':'A previsão usa só os gastos registrados.','trend');return;}
     if(type==='restore-backup'){
       if(!restoreDraft||!validBackup(restoreDraft)){error('O backup não está mais disponível. Selecione o arquivo novamente.');return;}
       try{localStorage.setItem('junto-before-restore-v1',JSON.stringify(state));}catch{error('Não foi possível criar a cópia de segurança antes da restauração. Exporte o estado atual e tente novamente.');return;}

@@ -7,7 +7,7 @@ const app=window.JuntoApp,PERSONAL_KEY='junto-personal-backup-v1';
 let client=null,user=null,sessionReady=false,checkpoint=null,subscription=null,authLoading=null,authLoadingUID=null,authGeneration=0;
 let syncRunning=false,syncTimer=null,conflict=null,authView='login',passwordRecovery=false;
 let syncCompletion=Promise.resolve(),spaceSwitching=false;
-let message='Dados neste aparelho',lastSync=null,restoreDraft=null;
+let message='Dados neste aparelho',lastSync=null,restoreDraft=null,disconnectDraft=null;
 const PENDING_EMAIL_KEY='junto-auth-pending-email';
 let pendingEmail=localStorage.getItem(PENDING_EMAIL_KEY)||'',authNotice=pendingEmail?'Confirme seu e-mail pelo link recebido e entre com sua senha.':'';
 const confirmationCallback=new URLSearchParams(location.search).has('code')||/access_token=|error_description=/.test(location.hash);
@@ -34,7 +34,7 @@ function accountAction(feature,icon,title,description,primary=false){return `<bu
 function accountHTML(){
   const profiles=app.getState().users,profile=profiles.find(u=>u.id===checkpoint.slot),name=profile?.name||userName()||'Sua conta',paired=checkpoint.members===2;
   const connection=paired
-    ?`<div class="cloud-connected"><span class="cloud-action-icon">${accountIcon('heart')}</span><div><strong>${profiles.map(u=>esc(u.name)).join(' &amp; ')}</strong><p>Duas contas no mesmo espaço.</p></div></div>`
+    ?`<div class="cloud-connected"><span class="cloud-action-icon">${accountIcon('heart')}</span><div><strong>${profiles.map(u=>esc(u.name)).join(' &amp; ')}</strong><p>Saldo e planos juntos. Cada um organiza suas entradas e gastos.</p></div></div><button class="cloud-disconnect-link" data-feature="cloud-disconnect-open">Desconectar dupla</button>`
     :`<p class="cloud-section-description">Escolha como juntar as duas contas.</p><div class="cloud-connect-actions">${checkpoint.slot==='a'?accountAction('cloud-invite','heart','Convidar meu amor','Gerar um código para compartilhar',true)+accountAction('cloud-join-open','code','Já tenho um código','Usar o convite que recebi'):''}</div>`;
   return `<div class="cloud-account-layout">
     <div class="cloud-profile"><span class="cloud-profile-avatar" aria-hidden="true">${esc(Array.from(name.trim())[0]?.toUpperCase()||'J')}</span><div><strong>${esc(name)}</strong><span>${esc(user.email||'Sua conta')}</span></div></div>
@@ -56,7 +56,7 @@ function updateStatus(){let button=document.getElementById('cloud-account-button
 function settingsHTML(){return `<div class="feature-card"><div><span class="feature-eyebrow">Sua conta</span><h3>Juntô em dois celulares</h3><p>${esc(message)}. Cada pessoa entra na própria conta; os registros da dupla ficam juntos.</p></div><button class="btn primary" data-feature="cloud-open">${user?'Ver minha conta':'Entrar / criar conta'}</button><button class="btn secondary" data-feature="cloud-export">Exportar meus dados</button></div>`;}
 const errorMessage=e=>{
   const text=String(e?.message||e||'Não foi possível conectar.');
-  const errors={LOGIN_REQUIRED:'Entre na sua conta.',ALREADY_MEMBER:'Esta conta já está conectada a uma dupla. Não é possível entrar em outra dupla.',NOT_OWNER:'Só quem criou a dupla pode gerar um convite.',COUPLE_FULL:'Essa dupla já tem duas pessoas.',INVITE_INVALID:'O convite está incorreto, expirou ou já foi usado.',INVITE_OWN:'Esse código é seu. Peça o código gerado pela outra pessoa.',INVALID_NAME:'Informe seu nome com até 24 caracteres.',TOO_MANY_ATTEMPTS:'Muitas tentativas de convite. Aguarde uma hora.',ACCESS_DENIED:'Sua conta não tem acesso a esta dupla.',MISSING_MEMBER_PROFILE:'Os dois perfis precisam permanecer no espaço.',RESTORE_CHANGED:'As finanças mudaram. Volte à conta e confira a recuperação novamente.',INVALID_SOLO_PROFILE:'O arquivo anterior precisa conter apenas o seu perfil individual.',INVALID_PAYLOAD:'Os dados não puderam ser sincronizados. Exporte um backup para conferir.'};
+  const errors={DISCONNECT_CHANGED:'Os registros mudaram. Volte à conta e confira a desconexão novamente.',NOT_PAIRED:'Esta conta já está no modo solo.',LOGIN_REQUIRED:'Entre na sua conta.',ALREADY_MEMBER:'Esta conta já está conectada a uma dupla. Não é possível entrar em outra dupla.',NOT_OWNER:'Só quem criou a dupla pode gerar um convite.',COUPLE_FULL:'Essa dupla já tem duas pessoas.',INVITE_INVALID:'O convite está incorreto, expirou ou já foi usado.',INVITE_OWN:'Esse código é seu. Peça o código gerado pela outra pessoa.',INVALID_NAME:'Informe seu nome com até 24 caracteres.',TOO_MANY_ATTEMPTS:'Muitas tentativas de convite. Aguarde uma hora.',ACCESS_DENIED:'Sua conta não tem acesso a esta dupla.',MISSING_MEMBER_PROFILE:'Os dois perfis precisam permanecer no espaço.',RESTORE_CHANGED:'As finanças mudaram. Volte à conta e confira a recuperação novamente.',INVALID_SOLO_PROFILE:'O arquivo anterior precisa conter apenas o seu perfil individual.',INVALID_PAYLOAD:'Os dados não puderam ser sincronizados. Exporte um backup para conferir.'};
   for(const[key,value]of Object.entries(errors))if(text.includes(key))return value;
   if(/invalid login credentials/i.test(text))return 'E-mail ou senha incorretos.';
   if(/email not confirmed/i.test(text))return 'Seu e-mail ainda não foi confirmado. Abra o link recebido e depois entre com sua senha.';
@@ -95,6 +95,8 @@ async function handleSession(session){
     if(!previous)backupPersonal();checkpoint=saved;localStorage.setItem('junto-cloud-account',user.id);if(checkpoint)app.setSlot(checkpoint.slot);
     try{const remote=await rpc('junto_read_space');if(generation!==authGeneration||user?.id!==sessionUID)return;if(!remote){checkpoint=null;app.setSlot(null);app.applyState(app.freshState(userName()));setMessage('Escolha seu espaço');open();return;}
       validateState(remote.payload);
+      if(checkpoint?.spaceId&&checkpoint.spaceId!==remote.space_id&&checkpoint.dirty&&local){app.applyState(local);await changedSpace(remote);return;}
+      if(checkpoint?.spaceId&&checkpoint.spaceId!==remote.space_id&&remote.members===1)localStorage.removeItem(archiveKey());
       if(checkpoint?.spaceId===remote.space_id&&checkpoint.base&&local){const result=mergeStates(checkpoint.base,local,remote.payload);
         if(result.conflicts.length){conflict={base:clone(saved.base),local:clone(local),remote:clone(remote.payload),revision:remote.revision,conflicts:result.conflicts};checkpoint={...checkpoint,pending:clone(local),dirty:true,members:remote.members};app.applyState(local);setMessage('Alterações para conferir');}
         else{checkpoint={...checkpoint,revision:remote.revision,base:clone(remote.payload),pending:result.state,dirty:!equal(result.state,remote.payload),members:remote.members};app.applyState(result.state);}
@@ -103,7 +105,7 @@ async function handleSession(session){
     }catch(e){if(generation!==authGeneration||user?.id!==sessionUID)return;if(checkpoint?.spaceId&&checkpoint?.pending&&Date.now()<sessionExpiresAt&&/fetch|network|abort/i.test(String(e?.message||e))){validateState(local||checkpoint.pending);app.setSlot(checkpoint.slot);app.applyState(local||checkpoint.pending);app.setAccess(true);setMessage('Sem conexão · dados salvos');return;}setMessage(errorMessage(e));accessError(e);throw e;}
   })();authLoading=loading;try{await loading;}finally{if(authLoading===loading){authLoading=null;authLoadingUID=null;}}
 }
-function subscribe(){if(subscription)client.removeChannel(subscription);subscription=client.channel(`junto:${checkpoint.spaceId}`).on('postgres_changes',{event:'UPDATE',schema:'public',table:'junto_snapshots',filter:`space_id=eq.${checkpoint.spaceId}`},()=>syncSoon()).subscribe();}
+function subscribe(){if(subscription)client.removeChannel(subscription);subscription=client.channel(`junto:${checkpoint.spaceId}`).on('postgres_changes',{event:'UPDATE',schema:'public',table:'junto_snapshots',filter:`space_id=eq.${checkpoint.spaceId}`},()=>syncSoon()).on('postgres_changes',{event:'UPDATE',schema:'public',table:'junto_members',filter:`user_id=eq.${user.id}`},()=>syncSoon()).subscribe();}
 function syncSoon(){clearTimeout(syncTimer);syncTimer=setTimeout(()=>synchronize(),500);}
 async function synchronize(force=false){
   if(!client||!user||!sessionReady||!checkpoint||conflict||spaceSwitching)return;
@@ -118,6 +120,10 @@ async function synchronize(force=false){
     // conflict or after state changed while a request was in flight.
     for(let pass=0;pass<4;pass++){
       if(checkpoint!==currentCheckpoint||user?.id!==currentUserID)return;
+      const observed=await rpc('junto_read_space');
+      if(checkpoint!==currentCheckpoint||user?.id!==currentUserID)return;
+      if(!observed)throw new Error('ACCESS_DENIED');
+      if(observed.space_id!==checkpoint.spaceId){await changedSpace(observed);return;}
       if(checkpoint.dirty){
         const sent=app.getState();validateState(sent);setMessage('Sincronizando…');
         const response=await rpc('junto_sync_space',{p_space_id:checkpoint.spaceId,p_revision:checkpoint.revision,p_payload:sent});
@@ -139,7 +145,7 @@ async function synchronize(force=false){
         break;
       }
 
-      const remote=await rpc('junto_read_space');
+      const remote=observed;
       if(checkpoint!==currentCheckpoint||user?.id!==currentUserID)return;
       if(!remote)throw new Error('ACCESS_DENIED');
       checkpoint.members=remote.members;checkpoint.archivePending=Boolean(remote.personal_archive_pending);
@@ -159,8 +165,40 @@ async function synchronize(force=false){
     setMessage(checkpoint.dirty?'Mudanças aguardando sincronização':`Sincronizado${lastSync?' · '+new Date(lastSync).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):''}`);
     if(checkpoint.dirty&&!conflict)syncSoon();
   }catch(e){
+    if(user?.id===currentUserID&&checkpoint===currentCheckpoint&&String(e?.message||e).includes('ACCESS_DENIED')){
+      try{const remote=await rpc('junto_read_space');if(remote&&remote.space_id!==checkpoint.spaceId){await changedSpace(remote);return;}}catch(transitionError){e=transitionError;}
+    }
     setMessage(errorMessage(e));try{saveCheckpoint();}catch{setMessage('Não foi possível salvar a fila. Exporte um backup.');}
   }finally{syncRunning=false;finish();}
+}
+async function changedSpace(remote){
+  const generation=authGeneration,uid=user?.id,old=checkpoint,local=app.getState();
+  spaceSwitching=true;clearTimeout(syncTimer);saveCheckpoint();app.setAccess(false);
+  document.getElementById('auth-gate').innerHTML='<div class="auth-card"><h1>Juntô</h1><p role="status">Atualizando seu espaço individual…</p></div>';
+  try{
+    let result=null,base=null,personal=null;
+    if(old.dirty){
+      base=await rpc('junto_personal_payload',{p_payload:old.base,p_slot:old.slot});
+      personal=await rpc('junto_personal_payload',{p_payload:local,p_slot:old.slot});
+      result=mergeStates(base,personal,remote.payload);
+    }
+    if(generation!==authGeneration||uid!==user?.id)return;
+    localStorage.removeItem(archiveKey());
+    await adopt(result?{...remote,payload:result.state}:remote,generation,uid);
+    if(result){checkpoint.base=clone(remote.payload);checkpoint.pending=app.getState();checkpoint.dirty=!equal(checkpoint.pending,remote.payload);
+      if(result.conflicts.length){conflict={base,local:clone(checkpoint.pending),remote:clone(remote.payload),revision:remote.revision,conflicts:result.conflicts};setMessage('Alterações para conferir');}
+      localStorage.setItem(archiveKey(),JSON.stringify(personal));saveCheckpoint();
+    }
+    app.toast('Sua dupla foi desconectada.','Seu saldo e seus registros continuam no modo solo.');
+  }catch(e){if(generation===authGeneration&&uid===user?.id){app.setAccess(true);setMessage(errorMessage(e));}throw e;}
+  finally{spaceSwitching=false;if(checkpoint?.dirty&&!conflict)syncSoon();}
+}
+async function openDisconnect(){
+  await synchronize(true);
+  if(!checkpoint||checkpoint.members!==2)return open();
+  if(checkpoint.dirty||conflict)throw new Error('Sincronize ou confira suas alterações antes de desconectar.');
+  disconnectDraft={spaceId:checkpoint.spaceId,revision:checkpoint.revision,generation:authGeneration,uid:user.id};
+  app.openModal('Desconectar nossa dupla',`<p class="modal-sub">As duas contas voltam ao modo solo. Cada pessoa continua com seu saldo, suas entradas e seus gastos.</p><ul class="cloud-disconnect-summary"><li>Contas e gastos divididos levam apenas a parte de cada pessoa.</li><li>Os planos viram cópias individuais. O progresso segue as contribuições registradas; sem contribuições, fica metade para cada um.</li><li>A meta mensal de guardar é dividida pela metade. Cada um pode ajustá-la no solo.</li><li>Os dados anteriores continuam guardados em Meus backups.</li></ul><form class="form" data-feature-form="cloud-disconnect"><label class="check"><input type="checkbox" name="confirm-disconnect" required><span>Entendi que a conexão será encerrada nos dois celulares.</span></label><p class="feature-error" role="alert"></p><button class="btn danger wide" type="submit">Desconectar dupla</button></form><button class="btn ghost wide" data-feature="cloud-open">Continuar em dupla</button>`,'cloud-disconnect');
 }
 function joinForm(){
   return `<form class="form" data-feature-form="cloud-join"><div class="field"><label for="cloud-join-name">Seu nome</label><input id="cloud-join-name" name="name" maxlength="24" autocomplete="given-name" value="${esc(userName())}" required></div><div class="field"><label for="cloud-invite">Código recebido do seu amor</label><input id="cloud-invite" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" placeholder="XXXX-XXXX-XXXX-XXXX" aria-describedby="cloud-join-note" required><small>Cole o código que a outra pessoa gerou. Ele vale por 48 horas.</small></div><p class="form-note" id="cloud-join-note">${checkpoint?'Seu saldo, gastos, contas, entradas e planos serão levados para a dupla. Os registros da outra pessoa também serão mantidos. Uma cópia do seu espaço solo continuará guardada.':'Cada pessoa usa sua própria conta. Os registros ficam juntos no mesmo espaço.'}</p>${checkpoint?'<label class="check"><input type="checkbox" name="confirm-space" required><span>Quero juntar meus registros com os do meu amor.</span></label>':''}<p class="feature-error" role="alert"></p><button class="btn primary wide" type="submit">Conectar com esse código</button></form>`;
@@ -211,7 +249,7 @@ function showConflicts(){const result=mergeStates(conflict.base,app.getState(),c
 window.addEventListener('junto:state-changed',event=>{if(!checkpoint||!user)return;checkpoint.pending=clone(event.detail);checkpoint.dirty=!equal(checkpoint.pending,checkpoint.base);try{saveCheckpoint();setMessage(conflict?'Alterações para conferir':checkpoint.dirty?'Mudanças aguardando sincronização':message);if(!conflict)syncSoon();}catch{setMessage('Não foi possível salvar a fila. Exporte um backup.');}});
 document.addEventListener('click',async event=>{const button=event.target.closest('[data-feature]');if(!button?.dataset.feature.startsWith('cloud-'))return;event.preventDefault();try{const action=button.dataset.feature;
   if(action==='cloud-retry'){if(!client)return startClient();const{data,error}=await client.auth.getSession();if(error)throw error;return handleSession(data.session);}
-  if(action==='cloud-open')return open();if(action==='cloud-join-open')return openJoin();if(action==='cloud-restore-open')return await openRestore();if(action==='cloud-export')return app.exportBackup();if(action==='cloud-export-personal'){const previous=parse(archiveKey())||await rpc('junto_read_personal_archive')||parse(PERSONAL_KEY);if(!previous)throw new Error('Não há um espaço individual anterior para exportar.');await download(previous,'Junto-dados-anteriores.json');return;}
+  if(action==='cloud-disconnect-open')return await openDisconnect();if(action==='cloud-open')return open();if(action==='cloud-join-open')return openJoin();if(action==='cloud-restore-open')return await openRestore();if(action==='cloud-export')return app.exportBackup();if(action==='cloud-export-personal'){const previous=parse(archiveKey())||await rpc('junto_read_personal_archive')||parse(PERSONAL_KEY);if(!previous)throw new Error('Não há um espaço individual anterior para exportar.');await download(previous,'Junto-dados-anteriores.json');return;}
   if(action==='cloud-auth-toggle'){authView=authView==='login'?'signup':'login';authNotice='';return open();}
   if(action==='cloud-confirmed'){authView='login';authNotice='Entre com seu e-mail e senha para continuar.';return open();}
   if(action==='cloud-resend'){button.disabled=true;try{const{error}=await client.auth.resend({type:'signup',email:pendingEmail,options:{emailRedirectTo:redirectURL()}});if(error)throw error;authNotice='Solicitação enviada. Confira sua caixa de entrada e a pasta de spam.';}catch(e){authNotice=errorMessage(e);}finally{button.disabled=false;}return open();}
@@ -223,7 +261,7 @@ document.addEventListener('click',async event=>{const button=event.target.closes
   if(action==='cloud-signout'){if(checkpoint?.dirty){app.openModal('Alterações ainda neste aparelho','<p class="modal-sub">Sincronize ou exporte uma cópia antes de sair. Assim, seus últimos registros ficam protegidos.</p><button class="btn primary wide" data-feature="cloud-sync">Sincronizar agora</button><button class="btn secondary wide" data-feature="cloud-export">Exportar registros</button><button class="btn ghost wide" data-feature="cloud-signout-confirm">Sair mantendo a fila neste aparelho</button>','cloud-signout');return;}return signOut();}
   if(action==='cloud-signout-confirm')return signOut();if(action==='cloud-export-conflict'){download({base:conflict.base,nesteAparelho:app.getState(),nuvem:conflict.remote},'Junto-conferencia-duas-versoes.json');return;}
 }catch(e){app.toast('Não foi possível concluir.',errorMessage(e));}});
-async function signOut(){restoreDraft=null;lock();if(checkpoint)saveCheckpoint();const{error}=await client.auth.signOut({scope:'local'});if(error)throw error;await handleSession(null);}
+async function signOut(){restoreDraft=null;disconnectDraft=null;lock();if(checkpoint)saveCheckpoint();const{error}=await client.auth.signOut({scope:'local'});if(error)throw error;await handleSession(null);}
 document.addEventListener('submit',async event=>{const form=event.target.closest('[data-feature-form]');if(!form?.dataset.featureForm.startsWith('cloud-'))return;event.preventDefault();const error=form.querySelector('.feature-error'),button=form.querySelector('[type=submit]');if(button.disabled)return;button.disabled=true;error.textContent='';const data=new FormData(form),type=form.dataset.featureForm;
   try{
     if(type==='cloud-auth'){backupPersonal();const email=String(data.get('email')).trim(),password=String(data.get('password')),response=form.dataset.mode==='signup'?await client.auth.signUp({email,password,options:{data:{display_name:String(data.get('name')).trim()},emailRedirectTo:redirectURL()}}):await client.auth.signInWithPassword({email,password});if(response.error)throw response.error;if(!response.data.session){pendingEmail=email;localStorage.setItem(PENDING_EMAIL_KEY,email);authView='login';authNotice='Conta criada. Confirme seu e-mail pelo link recebido e depois entre com sua senha.';open();return;}await handleSession(response.data.session);return open();}
@@ -244,6 +282,18 @@ document.addEventListener('submit',async event=>{const form=event.target.closest
       app.setAccess(false);document.getElementById('auth-gate').innerHTML='<div class="auth-card"><h1>Juntô</h1><p role="status">Conectando sua dupla…</p></div>';
       try{const remote=await rpc('junto_join_space',{p_code:code,p_name:name});await adopt(remote,generation,uid);open();}
       catch(e){if(generation===authGeneration&&user?.id===uid){if(checkpoint)app.setAccess(true);openJoin();document.querySelector('[data-feature-form="cloud-join"] .feature-error').textContent=errorMessage(e);document.getElementById('cloud-invite').value=String(data.get('code'));document.getElementById('cloud-join-name').value=name;}else throw e;}
+      finally{spaceSwitching=false;if(checkpoint?.dirty)syncSoon();}
+      return;
+    }
+    if(type==='cloud-disconnect'){
+      if(!disconnectDraft||disconnectDraft.generation!==authGeneration||disconnectDraft.uid!==user?.id||disconnectDraft.spaceId!==checkpoint?.spaceId)throw new Error('LOGIN_REQUIRED');
+      if(data.get('confirm-disconnect')!=='on')throw new Error('Confirme que deseja desconectar a dupla.');
+      await synchronize(true);
+      if(!checkpoint||checkpoint.dirty||conflict||checkpoint.revision!==disconnectDraft.revision)throw new Error('DISCONNECT_CHANGED');
+      const generation=authGeneration,uid=user.id;spaceSwitching=true;clearTimeout(syncTimer);app.setAccess(false);
+      document.getElementById('auth-gate').innerHTML='<div class="auth-card"><h1>Juntô</h1><p role="status">Desconectando a dupla e preservando os registros…</p></div>';
+      try{const remote=await rpc('junto_disconnect_space',{p_space_id:disconnectDraft.spaceId,p_revision:disconnectDraft.revision});localStorage.removeItem(archiveKey());await adopt(remote,generation,uid);disconnectDraft=null;open();app.toast('Modo solo ativado.','Cada pessoa continua com seu saldo e seus próprios registros.');}
+      catch(e){if(generation===authGeneration&&user?.id===uid){app.setAccess(true);open();app.toast('Não foi possível desconectar.',errorMessage(e));}else throw e;}
       finally{spaceSwitching=false;if(checkpoint?.dirty)syncSoon();}
       return;
     }

@@ -260,3 +260,7 @@ dialog[data-kind="cloud-account"] .modal-head h2{font-size:23px!important;color:
   .cloud-action{gap:9px;padding:12px 10px}
   .cloud-action-copy strong{font-size:13px}
 }
+/* Account separation is a secondary action with a clear confirmation. */
+.cloud-disconnect-link{display:block;margin:14px 0 0;padding:10px 0;border:0;background:transparent;color:var(--muted);font:inherit;font-size:13px;text-decoration:underline;text-underline-offset:4px;cursor:pointer}
+.cloud-disconnect-summary{margin:0 0 18px;padding-left:20px;color:var(--muted);font-size:13px;line-height:1.55}
+.cloud-disconnect-summary li+li{margin-top:9px}

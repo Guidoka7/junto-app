@@ -711,7 +711,25 @@
       log(inc.person,`teve ${inc.name.toLowerCase()} confirmado sozinho (${money(inc.amount)})${share>0?` e o Juntô já guardou ${money(share)} em ${g.name}`:''}.`);});
     return {n,saved};
   }
-  const KEYWORDS=[[/mercado livre|shopee|amazon|shein|aliexpress|magalu|roupa|loja|presente|t[eê]nis|sapato|perfume/,'Compras'],[/ifood|rappi|delivery|pizza|burger|hamb[uú]rguer|sushi|z[eé] delivery|marmita/,'Delivery'],[/mercado|atacad|assa[ií]|hortifruti|padaria|a[cç]ougue|feira|carrefour|sacol/,'Alimentação'],[/uber|\b99\b|gasolina|posto|combust|[oô]nibus|metr[oô]|estacion|ped[aá]gio|oficina/,'Transporte'],[/caf[eé]|lanche|pastel|sorvete|a[cç]a[ií]|salgado|p[aã]o de queijo|coxinha/,'Lanches'],[/\bbar\b|barzinho|cinema|show|jantar|restaurante|happy|balada|viagem|passeio|ingresso|cerveja/,'Lazer'],[/farm[aá]cia|rem[eé]dio|m[eé]dico|consulta|exame|academia|dentista|psic/,'Saúde'],[/netflix|spotify|internet|celular|streaming|prime|disney|youtube|icloud|assinatura|globoplay/,'Assinaturas'],[/aluguel|condom[ií]nio|\bluz\b|[aá]gua|\bg[aá]s\b|energia|iptu|faxina/,'Casa']];
+  const KEYWORDS=[
+    [/mercado livre|shopee|amazon|shein|aliexpress|magalu|roupa|loja|presente|t[eê]nis|sapato|perfume/,'Compras'],
+    [/restaurante|almo[cç]o|jantar|rod[ií]zio|churrasc|self.?service|bistr[oô]/,'Restaurantes'],
+    [/ifood|rappi|delivery|pizza|burger|hamb[uú]rguer|sushi|z[eé] delivery|marmita/,'Delivery'],
+    [/mercado|atacad|assa[ií]|hortifruti|padaria|a[cç]ougue|feira|carrefour|sacol/,'Alimentação'],
+    [/uber|\b99\b|gasolina|posto|combust|[oô]nibus|metr[oô]|estacion|ped[aá]gio|oficina/,'Transporte'],
+    [/caf[eé]|lanche|pastel|sorvete|a[cç]a[ií]|salgado|p[aã]o de queijo|coxinha/,'Lanches'],
+    [/\bbar\b|barzinho|cinema|show|happy|balada|passeio|ingresso/,'Lazer'],
+    [/hotel|pousada|airbnb|passagem a[eé]rea|viagem|praia/,'Viagem'],
+    [/farm[aá]cia|rem[eé]dio|m[eé]dico|consulta|exame|academia|dentista|psic/,'Saúde'],
+    [/netflix|spotify|internet|celular|streaming|prime|disney|youtube|icloud|assinatura|globoplay/,'Assinaturas'],
+    [/aluguel|condom[ií]nio|\bluz\b|[aá]gua|\bg[aá]s\b|energia|faxina/,'Casa'],
+    [/curso|livro|faculdade|escola|apostila|material escolar/,'Educação'],
+    [/pet|ra[cç][aã]o|veterin|petshop/,'Pets'],
+    [/maquiagem|skincare|sal[aã]o|barbeir|manicure|sobrancelha|cosm[eé]tico/,'Beleza'],
+    [/notebook|computador|mouse|teclado|monitor|iphone|smartphone|tablet|carregador|fone bluetooth/,'Tecnologia'],
+    [/coworking|material de trabalho|uniforme|ferramenta de trabalho|software de trabalho|despesa profissional/,'Trabalho'],
+    [/imposto|iptu|ipva|darf|detran|multa|taxa banc[aá]ria|tarifa banc[aá]ria|tributo/,'Impostos']
+  ];
   function guessCategory(name){
     const n=String(name||'').trim().toLowerCase();if(n.length<3)return null;const w=n.split(/\s+/)[0],counts={};
     state.transactions.forEach(t=>{const tn=t.name.toLowerCase();if(tn===n||(w.length>3&&tn.split(/\s+/)[0]===w))counts[t.category]=(counts[t.category]||0)+(tn===n?3:1);});

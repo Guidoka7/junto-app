@@ -140,3 +140,9 @@ dialog .modal-head .icon-btn{min-width:44px;min-height:44px}
   .home-primary-actions{grid-template-columns:1fr}
   .ledger-detail-grid{grid-template-columns:1fr}
 }
+
+/* Backup and settings actions stay compact on narrow screens. */
+.settings-row-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.settings-row-actions .btn{min-width:92px}
+.backup-row{align-items:center}
+@media(max-width:520px){.backup-row{align-items:flex-start}.backup-row .settings-row-actions{width:100%;justify-content:flex-start}.backup-row .settings-row-actions .btn{flex:1 1 120px}}

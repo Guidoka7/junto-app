@@ -1000,21 +1000,37 @@
     }
     return {category,payer,amount,count:matches.length};
   }
+  function billHistoryPrefill(text){
+    const p=parseQuick(text),r=recognizeP(p),key=norm(p.label||p.name).trim();if(key.length<2)return null;
+    const matches=state.bills.filter(b=>{
+      const nk=norm(b.name||''),ik=norm(b.item||'');
+      if(r&&ik&&ik===norm(r.item))return true;
+      return nk===key||(firstWord(nk).length>3&&firstWord(nk)===firstWord(key));
+    }).slice(-24);
+    if(!matches.length)return null;
+    const mode=(fn,min=1)=>{const c={};matches.forEach(x=>{const k=fn(x);if(k!==undefined&&k!==null&&k!=='')c[k]=(c[k]||0)+1;});const best=Object.entries(c).sort((a,b)=>b[1]-a[1])[0];return best&&best[1]>=min?best[0]:null;};
+    const category=mode(b=>b.category),payer=isSolo()?'a':mode(b=>b.payer),recurring=matches.filter(b=>b.recurring).length>=Math.ceil(matches.length*.5);
+    const amounts=matches.map(b=>b.amount).filter(Number.isSafeInteger).sort((a,b)=>a-b),amount=amounts.length?amounts[Math.floor(amounts.length/2)]:null;
+    const days=matches.map(b=>pd(b.due).getDate()),dueDay=Number(mode(b=>String(pd(b.due).getDate())));
+    let date=null;if(dueDay){const now=new Date(),today=dateISO(now),y=now.getFullYear(),m=now.getMonth(),cur=new Date(y,m,Math.min(dueDay,daysInMonth(y,m)));date=dateISO(cur);if(date<today){const nx=new Date(y,m+1,1);date=dateISO(new Date(nx.getFullYear(),nx.getMonth(),Math.min(dueDay,daysInMonth(nx.getFullYear(),nx.getMonth()))));}}
+    const open=matches.find(b=>b.status==='open'&&(!p.amount||b.amount===p.amount));
+    return {category,payer,amount,date,kind:recurring?'fixed':'bill',count:matches.length,openId:open?.id||null};
+  }
   function smartRead(prefix){
     const input=$('#'+prefix+'-title');if(!input)return;
-    const p=parseQuick(input.value),r=recognizeP(p),hist=prefix==='expense'?historyPrefill(input.value):null,sel=$('#'+prefix+'-category'),tile=$('#'+prefix+'-icon'),read=$('#'+prefix+'-read'),amt=$('#'+prefix+'-amount');
-    const suggestedCategory=r?.category||hist?.category;
+    const p=parseQuick(input.value),r=recognizeP(p),hist=prefix==='expense'?historyPrefill(input.value):null,billHist=prefix==='expense'?billHistoryPrefill(input.value):null,sel=$('#'+prefix+'-category'),tile=$('#'+prefix+'-icon'),read=$('#'+prefix+'-read'),amt=$('#'+prefix+'-amount');
+    const suggestedCategory=r?.category||hist?.category||billHist?.category;
     if(suggestedCategory&&sel&&sel.dataset.touched!=='1'&&categories.includes(suggestedCategory))sel.value=suggestedCategory;
     const cat=sel?.value||'Outros',ic=r?r.icon:input.value.trim()?categoryIcon(cat):'sparkle';
     if(tile){tile.innerHTML=icon(ic);tile.classList.toggle('known',!!r||!!hist);}
-    if(amt&&amt.dataset.touched!=='1'){if(p.amount)amt.value=moneyNumber(p.amount);else if(hist?.amount)amt.value=moneyNumber(hist.amount);else if(input.value.trim())amt.value='';}
-    const pay=$('#'+prefix+'-payer'),payer=p.payer||hist?.payer;
+    if(amt&&amt.dataset.touched!=='1'){if(p.amount)amt.value=moneyNumber(p.amount);else if(hist?.amount)amt.value=moneyNumber(hist.amount);else if(billHist?.amount)amt.value=moneyNumber(billHist.amount);else if(input.value.trim())amt.value='';}
+    const pay=$('#'+prefix+'-payer'),payer=p.payer||hist?.payer||billHist?.payer;
     if(pay&&payer&&pay.dataset.touched!=='1'&&[...state.users.map(u=>u.id),'half','prop'].includes(payer))pay.value=payer;
-    const dt=$('#'+prefix+'-date');if(dt&&p.date&&dt.dataset.touched!=='1')dt.value=p.date;
-    if(prefix==='expense'&&p.kind){const form=input.closest('form'),radio=form?.querySelector(`input[name="expense-type"][value="${p.kind}"]`);if(radio&&form?.dataset.typeTouched!=='1'){radio.checked=true;syncExpenseKind(p.kind);}}
+    const dt=$('#'+prefix+'-date'),smartDate=p.date||billHist?.date;if(dt&&smartDate&&dt.dataset.touched!=='1')dt.value=smartDate;
+    const smartKind=p.kind||billHist?.kind;if(prefix==='expense'&&smartKind){const form=input.closest('form'),radio=form?.querySelector(`input[name="expense-type"][value="${smartKind}"]`);if(radio&&form?.dataset.typeTouched!=='1'){radio.checked=true;syncExpenseKind(smartKind);}}
     if(!read)return;if(!input.value.trim()){read.innerHTML=READ_DEFAULT;return;}
-    const learnedByHistory=hist&&!p.payer&&!p.amount;
-    read.innerHTML=`<span class="chip strong">${icon(ic)}${esc(r?r.item:cap(p.label||p.name))}</span><span class="chip">${esc(catPath(cat))}</span>${p.qty>1&&p.unit?`<span class="chip">${p.qty} × ${money(p.unit)}</span>`:''}${payer?`<span class="chip">${esc(payerLabel(payer))}</span>`:''}${p.date?`<span class="chip">${dateText(p.date)}</span>`:''}${hist?.amount&&!p.amount?`<span class="chip soft">valor habitual ${money(hist.amount)}</span>`:''}${r?.fuzzy?`<span class="chip soft">entendi “${esc(p.label)}” como ${esc(r.item.toLowerCase())}</span>`:''}${r?.learned?'<span class="chip soft">aprendido com você</span>':learnedByHistory?`<span class="chip soft">preenchido pelo histórico (${hist.count}x)</span>`:!r?'<span class="chip soft">novo: o Juntô aprende com a categoria escolhida</span>':''}<button type="button" class="text-link" data-action="cat-change" data-prefix="${prefix}">Trocar categoria</button>`;
+    const learnedByHistory=hist&&!p.payer&&!p.amount,learnedBill=billHist&&!p.amount&&!p.date;
+    read.innerHTML=`<span class="chip strong">${icon(ic)}${esc(r?r.item:cap(p.label||p.name))}</span><span class="chip">${esc(catPath(cat))}</span>${p.qty>1&&p.unit?`<span class="chip">${p.qty} × ${money(p.unit)}</span>`:''}${payer?`<span class="chip">${esc(payerLabel(payer))}</span>`:''}${smartDate?`<span class="chip">${dateText(smartDate)}</span>`:''}${smartKind&&prefix==='expense'?`<span class="chip soft">${smartKind==='fixed'?'conta fixa':smartKind==='bill'?'a pagar':'gasto'}</span>`:''}${hist?.amount&&!p.amount?`<span class="chip soft">valor habitual ${money(hist.amount)}</span>`:billHist?.amount&&!p.amount?`<span class="chip soft">valor habitual ${money(billHist.amount)}</span>`:''}${billHist?.openId?`<span class="chip warn">já existe uma conta parecida aberta</span>`:''}${r?.fuzzy?`<span class="chip soft">entendi “${esc(p.label)}” como ${esc(r.item.toLowerCase())}</span>`:''}${r?.learned?'<span class="chip soft">aprendido com você</span>':learnedByHistory?`<span class="chip soft">preenchido pelo histórico (${hist.count}x)</span>`:learnedBill?`<span class="chip soft">aprendido com contas anteriores (${billHist.count}x)</span>`:!r?'<span class="chip soft">novo: o Juntô aprende com a categoria escolhida</span>':''}<button type="button" class="text-link" data-action="cat-change" data-prefix="${prefix}">Trocar categoria</button>`;
   }
   function smartEntry(prefix,label){return `<div class="smart-entry"><span class="item-tile" id="${prefix}-icon" aria-hidden="true">${icon('sparkle')}</span><div class="field"><label for="${prefix}-title">${label}</label><input id="${prefix}-title" name="${prefix}-title" type="text" maxlength="60" autocomplete="off" placeholder="Ex.: 2 cigarros a 3, pizza 45, uber 18" required></div></div><p class="smart-read" id="${prefix}-read" aria-live="polite">${READ_DEFAULT}</p>`;}
   function askModal(){
@@ -1809,7 +1825,7 @@ ${JSON.stringify(chatContext())}`;
         const c=charge(amount,payer);if(c.error){error(c.error);return;}
         state.transactions.push({id:uid(),name:nm,amount,category,payer,date,...itf,by:active,createdAt:now,...(c.shares.length>1?{split:c.shares}:{})});log(active,`registrou ${nm}: ${money(amount)}, ${c.shares.length>1?payerLabel(payer).toLowerCase():'na conta de '+first(user(payer).name)}.`);
       }else{
-        const duplicate=state.bills.find(b=>now-(b.createdAt||0)<90000&&b.status==='open'&&b.amount===amount&&b.due===date&&b.payer===payer&&norm(b.name)===norm(nm));
+        const duplicate=state.bills.find(b=>b.status==='open'&&b.amount===amount&&b.due===date&&b.payer===payer&&norm(b.name)===norm(nm));
         if(duplicate){error('Essa conta parece já ter sido adicionada agora. Abra a existente para editar, em vez de duplicar.');return;}
         state.bills.push({id:uid(),name:nm,amount,category,payer,due:date,item:itf.item,icon:itf.icon,recurring:kind==='fixed',status:'open',createdAt:now});log(active,`adicionou ${kind==='fixed'?'uma conta fixa':'uma conta a pagar'}: ${title}.`);
       }

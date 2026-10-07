@@ -1753,13 +1753,20 @@ ${JSON.stringify(chatContext())}`;
       notify(r.recipient,'Amor, posso gastar?',`${first(user().name)} quer combinar ${title} por ${money(amount)}.`,'request',r.id);log(active,`pediu um combinado: ${title} por ${money(amount)}.`);close();route='requests';requestFilter='all';persist();toast('Pedido entregue. Agora é com teu amor.',`Responda no celular de ${first(user(other()).name)} ou troque de perfil.`,'chat');return;
     }
     if(type==='expense'){
-      const title=titleValue(d,'expense-title'),amount=amountValue(d,'expense-amount'),payer=d.get('expense-payer'),kind=d.get('expense-type'),date=d.get('expense-date'),category=d.get('expense-category');
-      if(title==null||amount==null)return;learnFrom(title,category,$('#expense-category')?.dataset.touched==='1');const itf=itemFields(title,category),nm=smartName(title);if(!['a','b','half','prop'].includes(payer)||!/^\d{4}-\d{2}-\d{2}$/.test(date)){error('Confira quem paga e a data do gasto.');return;}
+      const title=titleValue(d,'expense-title'),amount=amountValue(d,'expense-amount'),payer=isSolo()?'a':d.get('expense-payer'),kind=d.get('expense-type'),date=d.get('expense-date'),category=d.get('expense-category');
+      if(title==null||amount==null)return;learnFrom(title,category,$('#expense-category')?.dataset.touched==='1');const itf=itemFields(title,category),nm=smartName(title);if(!['a','b','half','prop'].includes(payer)||!/^\d{4}-\d{2}-\d{2}$/.test(date)){error('Confira quem paga e a data do lançamento.');return;}
+      const now=Date.now();
       if(kind==='spent'){
+        const duplicate=state.transactions.find(t=>!t.billId&&now-(t.createdAt||0)<90000&&t.amount===amount&&t.date===date&&t.payer===payer&&norm(t.name)===norm(nm));
+        if(duplicate){error('Esse gasto parece já ter sido registrado agora. Abra o lançamento existente para editar, em vez de duplicar.');return;}
         const c=charge(amount,payer);if(c.error){error(c.error);return;}
-        state.transactions.push({id:uid(),name:nm,amount,category,payer,date,...itf,by:active,createdAt:Date.now(),...(c.shares.length>1?{split:c.shares}:{})});log(active,`registrou ${nm}: ${money(amount)}, ${c.shares.length>1?payerLabel(payer).toLowerCase():'na conta de '+first(user(payer).name)}.`);
-      }else{state.bills.push({id:uid(),name:nm,amount,category,payer,due:date,item:itf.item,icon:itf.icon,recurring:kind==='fixed',status:'open'});log(active,`adicionou ${kind==='fixed'?'uma conta fixa':'uma conta a pagar'}: ${title}.`);}
-      notify(other(),'Conta atualizada.',`${first(user().name)} registrou ${title} por ${money(amount)}.`);close();route='bills';billFilter='all';persist();toast(kind==='spent'?'Gasto anotado. Sem mistério.':'Conta no radar da dupla.',`${title} · ${money(amount)}`);return;
+        state.transactions.push({id:uid(),name:nm,amount,category,payer,date,...itf,by:active,createdAt:now,...(c.shares.length>1?{split:c.shares}:{})});log(active,`registrou ${nm}: ${money(amount)}, ${c.shares.length>1?payerLabel(payer).toLowerCase():'na conta de '+first(user(payer).name)}.`);
+      }else{
+        const duplicate=state.bills.find(b=>now-(b.createdAt||0)<90000&&b.status==='open'&&b.amount===amount&&b.due===date&&b.payer===payer&&norm(b.name)===norm(nm));
+        if(duplicate){error('Essa conta parece já ter sido adicionada agora. Abra a existente para editar, em vez de duplicar.');return;}
+        state.bills.push({id:uid(),name:nm,amount,category,payer,due:date,item:itf.item,icon:itf.icon,recurring:kind==='fixed',status:'open',createdAt:now});log(active,`adicionou ${kind==='fixed'?'uma conta fixa':'uma conta a pagar'}: ${title}.`);
+      }
+      notify(other(),'Conta atualizada.',`${first(user().name)} registrou ${title} por ${money(amount)}.`);close();route='bills';billFilter=kind==='spent'?'month':kind==='fixed'?'fixed':'open';persist();toast(kind==='spent'?'Gasto anotado. Sem mistério.':'Conta no radar.',`${title} · ${money(amount)}`);return;
     }
     if(type==='edit-tx'){
       const t=state.transactions.find(x=>x.id===id);if(!t)return;const name=titleValue(d,'edit-tx-name',1,60),amount=amountValue(d,'edit-tx-amount'),category=d.get('edit-tx-category'),payer=d.get('edit-tx-payer'),date=d.get('edit-tx-date');
@@ -1810,7 +1817,7 @@ ${JSON.stringify(chatContext())}`;
     if(type==='pay-bill'){
       const b=state.bills.find(b=>b.id===id),payer=d.get('bill-payer');if(!b||b.status!=='open'||!['a','b','half','prop'].includes(payer))return;
       const c=charge(b.amount,payer);if(c.error){error(c.error);return;}
-      b.status='paid';b.paidAt=Date.now();b.payer=payer;state.transactions.push({id:uid(),billId:b.id,name:b.name,by:active,amount:b.amount,category:b.category,payer,date:dateISO(),createdAt:Date.now(),...(c.shares.length>1?{split:c.shares}:{})});log(active,c.shares.length>1?`confirmou ${b.name} pago ${payerLabel(payer).toLowerCase()}: ${c.shares.map(x=>first(user(x.id).name)+' '+money(x.amount)).join(', ')}.`:`confirmou ${b.name} pago por ${first(user(payer).name)}: ${money(b.amount)}.`);notify(other(),'Um boleto a menos. 🙌',`${first(user().name)} marcou ${b.name} como pago.`);close();persist();toast('Conta paga. Respira.','O gasto foi registrado e a conta saiu das pendências.');return;
+      b.status='paid';b.paidAt=Date.now();b.payer=payer;state.transactions.push({id:uid(),billId:b.id,name:b.name,by:active,amount:b.amount,category:b.category,payer,date:dateISO(),createdAt:Date.now(),...(c.shares.length>1?{split:c.shares}:{})});log(active,c.shares.length>1?`confirmou ${b.name} pago ${payerLabel(payer).toLowerCase()}: ${c.shares.map(x=>first(user(x.id).name)+' '+money(x.amount)).join(', ')}.`:`confirmou ${b.name} pago por ${first(user(payer).name)}: ${money(b.amount)}.`);notify(other(),'Um boleto a menos. 🙌',`${first(user().name)} marcou ${b.name} como pago.`);close();billFilter='paid';persist();toast('Conta paga. Respira.','O pagamento ficou em “Pagas” e o saldo foi atualizado.');return;
     }
     if(type==='cancel-request'){
       const r=state.requests.find(r=>r.id===id);if(!r||r.author!==actor||!['pending','approved'].includes(r.status))return;r.status='cancelled';log(actor,`cancelou o pedido ${r.title}.`);notify(r.recipient,'Planos mudam. Tudo bem.',`${first(user(actor).name)} cancelou o pedido ${r.title}.`,'cancelled',id);close();persist();toast('Pedido cancelado.','Se havia dinheiro reservado, ele voltou ao livre.');return;

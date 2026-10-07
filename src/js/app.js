@@ -1864,6 +1864,7 @@ ${JSON.stringify(chatContext())}`;
         if(!validBackup(parsed))throw new Error('O arquivo não tem uma estrutura válida do Juntô.');
         const next=migrate(structuredClone(parsed)),currentIds=state.users.map(u=>u.id).sort().join(','),nextIds=next.users.map(u=>u.id).sort().join(',');
         if(cloudSlot&&currentIds!==nextIds)throw new Error('Em um espaço sincronizado, o backup precisa ter os mesmos perfis da dupla.');
+        if(cloudSlot&&next.demo)throw new Error('Dados de demonstração não podem substituir um espaço sincronizado.');
         restoreDraft=next;
         openModal('Restaurar este backup?',`<p class="modal-sub">Esta cópia tem <b>${next.transactions.length}</b> gastos, <b>${next.bills.length}</b> contas, <b>${next.goals.length}</b> planos e ${next.users.length===1?'modo individual':'modo a dois'}.</p><div class="form-note warn"><strong>Antes de substituir os dados, o estado atual será guardado neste aparelho.</strong>${cloudSlot?' Como este espaço está sincronizado, a restauração será enviada para a nuvem depois da confirmação.':''}</div><form class="form" data-form="restore-backup">${formEnd('Restaurar backup')}</form><button type="button" class="btn ghost wide" data-action="close">Cancelar</button>`,'restore-backup');
       }catch(e){restoreDraft=null;toast('Não foi possível restaurar.',e.message||'Confira se este é um backup válido do Juntô.','info');}
@@ -2041,7 +2042,7 @@ ${JSON.stringify(chatContext())}`;
     if(type==='estimate'){const v=amountValue(d,'estimate-amount',true);if(v==null)return;state.settings.variableEstimate=v;persist();toast('Estimativa salva.',v?'Ela pesa menos conforme os gastos reais entram.':'A previsão usa só os gastos registrados.','trend');return;}
     if(type==='restore-backup'){
       if(!restoreDraft||!validBackup(restoreDraft)){error('O backup não está mais disponível. Selecione o arquivo novamente.');return;}
-      try{localStorage.setItem('junto-before-restore-v1',JSON.stringify(state));}catch{}
+      try{localStorage.setItem('junto-before-restore-v1',JSON.stringify(state));}catch{error('Não foi possível criar a cópia de segurança antes da restauração. Exporte o estado atual e tente novamente.');return;}
       state=migrate(structuredClone(restoreDraft));restoreDraft=null;
       active=cloudSlot&&hasUser(cloudSlot)?cloudSlot:(hasUser(active)?active:state.users[0]?.id||'a');
       route='home';billFilter='all';requestFilter='all';analysisTab='overview';futureTab='forecast';incomeTab='overview';planTab='goals';

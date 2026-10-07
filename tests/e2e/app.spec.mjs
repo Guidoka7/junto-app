@@ -443,6 +443,24 @@ test('goals open details, can be edited and safely stop an attached saving plan'
 });
 
 
+test('opening a modal cannot steal focus after the user selects another field',async({page})=>{
+ await page.goto('/');await personal(page,100000);
+ await page.evaluate(()=>{const s=window.JuntoApp.getState();s.goals=[{id:'trip',name:'Viagem',target:100000,saved:0,icon:'plane'}];window.JuntoApp.applyState(s);});
+ await page.locator('#mobile-nav [data-route="goals"]').click();await page.locator('[data-action="goal-detail"]').first().click();
+ // Hold a visual frame while the user moves to another field. Its callback
+ // must never redirect subsequent keyboard input into the goal's name.
+ await page.evaluate(()=>{
+   const raf=window.requestAnimationFrame;window.__heldFrames=[];
+   window.requestAnimationFrame=callback=>{window.__heldFrames.push(callback);return 1;};
+   try{document.querySelector('#modal [data-action="edit-goal"]').click();}finally{window.requestAnimationFrame=raf;}
+ });
+ await page.locator('#edit-goal-title').fill('Viagem 2027');await page.locator('#edit-goal-target').fill('');
+ await page.evaluate(()=>window.__heldFrames.forEach(callback=>callback(performance.now())));
+ await expect(page.locator('#edit-goal-target')).toBeFocused();await page.keyboard.insertText('1500');
+ await page.locator('[data-form="edit-goal"] [type="submit"]').click();
+ const s=await page.evaluate(()=>window.JuntoApp.getState());expect(s.goals[0].name).toBe('Viagem 2027');expect(s.goals[0].target).toBe(150000);
+});
+
 test('automatic income and recurring maintenance run again when the app resumes',async({page})=>{
  await page.goto('/');await personal(page,10000);
  await page.evaluate(()=>{

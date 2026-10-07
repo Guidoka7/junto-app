@@ -405,6 +405,27 @@ test('editing a recurring income schedule does not create a duplicate confirmati
  await expect(page.locator('.pending-banner.arrival')).toHaveCount(0);
 });
 
+
+test('monthly income summary uses actual receipts and removes skipped occurrences',async({page})=>{
+ await page.goto('/');await personal(page,10000);
+ await page.evaluate(()=>{
+   const s=window.JuntoApp.getState(),d=new Date(),iso=x=>String(x.getFullYear())+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'),ym=iso(d).slice(0,7);
+   s.incomes=[
+     {id:'actual-inc',name:'Salário',person:'a',amount:50000,rule:'monthly',day:Math.max(1,d.getDate()-2),since:ym+'-01',auto:false},
+     {id:'skip-inc',name:'Extra',person:'a',amount:30000,rule:'monthly',day:Math.max(1,d.getDate()-1),since:ym+'-01',auto:false}
+   ];
+   s.received=[
+     {id:'actual-receipt',incomeId:'actual-inc',person:'a',date:ym+'-'+String(Math.max(1,d.getDate()-2)).padStart(2,'0'),amount:60000,status:'received',at:Date.now(),balanceDelta:60000},
+     {id:'skip-receipt',incomeId:'skip-inc',person:'a',date:ym+'-'+String(Math.max(1,d.getDate()-1)).padStart(2,'0'),amount:0,status:'skipped',at:Date.now()}
+   ];
+   window.JuntoApp.applyState(s);
+ });
+ await page.locator('#mobile-nav [data-route="future"]').click();
+ await page.locator('.future-v3-tabs [data-route="incomes"]').click();
+ await expect(page.locator('.income-v3-total strong')).toContainText('R$ 600');
+ await expect(page.locator('.income-v3-insight')).toContainText('já foram confirmadas');
+});
+
 test.describe('offline PWA',()=>{
  test.use({serviceWorkers:'allow'});
  test('PWA reloads offline with its bundled fonts and scripts',async({page,context})=>{

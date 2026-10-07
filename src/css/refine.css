@@ -65,6 +65,9 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{cursor:not-allo
 }
 :is(.home-latest-row,.analysis-v3-latest-row,.future-v3-event,.income-v3-row,button.bills-v3-row,.plans-v3-other>button):hover{background:#fffaf2}
 :is(.home-latest-row,.analysis-v3-latest-row,.future-v3-event,.income-v3-row,button.bills-v3-row,.plans-v3-other>button):active{transform:scale(.995)}
+.cal-record{display:flex;align-items:center;gap:11px;width:100%;min-height:44px;padding:4px;border:0;border-radius:12px;background:transparent;color:inherit;text-align:left}
+.cal-record>span:nth-child(2){flex:1;min-width:0}
+.cal-record:hover{background:#fffaf2}
 :is(.home-latest-copy,.bills-v3-copy,.income-v3-row>span:nth-child(2),.future-v3-event>span:nth-child(2)){min-width:0}
 
 /* Forms and sheets use the same rhythm and avoid accidental zoom on mobile. */
@@ -98,6 +101,9 @@ dialog .modal-head .icon-btn{min-width:44px;min-height:44px}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+/* The companion panel is hidden on tablets; its grid column must collapse too. */
+@media(max-width:1060px){.columns{grid-template-columns:minmax(0,1fr)}}
 
 @media(max-width:760px){
   body{background:linear-gradient(180deg,#fffdfa 0%,var(--junto-canvas) 56%,#f6f7f9 100%)}

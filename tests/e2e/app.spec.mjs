@@ -35,6 +35,7 @@ test('new Home stays functional in solo and couple modes',async({page})=>{
  await expect(page.locator('.home-money-card')).toContainText('Seu saldo livre hoje');
  await expect(page.locator('#couple-cta .couple-top-cta')).toBeVisible();
  await expect(page.locator('.home-v2 .connect-card')).toHaveCount(0);
+ await expect(page.locator('#peer-rail')).toBeHidden();
  const categories=await page.evaluate(()=>window.JuntoApp.getCategories());
  for(const category of ['Educação','Pets','Beleza','Viagem','Presentes'])expect(categories).toContain(category);
  await page.locator('[data-action="quick-expense"][data-category="Transporte"]').click();

@@ -29,6 +29,23 @@ test('mobile app renders, navigates and preserves the fixed bottom bar',async({p
  for(const route of ['future','analysis','bills','goals','home']){await page.locator(`#mobile-nav [data-route="${route}"]`).click();await expect(page.locator('body')).toHaveAttribute('data-route',route);}
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(errors).toEqual([]);await page.screenshot({path:'test-results/mobile.png'});
 });
+test('new Home stays functional in solo and couple modes',async({page})=>{
+ await page.goto('/');await personal(page,250000);
+ await expect(page.locator('.home-v2')).toBeVisible();
+ await expect(page.locator('.home-money-card')).toContainText('Seu saldo livre hoje');
+ await expect(page.locator('#couple-cta .couple-top-cta')).toBeVisible();
+ await expect(page.locator('.home-v2 .connect-card')).toHaveCount(0);
+ const categories=await page.evaluate(()=>window.JuntoApp.getCategories());
+ for(const category of ['Educação','Pets','Beleza','Viagem','Presentes'])expect(categories).toContain(category);
+ await page.locator('[data-action="quick-expense"][data-category="Transporte"]').click();
+ await expect(page.locator('#expense-cat-wrap')).toBeVisible();
+ await expect(page.locator('#expense-category')).toHaveValue('Transporte');
+ await page.locator('#modal [data-action="close"]').click();
+ await page.evaluate(()=>{const s=window.JuntoApp.freshState('Guilherme');s.users[0].balance=250000;s.users.push({id:'b',name:'Bia',balance:150000,tone:'pink'});window.JuntoApp.applyState(s);});
+ await expect(page.locator('.home-money-card')).toContainText('Saldo livre da dupla hoje');
+ await expect(page.locator('.home-spend-cta')).toContainText('Amor, posso gastar?');
+ await expect(page.locator('#couple-cta .couple-top-cta')).toHaveCount(0);
+});
 test.describe('offline PWA',()=>{
  test.use({serviceWorkers:'allow'});
  test('PWA reloads offline with its bundled fonts and scripts',async({page,context})=>{

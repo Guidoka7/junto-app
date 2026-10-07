@@ -31,8 +31,13 @@
   window.addEventListener('appinstalled',()=>{installed=true;deferredPrompt=null;emit();});
 
   if(!('serviceWorker'in navigator)||!/^https?:$/.test(location.protocol)){emit();return;}
+  const hadController=Boolean(navigator.serviceWorker.controller);
   navigator.serviceWorker.addEventListener('controllerchange',()=>{
-    if(reloading)return;reloading=true;location.reload();
+    if(reloading)return;
+    // The first service-worker claim should be invisible to the user. Reload only
+    // when replacing an already-controlled app after an explicit update.
+    if(!hadController&&!waitingWorker){emit();return;}
+    reloading=true;location.reload();
   });
   window.addEventListener('load',async()=>{
     try{

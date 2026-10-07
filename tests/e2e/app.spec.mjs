@@ -94,6 +94,12 @@ test('new Home stays functional in solo and couple modes',async({page})=>{
  await expect(page.locator('.home-money-card')).toContainText('Saldo livre da dupla hoje');
  await expect(page.locator('.home-spend-cta')).toContainText('Amor, posso gastar?');
  await expect(page.locator('#couple-cta .couple-top-cta')).toHaveCount(0);
+ await page.evaluate(()=>{const s=window.JuntoApp.getState();s.notifications=[{id:'home-notice',to:'a',title:'Combinado aprovado',body:'Seu amor respondeu ao pedido.',kind:'info',read:false,createdAt:Date.now()}];window.JuntoApp.applyState(s);});
+ await page.locator('.profile-photo-button:visible').click();
+ await expect(page.locator('#modal')).toContainText('1 aviso novo para você.');
+ await page.locator('#modal [data-action="notifications"]').click();
+ await expect(page.locator('#modal')).toContainText('Combinado aprovado');
+ expect(await page.evaluate(()=>window.JuntoApp.getState().notifications[0].read)).toBe(true);
 });
 
 
@@ -230,14 +236,16 @@ test('couple request flow reserves then charges only when purchase is confirmed'
  expect(state.requests).toHaveLength(1);expect(state.requests[0].status).toBe('pending');
  expect(state.users[0].balance).toBe(100000);expect(state.users[1].balance).toBe(100000);
 
- await page.locator('#mobile-user-switch [data-action="profile-photo-switch"]').click();
+ await page.locator('#mobile-user-switch .profile-photo-button').click();
+ await page.locator('#modal [data-action="profile-photo-switch"]').click();
  await page.locator('#mobile-nav [data-route="requests"]').click();
  await page.locator('[data-action="approve"]').click();
  state=await page.evaluate(()=>window.JuntoApp.getState());
  expect(state.requests[0].status).toBe('approved');
  expect(state.users[0].balance).toBe(100000);expect(state.users[1].balance).toBe(100000);
 
- await page.locator('#mobile-user-switch [data-action="profile-photo-switch"]').click();
+ await page.locator('#mobile-user-switch .profile-photo-button').click();
+ await page.locator('#modal [data-action="profile-photo-switch"]').click();
  await page.locator('#mobile-nav [data-route="requests"]').click();
  await page.locator('[data-action="purchase"]').click();
  await expect(page.locator('#purchase-payer')).toHaveValue('half');
@@ -360,11 +368,18 @@ test('approved screens remain usable at mobile, tablet and desktop widths in bot
    for(const route of ['home','future','analysis','bills','goals']){
      await page.locator(`button[data-route="${route}"]:visible`).first().click();await expect(page.locator('body')).toHaveAttribute('data-route',route);
      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${width}px ${couple?'dupla':'solo'} ${route}`).toBe(true);
+     if(width<760&&route==='home'){
+       const brand=await page.locator('.topbar .mobile-brand').boundingBox(),profile=await page.locator('#mobile-user-switch .profile-photo-button').boundingBox();
+       expect(Math.abs(brand.y-profile.y)).toBeLessThanOrEqual(1);
+       expect(await page.locator('.topbar').evaluate(el=>el.getBoundingClientRect().height)).toBeLessThanOrEqual(45);
+       if(!couple){const invite=await page.locator('#couple-cta').boundingBox();expect(invite.x+invite.width).toBeLessThanOrEqual(profile.x-4);await expect(page.locator('.couple-top-cta span')).toBeVisible();}
+       await page.screenshot({path:`test-results/header-${width}-${couple?'couple':'solo'}.png`});
+     }
      if(width===768){const area=await page.locator('#app-content').boundingBox(),columns=await page.locator('.columns').boundingBox();expect(area.width,`tablet ${route}: a coluna oculta não deve estreitar o conteúdo`).toBeGreaterThanOrEqual(columns.width-1);}
      const duplicates=await page.locator('[id]').evaluateAll(nodes=>{const ids=nodes.map(n=>n.id);return [...new Set(ids.filter((id,i)=>ids.indexOf(id)!==i))];});expect(duplicates).toEqual([]);
      if(width<760)expect(await page.locator('#mobile-nav').evaluate(el=>getComputedStyle(el).position)).toBe('fixed');
    }
-   await page.locator('[data-action="settings"]:visible').first().click();await expect(page.locator('#modal')).toBeVisible();
+   await page.locator('.profile-photo-button:visible').click();await expect(page.locator('#modal')).toBeVisible();
    const box=await page.locator('#modal').boundingBox();expect(box.x).toBeGreaterThanOrEqual(-1);expect(box.x+box.width).toBeLessThanOrEqual(width+1);expect(box.y).toBeGreaterThanOrEqual(-1);expect(box.y+box.height).toBeLessThanOrEqual(845);
    await page.screenshot({path:`test-results/layout-${width}-${couple?'couple':'solo'}.png`});await page.locator('#modal [data-action="close"]').first().click();
  }
@@ -428,7 +443,7 @@ test('manual backup restore validates, confirms and preserves a pre-restore copy
    s.transactions=[{id:'restored-tx',name:'Mercado',item:'Mercado',icon:'cart',amount:2300,category:'Alimentação',payer:'a',by:'a',date,createdAt:Date.now()}];
    return JSON.stringify(s);
  });
- await page.locator('#settings-button').click();
+ await page.locator('.profile-photo-button:visible').click();
  await page.locator('[data-action="backup-import"]').click();
  await page.locator('#backup-import-input').setInputFiles({name:'Junto-backup.json',mimeType:'application/json',buffer:Buffer.from(backup)});
  await expect(page.locator('dialog[data-kind="restore-backup"]')).toBeVisible();
@@ -563,7 +578,7 @@ test.describe('offline PWA',()=>{
  });
 });
 test('Android back closes a dialog, chat, navigation, then exits',async({page})=>{
- await fakeNative(page,[]);await page.goto('/');await page.locator('#settings-button').click();await expect(page.locator('#modal')).toBeVisible();await page.evaluate(()=>window.__nativeEvents.backButton());await expect(page.locator('#modal')).not.toBeVisible();
+ await fakeNative(page,[]);await page.goto('/');await page.locator('.profile-photo-button:visible').click();await expect(page.locator('#modal')).toBeVisible();await page.evaluate(()=>window.__nativeEvents.backButton());await expect(page.locator('#modal')).not.toBeVisible();
  await page.evaluate(()=>document.querySelector('[data-action="chat-open"]').click());await expect(page.locator('#chat-panel')).toBeVisible();await page.evaluate(()=>window.__nativeEvents.backButton());await expect(page.locator('#chat-panel')).not.toBeVisible();
  await page.locator('#mobile-nav [data-route="bills"]').click();await page.evaluate(()=>window.__nativeEvents.backButton());await expect(page.locator('body')).toHaveAttribute('data-route','home');await page.evaluate(()=>window.__nativeEvents.backButton());expect(await page.evaluate(()=>window.__exited)).toBe(true);
 });
@@ -590,7 +605,7 @@ test('chat uses current money, retries real failures and can stop a request',asy
  pending?.release();await expect(page.locator('#chat-send')).toHaveAttribute('aria-label','Enviar');
 });
 test('bank picker is compact, searchable and keeps branded choices',async({page})=>{
- await fakeNative(page,[]);await page.goto('/');await personal(page);await page.locator('#settings-button').click();await page.locator('[data-feature="bank-settings"]').click();
+ await fakeNative(page,[]);await page.goto('/');await personal(page);await page.locator('.profile-photo-button:visible').click();await page.locator('[data-feature="bank-settings"]').click();
  await expect(page.locator('.bank-settings-screen')).toBeVisible();await expect(page.locator('.bank-search input')).toHaveAttribute('placeholder','Buscar banco ou carteira...');
  await expect(page.locator('[data-bank-card] .bank-brand-icon')).toHaveCount(7);
  await page.locator('[data-bank-search]').fill('PicPay');await expect(page.locator('[data-bank-card][data-search*="picpay"]')).toBeVisible();await expect(page.locator('[data-bank-card][data-search*="nubank"]')).toBeHidden();
@@ -604,7 +619,7 @@ test('bank confirmation is persistent, idempotent and excludes raw text',async({
  await fakeNative(page,[event()]);await page.goto('/');await personal(page);await page.locator('#bank-inbox-button').click();await page.locator('[data-feature="bank-review"]').click();await page.locator('#bank-name').fill('Almoço');await expect(page.locator('#bank-category')).toHaveValue('Restaurantes');await page.locator('[data-feature-form="bank-confirm"] [type="submit"]').click();
  const state=await page.evaluate(()=>window.JuntoApp.getState());expect(state.transactions.length).toBe(1);expect(state.users[0].balance).toBe(7500);expect(JSON.stringify(state)).not.toContain('Aviso privado');expect(await page.evaluate(()=>window.__bankAck.length)).toBe(1);
  const result=await page.evaluate(e=>window.JuntoApp.confirmBankMovement(e,{name:'Almoço',date:new Date().toISOString().slice(0,10),amount:2500,category:'Alimentação'}),event());expect(result.duplicate).toBe(true);expect(await page.evaluate(()=>window.JuntoApp.getState().transactions.length)).toBe(1);await page.reload();expect(await page.evaluate(()=>window.JuntoApp.getState().users[0].balance)).toBe(7500);
- await page.locator('#settings-button').click();await page.locator('#modal [data-feature="cloud-export"]').click();await expect.poll(()=>page.evaluate(()=>window.__exportedBackup?.name)).toMatch(/^Junto-backup-.*\.json$/);const backup=JSON.parse(await page.evaluate(()=>window.__exportedBackup.contents));expect(backup.transactions).toEqual(state.transactions);expect(backup.users[0].balance).toBe(7500);
+ await page.locator('.profile-photo-button:visible').click();await page.locator('#modal [data-feature="cloud-export"]').click();await expect.poll(()=>page.evaluate(()=>window.__exportedBackup?.name)).toMatch(/^Junto-backup-.*\.json$/);const backup=JSON.parse(await page.evaluate(()=>window.__exportedBackup.contents));expect(backup.transactions).toEqual(state.transactions);expect(backup.users[0].balance).toBe(7500);
 });
 
 test('bank review links an exact open bill automatically',async({page})=>{

@@ -1173,8 +1173,8 @@
   let cutPerson=null;const cutSel={};
   const CUT_FACTOR={keep:0,half:.5,cut:1};
   function itemStats(person){return cached('items:'+person,()=>{
-    const T=new Date(),M=model(),days=Math.max(1,Math.min(90,M.age)),from=dateISO(addDays(T,-(days-1))),map={};
-    state.transactions.forEach(t=>{if(t.billId||t.date<from)return;const sh=person==='both'?t.amount:shareOf(t,person);if(!sh)return;const it=itemOf(t),o=map[it.item]||(map[it.item]={key:it.item,item:it.item,icon:it.icon,category:t.category,total:0,count:0,qty:0,dates:new Set(),contests:0});o.total+=sh;o.count++;o.qty+=t.qty||1;o.dates.add(t.date);if(t.contest)o.contests++;});
+    const T=new Date(),M=model(),days=Math.max(14,Math.min(90,M.age)),from=dateISO(addDays(T,-(days-1))),map={};
+    state.transactions.forEach(t=>{if(!isVariable(t)||t.date<from||t.date>dateISO())return;const sh=person==='both'?t.amount:shareOf(t,person);if(!sh)return;const it=itemOf(t),o=map[it.item]||(map[it.item]={key:it.item,item:it.item,icon:it.icon,category:t.category,total:0,count:0,qty:0,dates:new Set(),contests:0});o.total+=sh;o.count++;o.qty+=t.qty||1;o.dates.add(t.date);if(t.contest)o.contests++;});
     return Object.values(map).map(o=>{const w=CUT_WEIGHT[o.category]??.3,monthly=o.total*30.4/days,unit=o.total/o.qty,perDay=o.qty/days;let sug='keep',why='';
       if(o.category==='Hábitos'){sug='cut';why='Hábito que pesa todo dia no bolso. Cortado, vira dinheiro inteiro.';}
       else if(w>=.5&&monthly>=8000){sug='half';why='Pela metade, ainda dá pra aproveitar de vez em quando.';}

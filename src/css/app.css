@@ -2443,3 +2443,56 @@ dialog[data-kind="connect-intro"] .modal-head h2{font-size:28px;line-height:1.08
 @media(min-width:761px){
  .chat-v3{width:min(440px,calc(100vw - 28px))}
 }
+/* ===== DETALHES CLICÁVEIS · CONTAS / GASTOS ===== */
+.bills-v3-row-wrap{border-bottom:1px solid #f0ede8}
+.bills-v3-row-wrap:last-child{border-bottom:0}
+.bills-v3-row-wrap>.bills-v3-row{border-bottom:0}
+button.bills-v3-row{width:100%;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;text-align:left;border-radius:14px;transition:background .16s ease,transform .16s ease}
+button.bills-v3-row:hover{background:#fffaf2}
+button.bills-v3-row:active{transform:scale(.995)}
+button.bills-v3-row:focus-visible{outline:3px solid #d7b76b55;outline-offset:2px}
+.bills-v3-chevron{display:flex;align-items:center;justify-content:center;width:24px;height:24px;color:#3d7a66;font-size:24px;line-height:1}
+.bills-v3-chevron svg{width:18px;height:18px}
+.bills-v3-contest-wrap{padding:0 0 12px}
+.bills-v3-contest-wrap .contest{margin:0}
+.ledger-detail-v3{display:flex;flex-direction:column;gap:16px}
+.ledger-detail-hero{display:grid;grid-template-columns:58px minmax(0,1fr);gap:14px;align-items:center;padding:15px;border-radius:21px;background:linear-gradient(135deg,#fffaf0,#fffdf9);border:1px solid #eee5d4}
+.ledger-detail-hero>.bills-v3-icon{width:54px;height:54px}
+.ledger-detail-hero>.bills-v3-icon svg{width:26px;height:26px}
+.ledger-status{display:inline-flex;align-items:center;min-height:23px;padding:3px 8px;border-radius:999px;background:#f3f1ed;color:#666e7b;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+.ledger-status.open{background:#fff3dc;color:#91661f}
+.ledger-status.paid{background:#eaf7f1;color:#2f725b}
+.ledger-status.spent{background:#eef3ff;color:#315e93}
+.ledger-detail-hero strong{display:block;margin-top:5px;font-size:27px;line-height:1.05;color:#0b2348;letter-spacing:-.8px}
+.ledger-detail-hero p{font-size:11px;color:#7a818e;margin-top:4px}
+.ledger-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.ledger-detail-meta{min-width:0;padding:12px 13px;border:1px solid #eeeae4;border-radius:16px;background:#fff}
+.ledger-detail-meta span{display:block;font-size:9px;color:#8a8f99;text-transform:uppercase;letter-spacing:.04em;font-weight:750}
+.ledger-detail-meta b{display:block;margin-top:4px;font-size:12px;line-height:1.35;color:#0b2348;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ledger-split-detail{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ledger-split-detail>span{display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:8px;align-items:center;padding:10px;border:1px solid #eeeae4;border-radius:15px;background:#fff}
+.ledger-split-detail .avatar{width:30px;height:30px;font-size:10px}
+.ledger-split-detail b{font-size:10.5px;color:#0b2348}
+.ledger-split-detail strong{font-size:10.5px;color:#0b2348}
+.ledger-actions{display:flex;flex-direction:column;gap:8px}
+.ledger-action{width:100%;display:grid;grid-template-columns:38px minmax(0,1fr);gap:10px;align-items:center;text-align:left;padding:11px 12px;border-radius:16px;border:1px solid #e9e5de;background:#fff;color:#0b2348}
+.ledger-action>svg{width:20px;height:20px;margin-left:8px;color:#9a793a}
+.ledger-action b{display:block;font-size:12px}
+.ledger-action small{display:block;font-size:9.5px;color:#818793;margin-top:2px;line-height:1.35}
+.ledger-action.primary{background:linear-gradient(135deg,#e5bd69,#cda044);border-color:#d6a74c}
+.ledger-action.primary>svg{color:#0b2348}
+.ledger-action.danger{color:#912e36;border-color:#f0d6d8;background:#fff8f8}
+.ledger-action.danger>svg{color:#b23d47}
+.ledger-edit-form .check-row{border:1px solid #ece7df;border-radius:15px;padding:11px 12px;background:#fff}
+dialog[data-kind="ledger-detail"],dialog[data-kind="ledger-edit"]{width:min(560px,calc(100vw - 22px));border-radius:28px}
+dialog[data-kind="ledger-detail"] .modal-wrap,dialog[data-kind="ledger-edit"] .modal-wrap{background:#fffdfa}
+@media(max-width:520px){
+ dialog[data-kind="ledger-detail"],dialog[data-kind="ledger-edit"]{width:100%;max-width:none;margin:auto 0 0;border-radius:28px 28px 0 0}
+ .ledger-detail-grid{grid-template-columns:1fr 1fr}
+ .ledger-detail-meta{padding:10px 11px}
+ .ledger-detail-hero strong{font-size:24px}
+}
+@media(max-width:360px){
+ .ledger-detail-grid{grid-template-columns:1fr}
+ .ledger-split-detail{grid-template-columns:1fr}
+}

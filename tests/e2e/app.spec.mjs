@@ -154,7 +154,7 @@ test('critical money flow stays coherent: spend, edit, delete, bill, pay and reo
 test('income goal and solo spending flows stay connected',async({page})=>{
  await page.goto('/');await personal(page,500000);
  await page.locator('#mobile-nav [data-route="future"]').click();
- await page.locator('[data-route="incomes"]').first().click();
+ await page.locator('.future-v3-tabs [data-route="incomes"]').click();
  await page.locator('[data-action="income-new"]').click();
  await page.locator('#income-name').fill('Salário');
  await page.locator('#income-amount').fill('5600');

@@ -123,10 +123,12 @@
     const s=splitShares(amount,mode);if(s.length<2)return `Sai tudo da conta de ${first(user(s[0].id).name)}.`;return s.map(x=>`${first(user(x.id).name)} paga ${money(x.amount)}`).join(' · ')+(mode==='prop'?` (renda prevista: ${pct(incomeShare())} / ${pct(1-incomeShare())})`:'');
   }  function charge(amount,mode){const shares=splitShares(amount,mode),short=shares.find(s=>s.amount>user(s.id).balance);if(short)return {error:`O saldo de ${first(user(short.id).name)} não cobre ${money(short.amount)}. Atualize o saldo ou escolha outra divisão.`};shares.forEach(s=>user(s.id).balance-=s.amount);return {shares};}
   function transactionShares(t){
-    if(Array.isArray(t?.split)&&t.split.length)return t.split.map(x=>({id:x.id,amount:x.amount})).filter(x=>user(x.id)&&Number.isSafeInteger(x.amount));
-    return t&&user(t.payer)?[{id:t.payer,amount:t.amount}]:[];
+    if(Array.isArray(t?.split)&&t.split.length)return t.split.map(x=>({id:x.id,amount:x.amount})).filter(x=>state.users.some(u=>u.id===x.id)&&Number.isSafeInteger(x.amount));
+    if(t&&state.users.some(u=>u.id===t.payer))return [{id:t.payer,amount:t.amount}];
+    if(t&&['half','prop'].includes(t.payer))return splitShares(t.amount,t.payer);
+    return [];
   }
-  function applyBalanceShares(shares,direction){shares.forEach(x=>{if(user(x.id))user(x.id).balance+=direction*x.amount;});}
+  function applyBalanceShares(shares,direction){shares.forEach(x=>{const u=state.users.find(u=>u.id===x.id);if(u)u.balance+=direction*x.amount;});}
   function reallocateTransaction(t,amount,payer){
     const oldShares=transactionShares(t);applyBalanceShares(oldShares,1);
     const nextShares=splitShares(amount,payer),short=nextShares.find(x=>x.amount>user(x.id).balance);
@@ -148,7 +150,7 @@
   const CUT_WEIGHT={Hábitos:.9,Delivery:.65,Lazer:.55,Compras:.6,Lanches:.5,Outros:.4,Alimentação:.15,Transporte:.15,Assinaturas:.4,Casa:.1,Saúde:0};
   const CUT_UNIT={Hábitos:['compra','compras'],Delivery:['pedido','pedidos'],Lazer:['saída','saídas'],Compras:['compra','compras'],Lanches:['lanche','lanches']};
   const isVariable=(t)=>!t.billId;
-  function shareOf(t,id){if(Array.isArray(t.split))return(t.split.find(s=>s.id===id)||{}).amount||0;return t.payer===id?t.amount:0;}
+  function shareOf(t,id){if(Array.isArray(t.split))return(t.split.find(s=>s.id===id)||{}).amount||0;if(t.payer===id)return t.amount;if(['half','prop'].includes(t.payer))return(splitShares(t.amount,t.payer).find(s=>s.id===id)||{}).amount||0;return 0;}
   function history(){return cached('hist',()=>{
     const T=new Date(),firstData=state.transactions.reduce((m,t)=>t.date<m?t.date:m,dateISO(T)),months=[];
     for(let k=6;k>=0;k--){const f=new Date(T.getFullYear(),T.getMonth()-k,1),ym=dateISO(f).slice(0,7);if(k>0&&dateISO(f)<firstData)continue;

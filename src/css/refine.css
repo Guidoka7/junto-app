@@ -146,3 +146,15 @@ dialog .modal-head .icon-btn{min-width:44px;min-height:44px}
 .settings-row-actions .btn{min-width:92px}
 .backup-row{align-items:center}
 @media(max-width:520px){.backup-row{align-items:flex-start}.backup-row .settings-row-actions{width:100%;justify-content:flex-start}.backup-row .settings-row-actions .btn{flex:1 1 120px}}
+
+/* Goal detail sheet uses the same interaction grammar as bills and expenses. */
+.goal-detail-v3{display:flex;flex-direction:column;gap:16px}
+.goal-detail-hero{display:grid;grid-template-columns:58px minmax(0,1fr);gap:14px;align-items:center;padding:15px;border:1px solid var(--junto-line);border-radius:21px;background:linear-gradient(135deg,#fffaf0,#fffdf9)}
+.goal-detail-icon{display:grid;place-items:center;width:54px;height:54px;border-radius:18px;background:var(--junto-gold-soft);color:#9a793a}
+.goal-detail-icon svg{width:27px;height:27px}
+.goal-detail-hero>div>span{font-size:9px;font-weight:800;letter-spacing:.08em;color:#92733b}
+.goal-detail-hero strong{display:block;margin-top:4px;font-size:27px;line-height:1.05;color:var(--junto-navy)}
+.goal-detail-hero p{margin-top:4px;font-size:11px;color:var(--junto-muted)}
+.plans-v3-detail-link{width:100%;min-height:40px;margin-top:4px;border:0;background:transparent;color:#8d6b2f;font-weight:750;text-align:center}
+dialog[data-kind="goal-detail"],dialog[data-kind="goal-edit"]{width:min(560px,calc(100vw - 22px));border-radius:28px}
+@media(max-width:520px){dialog[data-kind="goal-detail"],dialog[data-kind="goal-edit"]{width:100%;max-width:none;margin:auto 0 0;border-radius:28px 28px 0 0}}

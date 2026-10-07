@@ -653,11 +653,12 @@ test('two independent accounts invite, sync offline edits and keep their own pro
     await route.fulfill({json:{}});
   });await page.goto('/');await page.locator('#cloud-email').fill(index?'bia@junto.example':'gui@junto.example');await page.locator('#cloud-password').fill('TestPassword123');await page.locator('[data-feature-form="cloud-auth"] [type="submit"]').click();await expect(page.locator('[data-feature-form="cloud-create"]')).toBeVisible();return{context,page};}
  try{const a=await device(0);await a.page.locator('[data-feature-form="cloud-create"] [type="submit"]').click();await expect(a.page.locator('[data-feature="cloud-invite"]')).toBeVisible();
-  await a.page.evaluate(e=>{const s=window.JuntoApp.getState();s.users[0].balance=85000;window.JuntoApp.applyState(s);window.JuntoApp.confirmBankMovement(e,{name:'Conta individual Gui',amount:5000,date:new Date().toISOString().slice(0,10),category:'Outros'});},event('d'));
+  await a.page.evaluate(e=>{const s=window.JuntoApp.getState();s.users[0].balance=85000;s.incomes=[{id:'salary-gui',name:'Salário só do Gui',person:'a',amount:100000,rule:'monthly',day:30,since:new Date().toISOString().slice(0,10),auto:false}];s.settings.variableEstimate=5000;window.JuntoApp.applyState(s);window.JuntoApp.confirmBankMovement(e,{name:'Conta individual Gui',amount:5000,date:new Date().toISOString().slice(0,10),category:'Outros'});},event('d'));
   const ownerState=await a.page.evaluate(()=>window.JuntoApp.getState());await a.page.locator('[data-feature="cloud-invite"]').click();const invite=await a.page.locator('#real-invite-code').innerText();
   await expect(a.page.locator('#modal')).toContainText('Já tenho um código');expect(await a.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   const b=await device(1);await b.page.locator('[data-feature-form="cloud-create"] [type="submit"]').click();await expect(b.page.locator('#authenticated-app')).toBeVisible();
   await b.page.evaluate(()=>window.JuntoApp.closeModal());await b.page.locator('.profile-photo-button:visible').click();await b.page.locator('#modal [data-action="balance"]').click();await b.page.locator('#balance-amount').fill('400,00');await b.page.locator('[data-form="balance"] [type="submit"]').click();
+  await b.page.evaluate(()=>{const s=window.JuntoApp.getState();s.incomes=[{id:'salary-bia',name:'Salário só da Bia',person:'a',amount:60000,rule:'monthly',day:30,since:new Date().toISOString().slice(0,10),auto:false}];s.settings.variableEstimate=7000;window.JuntoApp.applyState(s);});
   await b.page.evaluate(e=>window.JuntoApp.confirmBankMovement(e,{name:'Café solo',amount:2500,date:new Date().toISOString().slice(0,10),category:'Alimentação'}),event('c'));
   const previous=await b.page.evaluate(()=>window.JuntoApp.getState());
   await b.page.locator('.couple-top-cta').click();await b.page.locator('[data-action="connect-setup"]').click();await b.page.locator('[data-feature="cloud-join-open"]').click();
@@ -676,6 +677,16 @@ test('two independent accounts invite, sync offline edits and keep their own pro
   await b.page.reload();await expect(b.page.locator('#authenticated-app')).toBeVisible();await b.page.locator('#cloud-account-button').click();await b.page.locator('[data-feature="cloud-restore-open"]').click();await expect(b.page.locator('[name="restore-balance"][value="solo"]')).toBeChecked();await b.page.locator('[data-feature-form="cloud-restore"] [type="submit"]').click();await expect(b.page.locator('#cloud-live-status')).toBeVisible();await expect(b.page.locator('[data-feature="cloud-restore-open"]')).toHaveCount(0);
   const recovered=await b.page.evaluate(()=>window.JuntoApp.getState());expect(recovered.users.map(u=>u.balance)).toEqual(combined.users.map(u=>u.balance));expect(recovered.transactions).toEqual(combined.transactions);await b.page.evaluate(()=>window.JuntoApp.closeModal());await b.page.locator('#mobile-nav [data-route="analysis"]').click();await expect(b.page.locator('#app-content')).toContainText('Café solo');
   await a.page.evaluate(()=>window.JuntoCloud.synchronize());
+  for(const [device,own,other] of[[a,'Salário só do Gui','Salário só da Bia'],[b,'Salário só da Bia','Salário só do Gui']]){
+    await device.page.evaluate(()=>window.JuntoApp.closeModal());await device.page.locator('#mobile-nav [data-route="future"]').click();await device.page.locator('#app-content [data-route="incomes"]').first().click();
+    await expect(device.page.locator('#app-content')).toContainText(own);await expect(device.page.locator('#app-content')).not.toContainText(other);
+    await device.page.locator('#app-content [data-action="income-edit"]').first().click();await expect(device.page.locator('#income-person option')).toHaveCount(1);await device.page.evaluate(()=>window.JuntoApp.closeModal());
+    await device.page.locator('#app-content [data-kind="income"][data-value="base"]').click();await expect(device.page.locator('#estimate-amount')).toHaveValue(device===a?'50,00':'70,00');
+    if(device===b){await device.page.locator('#estimate-amount').fill('80,00');await device.page.locator('[data-form="estimate"] [type="submit"]').click();await device.page.evaluate(()=>window.JuntoCloud.synchronize());}
+    await device.page.locator('#mobile-nav [data-route="analysis"]').click();await expect(device.page.locator('[data-action="analysis-person"]')).toHaveCount(1);
+    await expect(device.page.locator('#app-content')).not.toContainText(device===a?'Café solo':'Conta individual Gui');
+  }
+  await a.page.evaluate(()=>window.JuntoCloud.synchronize());expect(await a.page.evaluate(()=>window.JuntoApp.getState().settings.personalEstimates)).toEqual({a:5000,b:8000});
   for(const device of[a,b]){await device.page.evaluate(()=>window.JuntoApp.closeModal());await device.page.evaluate(()=>document.querySelector('[data-action="settings"]').click());await device.page.locator('#modal [data-action="balance"]').click();await device.page.locator('#balance-amount').fill('1.000,00');await device.page.locator('[data-form="balance"] [type="submit"]').click();await device.page.evaluate(()=>window.JuntoCloud.synchronize());}
   await a.page.evaluate(()=>window.JuntoCloud.synchronize());await b.page.evaluate(()=>window.JuntoCloud.synchronize());
   await expect.poll(()=>a.page.evaluate(()=>window.JuntoApp.getState().users.map(u=>u.balance))).toEqual([100000,100000]);
@@ -686,6 +697,18 @@ test('two independent accounts invite, sync offline edits and keep their own pro
   await b.page.evaluate(e=>window.JuntoApp.confirmBankMovement(e,{name:'Almoço',amount:2500,date:new Date().toISOString().slice(0,10),category:'Alimentação'}),event('b'));await b.page.evaluate(()=>window.JuntoCloud.synchronize());await a.context.setOffline(false);await a.page.evaluate(()=>window.JuntoCloud.synchronize());
   await expect.poll(async()=>{await a.page.evaluate(()=>window.JuntoCloud.synchronize());return a.page.evaluate(()=>window.JuntoApp.getState().transactions.length);}).toBe(4);await b.page.evaluate(()=>window.JuntoCloud.synchronize());
   await expect.poll(()=>b.page.evaluate(()=>window.JuntoApp.getState().transactions.length)).toBe(4);expect(await b.page.evaluate(()=>window.JuntoApp.getState().users.map(u=>u.balance))).toEqual([97500,97500]);await expect(b.page.locator('[data-action="profile-photo-switch"]')).toHaveCount(0);expect(await b.page.evaluate(()=>window.JuntoApp.getActive())).toBe('b');
+  // Disconnect while the partner has an offline expense: each solo ledger
+  // keeps its own history, and the queued bank movement still reaches the server.
+  await b.context.setOffline(true);await b.page.evaluate(e=>window.JuntoApp.confirmBankMovement(e,{name:'Despesa offline Bia',amount:1250,date:new Date().toISOString().slice(0,10),category:'Outros'}),event('f'));
+  await a.page.locator('#cloud-account-button').click();await a.page.locator('[data-feature="cloud-disconnect-open"]').click();await expect(a.page.locator('[data-feature-form="cloud-disconnect"]')).toBeVisible();
+  await a.page.locator('[name="confirm-disconnect"]').check();await a.page.locator('[data-feature-form="cloud-disconnect"] [type="submit"]').click();await expect(a.page.locator('.cloud-membership')).toHaveText('Modo solo');
+  expect(await a.page.evaluate(()=>window.JuntoApp.getState().users.map(u=>u.balance))).toEqual([97500]);
+  await b.context.setOffline(false);await b.page.reload();await expect(b.page.locator('#authenticated-app')).toBeVisible();await b.page.evaluate(()=>window.JuntoCloud.synchronize());
+  await expect.poll(()=>b.page.evaluate(()=>window.JuntoApp.getSlot())).toBe('a');await expect.poll(()=>b.page.evaluate(()=>window.JuntoApp.getState().users.map(u=>u.balance))).toEqual([96250]);
+  await b.page.evaluate(()=>window.JuntoCloud.synchronize());const ownB=await b.page.evaluate(()=>window.JuntoApp.getState());expect(ownB.transactions.map(t=>t.name)).toEqual(['Café solo','Almoço','Despesa offline Bia']);expect(ownB.incomes.map(i=>i.name)).toEqual(['Salário só da Bia']);
+  expect((await db.query('select payload from public.junto_snapshots where space_id=(select space_id from public.junto_members where user_id=$1)',[ids[1]])).rows[0].payload.users[0].balance).toBe(96250);
+  expect(await a.page.evaluate(()=>window.JuntoApp.getState().transactions.map(t=>t.name))).toEqual(['Conta individual Gui','Mercado']);
+  await b.page.locator('#cloud-account-button').click();await expect(b.page.locator('.cloud-membership')).toHaveText('Modo solo');await expect(b.page.locator('[data-feature="cloud-disconnect-open"]')).toHaveCount(0);await b.page.evaluate(()=>window.JuntoApp.closeModal());
   // A response that arrives after logout must not resurrect the old account.
   await a.page.evaluate(()=>window.JuntoCloud.synchronize());
   const personalBackup=await a.page.evaluate(()=>JSON.parse(localStorage.getItem('junto-personal-backup-v1')));

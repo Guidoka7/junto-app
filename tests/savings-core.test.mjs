@@ -55,7 +55,7 @@ test('corrida para o trabalho é reconhecida em Outros, sem chamar corridas sem 
   tx('work','Uber trabalho',4000,'a',today,'Outros'),
   tx('unknown','99 Pop',4200,'a',today,'Outros'),
   tx('necessary','Táxi hospital',5000,'a',today,'Outros'),
-  tx('bus','Passagem ônibus',1100,'a',today,'Outros')
+  tx('bus','Passagem ônibus',1100,'a','2026-10-06','Outros')
  ];
  const r=savingsReport(personalFinance(s,'a'),'a',today);
  assert.equal(classifyExpense(s.transactions[0]).kind,'transport-extra');
@@ -66,4 +66,13 @@ test('corrida para o trabalho é reconhecida em Outros, sem chamar corridas sem 
  assert.equal(r.unknownRide.id,'unknown');
  assert.ok(!r.avoidable.unknown);
  assert.ok(!r.avoidable.necessary);
+});
+
+test('ônibus já pago no mesmo dia não desconta a referência duas vezes do custo extra do Uber',()=>{
+ const s=base();
+ s.transactions=[tx('ride','Uber trabalho',4000,'a',today,'Outros'),tx('bus','Passagem ônibus',1100,'a',today,'Transporte')];
+ const report=savingsReport(personalFinance(s,'a'),'a',today);
+ assert.equal(report.opportunities.find(x=>x.key==='commute').saving,4000);
+ assert.equal(report.avoidable.ride,4000);
+ assert.ok(!report.avoidable.bus);
 });

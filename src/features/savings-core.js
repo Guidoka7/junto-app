@@ -13,14 +13,20 @@ export function classifyExpense(row){
   if(context==='necessary'||inferred==='necessary')return result('essential','essential','Necessário / exceção','Você marcou como necessário, ou o registro indica uma necessidade.');
   if(context==='optional')return result('optional','choices','Pode reduzir','Você marcou este gasto como uma escolha que pode reduzir.');
   if(/\b(cigarr[oa]s?|tabaco|vape|pod|fumo)\b/.test(n))return result('optional','tobacco','Pode reduzir','Compras de cigarro e tabaco podem ser reduzidas para guardar mais.');
-  if(row.category==='Transporte'){
-    const ride=/\b(uber|99|taxi|corrida de app|indrive)\b/.test(n),work=context==='work';
-    if(ride&&work)return result('transport-extra','commute','Compare com seu ônibus','Trajeto para o trabalho: compare o custo do dia com seu transporte habitual.',{work:true,ride:true});
-    if(ride)return result('review','ride','Entender o trajeto','Uma corrida pode ser necessária. Marque se foi para o trabalho ou uma exceção.',{ride:true});
-    return result('essential','transport','Transporte necessário','Passagem e lotação fazem parte do deslocamento; a dica preserva esse custo.',{work:work||/\b(onibus|passagem|lotacao)\b/.test(n)});
+  // A descrição da corrida vale mais que a categoria escolhida no preenchimento inteligente.
+  // Sem destino confirmado, não classificamos toda corrida como desperdício.
+  const ride=/\b(uber|99(?:pop)?|taxi|corrida de app|indrive)\b/.test(n);
+  if(ride&&context==='work')return result('transport-extra','commute','Compare com seu ônibus','Trajeto para o trabalho: compare o custo do dia com seu transporte habitual.',{work:true,ride:true});
+  if(ride)return result('review','ride','Entender o trajeto','Uma corrida pode ser necessária. Marque se foi para o trabalho ou uma exceção.',{ride:true});
+  if(row.category==='Transporte'||/\b(onibus|passagem|lotacao|metro|trem)\b/.test(n)){
+    return result('essential','transport','Transporte necessário','Passagem e lotação fazem parte do deslocamento; a dica preserva esse custo.',{work:context==='work'||/\b(onibus|passagem|lotacao)\b/.test(n)});
   }
-  if(/\b(almoco|jantar|marmita|arroz|feijao|mercado)\b/.test(n)||['Alimentação','Saúde','Casa','Trabalho','Educação','Impostos'].includes(row.category)||row.billId)return result('essential','essential','Necessário','Alimentação básica, saúde e compromissos não entram como desperdício.');
-  if(row.category==='Lanches'||/\b(lanche|lanchinho|coxinha|salgado|pastel|chocolate|sorvete|refrigerante|energetico)\b/.test(n))return result('optional','snacks','Pode reduzir','Lanches e extras podem dar lugar a uma opção planejada ou preparada em casa.');
+  // O nome específico prevalece sobre uma categoria genérica: "lanche" ainda é extra
+  // quando o preenchimento automático escolher Alimentação.
+  const meal=/\b(almoco|jantar|marmita|arroz|feijao|mercado|cesta basica)\b/.test(n);
+  if(meal||['Saúde','Casa','Trabalho','Educação','Impostos'].includes(row.category)||row.billId)return result('essential','essential','Necessário','Alimentação básica, saúde e compromissos não entram como desperdício.');
+  if(row.category==='Lanches'||/\b(lanche|lanchinho|coxinha|salgado|pastel|chocolate|sorvete|refrigerante|energetico|delivery)\b/.test(n))return result('optional','snacks','Pode reduzir','Lanches e extras podem dar lugar a uma opção planejada ou preparada em casa.');
+  if(row.category==='Alimentação')return result('essential','essential','Alimentação básica','Alimentação essencial não entra como desperdício; identifique lanches e extras pelo nome.');
   if(['Hábitos','Delivery','Restaurantes','Lazer','Compras','Beleza'].includes(row.category))return result('optional',row.category==='Hábitos'?'habits':'choices','Pode reduzir','É uma escolha flexível: reduza a frequência sem cortar o essencial.');
   return result('review','unknown','Precisa de contexto','O nome e a categoria ainda não bastam para dizer se este gasto pode ser reduzido.');
 }

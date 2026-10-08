@@ -8,6 +8,8 @@ export function sessionResponse(expiresIn=3600){
 }
 export async function mockCloud(page,{authenticated=false,space=true,members=1,signupSession=true,missingConfig=false,expiresIn=3600,denyRefresh=false}={}){
  const session=sessionResponse(expiresIn);let remote=null;
+ // Os testes antigos não passam pelo raio-x inicial; o teste dele limpa esta marca.
+ await page.addInitScript(()=>{try{if(!sessionStorage.getItem('junto-test-setup-keep')){localStorage.setItem('junto-setup-offered-a','1');localStorage.setItem('junto-setup-offered-b','1');}}catch{}});
  await page.route('**/js/config.js',route=>route.fulfill({contentType:'application/javascript',body:`window.JuntoCloudConfig=${JSON.stringify(missingConfig?{}:testConfig)};`}));
  if(authenticated)await page.addInitScript(session=>localStorage.setItem('sb-junto-test-auth-token',JSON.stringify(session)),session);
  await page.routeWebSocket('**/realtime/v1/websocket**',socket=>socket.onMessage(text=>{const m=JSON.parse(text);socket.send(JSON.stringify(Array.isArray(m)?[m[0],m[1],m[2],'phx_reply',{status:'ok',response:{}}]:{...m,event:'phx_reply',payload:{status:'ok',response:{}}}));}));

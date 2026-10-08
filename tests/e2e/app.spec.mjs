@@ -53,6 +53,44 @@ test('a debt paid during onboarding does not repeat every day in the month forec
  await expect(page.locator('.future-v3-card .j-big')).not.toHaveClass(/neg/);await expect(page.locator('[data-action="personal-budget"]')).toBeVisible();
 });
 
+test('raio-x inicial abre na primeira vez, monta entradas, contas e metas e não duplica ao refazer',async({page})=>{
+ await page.addInitScript(()=>sessionStorage.setItem('junto-test-setup-keep','1'));
+ await page.goto('/');await personal(page,150000);
+ await page.evaluate(()=>{localStorage.removeItem('junto-setup-offered-a');});await page.reload();await expect(page.locator('#authenticated-app')).toBeVisible();
+ await expect(page.locator('.j-setup')).toBeVisible();
+ const next=()=>page.locator('.j-setup [data-action="setup-next"]:not([data-skip])').click();
+ await next();
+ for(const k of ['salary','daily','vt'])await page.locator(`.j-setup-card:has(input[value="${k}"])`).click();
+ await next();
+ await next();await expect(page.locator('#form-error')).toContainText('salário');
+ await page.locator('[name="amount"]').fill('3.000,00');await next();
+ await page.locator('[name="amount"]').fill('100');await next();
+ await page.locator('[name="amount"]').fill('200');await page.locator('[name="fare"]').fill('6,00');await next();
+ await page.locator('.j-setup-row[data-key="rent"] .j-setup-toggle').click();await page.locator('[name="amount-rent"]').fill('1.000');await next();
+ await page.locator('[name="ess-food"]').fill('500');await next();
+ await page.locator('.j-setup-row[data-key="delivery"] .j-setup-toggle').click();await page.locator('[name="impamount-delivery"]').fill('300');await next();
+ await next();
+ await page.locator('[name="name"]').fill('Viagem');await page.locator('[name="target"]').fill('2.400');await next();
+ await expect(page.locator('.j-setup-sum')).toContainText('Sobra no mês');
+ await next();await expect(page.locator('#modal')).not.toBeVisible();
+ let s=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(s.incomes.map(i=>i.name).sort()).toEqual(['Ganhos da semana','Salário','Vale transporte']);
+ expect(s.incomes.find(i=>i.name==='Ganhos da semana').amount).toBe(50000);
+ expect(s.bills.filter(b=>b.name==='Aluguel'&&b.recurring)).toHaveLength(1);
+ expect(s.users[0].balance).toBe(150000);
+ const caps=s.settings.personalBudgets?.a||s.budgets;expect(caps.Alimentação).toBe(50000);expect(caps.Delivery).toBe(15000);
+ expect(s.settings.personalBudget.a.fare).toBe(600);expect(s.goals.map(g=>g.name)).toContain('Viagem');
+ await expect(page.locator('.j-setup-cta')).toHaveCount(0);
+ // Refazer: muda o salário, não duplica nada.
+ await page.locator('#mobile-nav [data-route="analysis"]').click();await page.locator('.j-setup-redo').click();
+ await next();await next();await page.locator('[name="amount"]').fill('3.500,00');
+ for(let i=0;i<12&&await page.locator('.j-setup-sum').count()===0;i++)await next();
+ await next();await expect(page.locator('#modal')).not.toBeVisible();
+ s=await page.evaluate(()=>window.JuntoApp.getState());
+ expect(s.incomes.filter(i=>i.name==='Salário')).toHaveLength(1);expect(s.incomes.find(i=>i.name==='Salário').amount).toBe(350000);
+ expect(s.bills.filter(b=>b.name==='Aluguel')).toHaveLength(1);expect(s.goals.filter(g=>g.name==='Viagem')).toHaveLength(1);
+});
+
 test('meu orçamento aceita vírgula e %, explica data antiga e mostra o que ficou salvo',async({page})=>{
  await page.goto('/');await personal(page,200000);
  await page.evaluate(()=>{const s=window.JuntoApp.getState();s.incomes=[{id:'sal',name:'Salário',person:'a',amount:300000,rule:'business',nth:5,countSat:true,since:'2026-01-01'}];window.JuntoApp.applyState(s);});
@@ -671,7 +709,7 @@ test('two independent accounts invite, sync offline edits and keep their own pro
  await db.exec("create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;");for(const id of ids)await db.query('insert into auth.users values($1)',[id]);await db.exec(await readFile('supabase/setup.sql','utf8'));
  let chain=Promise.resolve(),holdRead=null,releaseRead,readStarted,readFinished;const contexts=[];
  const token=uid=>[Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url'),Buffer.from(JSON.stringify({sub:uid,role:'authenticated',aud:'authenticated',exp:Math.floor(Date.now()/1000)+3600})).toString('base64url'),'test'].join('.');
- async function device(index){const context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block'});contexts.push(context);const page=await context.newPage();await page.route('**/js/config.js',route=>route.fulfill({contentType:'application/javascript',body:`window.JuntoCloudConfig=${JSON.stringify(testConfig)};`}));
+ async function device(index){const context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block'});contexts.push(context);await context.addInitScript(()=>{localStorage.setItem('junto-setup-offered-a','1');localStorage.setItem('junto-setup-offered-b','1');});const page=await context.newPage();await page.route('**/js/config.js',route=>route.fulfill({contentType:'application/javascript',body:`window.JuntoCloudConfig=${JSON.stringify(testConfig)};`}));
   await page.routeWebSocket('**/realtime/v1/websocket**',socket=>socket.onMessage(text=>{const m=JSON.parse(text);socket.send(JSON.stringify(Array.isArray(m)?[m[0],m[1],m[2],'phx_reply',{status:'ok',response:{}}]:{...m,event:'phx_reply',payload:{status:'ok',response:{}}}));}));
   await page.route('https://junto-test.supabase.co/**',async route=>{const request=route.request(),url=new URL(request.url()),payload=request.postDataJSON()||{};if(url.pathname.includes('/auth/v1/token')){const uid=ids[index],u={id:uid,email:index?'bia@junto.example':'gui@junto.example',aud:'authenticated',role:'authenticated',user_metadata:{display_name:index?'Bia':'Gui'},app_metadata:{provider:'email'},created_at:new Date().toISOString()};await route.fulfill({json:{access_token:token(uid),refresh_token:'refresh-'+index,expires_in:3600,token_type:'bearer',user:u}});return;}
     if(url.pathname.includes('/rest/v1/rpc/')){const delayed=index===0&&holdRead!==null;if(delayed){const wait=holdRead;holdRead=null;readStarted();await wait;}const task=async()=>{await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[ids[index]]);await db.exec('set role authenticated');try{const name=url.pathname.split('/').at(-1);const args=Object.values(payload);const rows=await db.query(`select public.${name}(${args.map((_,i)=>'$'+(i+1)).join(',')}) as result`,args);await route.fulfill({json:rows.rows[0].result});}catch(e){await route.fulfill({status:400,json:{message:e.message,code:'P0001'}});}finally{await db.exec('reset role');}};chain=chain.then(task,task);await chain;if(delayed)readFinished();return;}

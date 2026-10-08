@@ -121,7 +121,7 @@ html[data-theme] body{
   -webkit-font-smoothing:antialiased;
   text-rendering:optimizeLegibility;
 }
-html[data-theme] .topbar{align-items:center!important;column-gap:12px!important}
+html[data-theme] .topbar{column-gap:12px!important}
 html[data-theme] #main-title{
   color:var(--premium-ink)!important;
   font-weight:750!important;
@@ -376,4 +376,67 @@ html[data-theme] :is(.app-content,.columns,.future-v3-surface,.home-v3,.chat-v3,
 @media(prefers-reduced-transparency:reduce){
   html[data-theme] .mobile-nav,html[data-theme] .header-quick-btn,
   html[data-theme] .auth-card{background:var(--premium-surface)!important;backdrop-filter:none!important}
+}
+
+/* Final dark contrast audit — content that legacy styles kept light or navy. */
+html[data-theme="dark"] .empty{
+  background:linear-gradient(152deg,#213047 0%,#19283b 100%)!important;
+  color:#e5edf9!important;
+  border:1px dashed rgba(209,225,248,.2)!important;
+  box-shadow:var(--premium-highlight),0 10px 22px rgba(0,0,0,.14)!important;
+}
+html[data-theme="dark"] .empty h3{color:#f0f5fc!important}
+html[data-theme="dark"] .empty p{color:#b3c0d3!important}
+html[data-theme="dark"] .empty svg{color:#d4b078!important}
+html[data-theme="dark"] :is(.goal-title,.goal-panel h2,.home-empty-row b,.home-insight-card h3,
+ .home-dream-card-v3 h3,.home-dream-progress b,.home-latest-copy b,.tip h3){
+  color:#f0f4fc!important;
+}
+html[data-theme="dark"] :is(.goal-sub,.home-empty-row small,.home-money-eyebrow,
+ .home-dream-card-v3 p,.future-v3-empty p,.plans-v3-empty p,.home-insight-card p,
+ .bills-v3-list small,.income-v3-calendar small,.plans-v3-dream-top p){
+  color:#b3bfd2!important;
+}
+html[data-theme="dark"] .home-money-link{
+  background:linear-gradient(125deg,#26384e,#213046)!important;
+  color:#f0c982!important;
+  border-color:var(--premium-hairline)!important;
+}
+html[data-theme="dark"] .home-money-link :is(span,b,svg){color:#f0c982!important}
+html[data-theme="dark"] :is(.home-register-cta,.goal-panel .btn.secondary,
+ .bills-v3-summary>button:not(.bills-v3-income)){
+  background:linear-gradient(155deg,#30445f,#28394f)!important;
+  border:1px solid rgba(212,229,248,.14)!important;
+  color:#eef4fd!important;
+  box-shadow:var(--premium-highlight),0 7px 18px -10px rgba(0,0,0,.40)!important;
+}
+html[data-theme="dark"] :is(.home-register-cta,.goal-panel .btn.secondary,
+ .bills-v3-summary>button:not(.bills-v3-income)) :is(span,svg,b){
+  color:#f0f4fc!important;
+}
+html[data-theme="dark"] .bills-v3-income{
+  border-color:var(--premium-hairline)!important;
+  color:#f0cc8a!important;
+}
+html[data-theme="dark"] .bills-v3-income :is(span,b,svg){color:#f0cc8a!important}
+html[data-theme="dark"] .ask-v3-impact{
+  background:linear-gradient(120deg,#223d3a,#213347)!important;
+  color:#c8e8df!important;border:1px solid rgba(155,213,190,.14)!important;
+}
+html[data-theme="dark"] .ask-v3-impact strong{color:#a6e1cb!important}
+html[data-theme="dark"] .ask-v3-intro small{color:#b1bfd1!important}
+html[data-theme="dark"] .bills-v3-list .home-empty-row{color:#b7c6d8!important}
+html[data-theme="dark"] .ch-tip{
+  background:#293a51!important;color:#edf5ff!important;
+  border:1px solid var(--premium-hairline)!important;
+}
+html[data-theme="dark"] .ch-tick,html[data-theme="dark"] .ch-label,
+html[data-theme="dark"] .yc-tick{fill:#a8b8cd!important}
+html[data-theme="dark"] .yc-scen{stroke:#dcb778!important}
+html[data-theme="dark"] .yc-dot:not(.base){fill:#dcb778!important}
+html[data-theme="dark"] .yc-val:not(.base){fill:#f0ce90!important}
+html[data-theme="dark"] .lg.scen:before{background:#dcb778!important}
+@media(max-width:760px){
+  html[data-theme] .topbar{align-items:flex-start!important}
+  html[data-theme] .top-tools{align-self:flex-start!important}
 }

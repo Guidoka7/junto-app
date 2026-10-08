@@ -493,6 +493,14 @@ function eventRow(e) {
     id: e.id,
   });
 }
+// Saldo na conta: o meu e o da dupla somados (no modo solo, só o meu).
+function heroBalances() {
+  const mine = user(active).balance;
+  if (isSolo())
+    return `<div class="j-hero-bal one"><button data-action="balance" data-user="${active}" aria-label="Ajustar meu saldo"><small>Saldo na conta</small><b class="num ${mine < 0 ? "neg" : ""}">${cash(mine)}</b></button></div>`;
+  const o = other(), theirs = user(o).balance, both = mine + theirs;
+  return `<div class="j-hero-bal"><button data-action="balance" data-user="${active}" aria-label="Ajustar meu saldo"><small>Meu saldo</small><b class="num ${mine < 0 ? "neg" : ""}">${cash(mine)}</b></button><i aria-hidden="true"></i><div><small>Juntos <em>${esc(first(user(o).name))}: ${cash(theirs)}</em></small><b class="num ${both < 0 ? "neg" : ""}">${cash(both)}</b></div></div>`;
+}
 function homeV4() {
   const solo = isSolo(),
     available = free(),
@@ -529,6 +537,7 @@ function homeV4() {
       <div class="j-hero-top"><span>Livre pra curtir</span><button class="icon-btn" data-action="hide" aria-label="${hidden ? "Mostrar" : "Ocultar"} valores">${icon(hidden ? "eyeOff" : "eye")}</button></div>
       <strong class="j-hero-value num ${available < 0 ? "neg" : ""}" id="free-amount">${signed(available, cash)}</strong>
       <p>${available < 0 ? "O mês passou do livre. Vale revisar antes do próximo gasto." : "Contas, planos e combinados já separados."}</p>
+      ${heroBalances()}
       <div class="j-hero-stats">
         <button data-action="go" data-route="analysis" data-kind="analysis" data-value="forecast"><small>Por dia, hoje</small><b class="num">${cap == null ? "—" : cashR(cap)}</b></button>
         <button data-action="go" data-route="analysis" data-kind="analysis" data-value="forecast"><small>Fim do mês</small><b class="num ${eom != null && eom < 0 ? "neg" : ""}">${eom == null ? "—" : signed(eom)}</b></button>

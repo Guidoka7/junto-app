@@ -980,3 +980,10 @@ html[data-theme] .j-card.j-month-stats {
   margin-top: 0;
   padding: 8px;
 }
+/* Foto do perfil: recorte em círculo garantido (Android WebView deixava a foto
+   ampliada vazar para fora do botão). */
+html[data-theme] .profile-photo-inner {
+  clip-path: circle(50% at 50% 50%);
+  contain: paint;
+  isolation: isolate;
+}

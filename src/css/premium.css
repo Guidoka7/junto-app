@@ -1,0 +1,459 @@
+/*
+ * Juntô — Premium iOS surfaces.
+ * Final layer over legacy light/dark rules. Same components in both themes;
+ * ambient gradients stop at the top while UI surfaces remain neutral and legible.
+ * No finance behavior or app architecture changes.
+ */
+:root,html[data-theme="light"]{
+  --premium-canvas:#f7f8fb;
+  --premium-ink:#1b2b46;
+  --premium-subtle:#6f7d91;
+  --premium-surface:#fff;
+  --premium-raised:#fbfcff;
+  --premium-surface-glass:rgba(255,255,255,.86);
+  --premium-soft:#eef2f7;
+  --premium-hairline:rgba(68,87,115,.115);
+  --premium-separator:rgba(80,100,126,.12);
+  --premium-shadow:0 2px 5px rgba(22,37,63,.025),0 12px 34px -20px rgba(34,54,83,.23);
+  --premium-shadow-float:0 12px 36px -16px rgba(30,48,75,.29);
+  --premium-highlight:inset 0 1px 0 rgba(255,255,255,.96);
+  --premium-pill:#e9edf4;
+  --premium-selected:#fff;
+  --premium-accent:#cfaa69;
+  --premium-accent-ink:#866732;
+  --premium-splash:#e7edf8;
+  --premium-text-on-accent:#17283e;
+  --junto-canvas:var(--premium-canvas);
+  --junto-surface:var(--premium-surface);
+  --junto-navy:var(--premium-ink);
+  --junto-muted:var(--premium-subtle);
+  --junto-line:var(--premium-hairline);
+  --junto-gold:#cda765;
+  --junto-gold-soft:#f6f0e5;
+  --junto-shadow:var(--premium-shadow);
+  --ios-bg:var(--premium-canvas);
+  --ios-surface-solid:var(--premium-surface);
+  --ios-fill:var(--premium-soft);
+  --ios-label:var(--premium-ink);
+  --ios-secondary:var(--premium-subtle);
+  --ios-separator:var(--premium-separator);
+  --ink:var(--premium-ink);
+  --muted:var(--premium-subtle);
+  --paper:var(--premium-canvas);
+  --white:var(--premium-surface);
+  --line:var(--premium-hairline);
+  --soft:var(--premium-soft);
+  --navy:var(--premium-ink);
+  --navy2:#344760;
+  --gold:#d8b579;
+  --gold-ink:var(--premium-accent-ink);
+  --gold-tint:#f6efe3;
+}
+html[data-theme="dark"]{
+  --premium-canvas:#0f1725;
+  --premium-ink:#f0f4fc;
+  --premium-subtle:#a4b3c9;
+  --premium-surface:#1b293c;
+  --premium-raised:#23334a;
+  --premium-surface-glass:rgba(28,42,61,.88);
+  --premium-soft:#283a53;
+  --premium-hairline:rgba(213,227,247,.105);
+  --premium-separator:rgba(208,224,246,.11);
+  --premium-shadow:0 2px 5px rgba(0,0,0,.13),0 16px 42px -20px rgba(0,0,0,.62);
+  --premium-shadow-float:0 18px 48px -14px rgba(0,0,0,.58);
+  --premium-highlight:inset 0 1px 0 rgba(230,241,255,.075);
+  --premium-pill:#28394e;
+  --premium-selected:#39495f;
+  --premium-accent:#e6be78;
+  --premium-accent-ink:#f0ce91;
+  --premium-splash:#233752;
+  --premium-text-on-accent:#1d2a3d;
+  --junto-canvas:var(--premium-canvas);
+  --junto-surface:var(--premium-surface);
+  --junto-navy:var(--premium-ink);
+  --junto-muted:var(--premium-subtle);
+  --junto-line:var(--premium-hairline);
+  --junto-gold:#e1b66e;
+  --junto-gold-soft:#353328;
+  --junto-shadow:var(--premium-shadow);
+  --ios-bg:var(--premium-canvas);
+  --ios-surface-solid:var(--premium-surface);
+  --ios-fill:var(--premium-soft);
+  --ios-label:var(--premium-ink);
+  --ios-secondary:var(--premium-subtle);
+  --ios-separator:var(--premium-separator);
+  --ink:var(--premium-ink);
+  --muted:var(--premium-subtle);
+  --paper:var(--premium-canvas);
+  --white:var(--premium-surface);
+  --line:var(--premium-hairline);
+  --soft:var(--premium-soft);
+  --navy:#304761;
+  --navy2:#415e80;
+  --gold:#e1bd80;
+  --gold-ink:var(--premium-accent-ink);
+  --gold-tint:#353328;
+  --pos:#8fd7b9;
+  --bad:#ffa5b0;
+}
+/* The ambient glow belongs to every route, not just Home; it disappears gently
+   after the first ~500 px. No opaque banner, no sharp color stop. */
+html[data-theme="light"] body,
+html[data-theme="light"] body[data-route]{
+  background:
+    radial-gradient(ellipse 110% 490px at 8% -155px,rgba(212,225,248,.88),rgba(232,239,251,0) 75%),
+    radial-gradient(ellipse 73% 350px at 102% -65px,rgba(252,227,223,.59),rgba(252,231,226,0) 79%),
+    linear-gradient(180deg,#f7f9fc 0%,#f7f8fb 52%,#f7f8fb 100%)!important;
+  background-attachment:scroll!important;
+  color:var(--premium-ink);
+}
+html[data-theme="dark"] body,
+html[data-theme="dark"] body[data-route]{
+  background:
+    radial-gradient(ellipse 115% 490px at 5% -150px,rgba(68,93,133,.50),rgba(43,66,97,0) 77%),
+    radial-gradient(ellipse 76% 355px at 100% -80px,rgba(111,79,115,.18),rgba(68,63,102,0) 81%),
+    linear-gradient(180deg,#121c2c 0%,#0f1725 50%,#0f1725 100%)!important;
+  background-attachment:scroll!important;
+  color:var(--premium-ink);
+}
+/* Shared type scale, compact rhythm, clear focus and controls. */
+html[data-theme] body{
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+html[data-theme] .topbar{column-gap:12px!important}
+html[data-theme] #main-title{
+  color:var(--premium-ink)!important;
+  font-weight:750!important;
+  letter-spacing:-1.3px!important;
+  line-height:1.13!important;
+}
+html[data-theme] .top-eyebrow{color:var(--premium-subtle)!important;letter-spacing:.012em}
+html[data-theme] .mobile-brand .brand,
+html[data-theme] .brand{color:var(--premium-ink)!important;letter-spacing:-1.65px}
+html[data-theme] .brand-mark{filter:none}
+html[data-theme] .top-tools{align-items:center!important;gap:7px!important}
+html[data-theme] .top-heading{min-width:0}
+html[data-theme] .header-actions{gap:6px}
+html[data-theme] .header-quick-btn{
+  width:40px;height:40px;flex-basis:40px;border-radius:14px;
+  color:var(--premium-ink);background:var(--premium-surface-glass);
+  border:1px solid var(--premium-hairline);
+  box-shadow:var(--premium-highlight),0 5px 14px -8px rgba(25,40,60,.20);
+  -webkit-backdrop-filter:blur(16px) saturate(1.1);backdrop-filter:blur(16px) saturate(1.1);
+}
+html[data-theme] .header-quick-btn:hover{background:var(--premium-raised);border-color:var(--premium-accent)}
+html[data-theme="dark"] .header-theme-btn{color:var(--premium-accent-ink)}
+html[data-theme] .profile-photo-button{
+  box-shadow:0 7px 24px -10px rgba(18,35,58,.36),0 0 0 2px var(--premium-surface)!important
+}
+html[data-theme] .profile-unread-dot{border-color:var(--premium-surface)}
+html[data-theme] :is(.home-greeting-v3,.future-v3-head,.income-v3-head,.analysis-v3-head,.bills-v3-head,.plans-v3-head) h2{
+  color:var(--premium-ink)!important;font-weight:760;letter-spacing:-1.2px!important;
+}
+html[data-theme] :is(.home-greeting-v3,.future-v3-head,.income-v3-head,.analysis-v3-head,.bills-v3-head,.plans-v3-head) p{
+  color:var(--premium-subtle)!important;font-weight:450;
+}
+html[data-theme] :is(.home-greeting-v3,.future-v3-head,.income-v3-head,.analysis-v3-head,.bills-v3-head,.plans-v3-head)>span{
+  color:var(--premium-accent-ink)!important;
+}
+html[data-theme] :is(.date-label,.side-caption,.home-mode-badge){color:var(--premium-subtle)}
+/* All primary page surfaces share one iOS-style material and hierarchy. */
+html[data-theme] :is(
+ .panel,.insight-card,.list-card,.request-card,.plan-card,.save-panel,.sim,.hist-panel,
+ .stat,.fixed-card,.cat,.radar-item,.forecast-strip,.goal-panel,.peer-request,
+ .home-money-card-v3,.home-dream-card-v3,.home-more-v3 .home-quick-entry,.home-more-v3 .home-latest,
+ .future-v3-card,.future-v3-sim,.future-v3-empty,.income-v3-total,.income-v3-list,
+ .income-v3-toolbar,.income-v3-calendar,.income-v3-adjust,.analysis-v3-card,
+ .analysis-v3-latest,.bills-v3-summary,.bills-v3-list,.plans-v3-dream,
+ .plans-v3-other,.plans-v3-empty,.plans-v3-create,.tip,.stat-card,
+ .goal-detail-hero
+){
+  background:linear-gradient(160deg,var(--premium-raised) 0%,var(--premium-surface) 84%)!important;
+  color:var(--premium-ink)!important;
+  border:1px solid var(--premium-hairline)!important;
+  box-shadow:var(--premium-highlight),var(--premium-shadow)!important;
+}
+html[data-theme] :is(
+ .panel,.insight-card,.list-card,.request-card,.plan-card,.save-panel,.sim,.hist-panel,
+ .home-money-card-v3,.home-dream-card-v3,.future-v3-card,.future-v3-sim,
+ .income-v3-total,.income-v3-list,.analysis-v3-card,.analysis-v3-latest,
+ .bills-v3-summary,.bills-v3-list,.plans-v3-dream,.plans-v3-other
+){border-radius:24px}
+html[data-theme] :is(.tip,.stat,.request-card,.cal-record){border-radius:18px}
+html[data-theme] :is(.home-section-title h2,.future-v3-total,.income-v3-total strong,
+ .analysis-v3-latest-row b,.analysis-v3-latest-row strong,.bills-v3-copy>b,
+ .bills-v3-row>strong,.bills-v3-summary>div>strong,.plans-v3-dream-top h3,
+ .plans-v3-other b,.future-v3-event b,.future-v3-event>strong,
+ .home-money-v3-value strong,.analysis-v3-donut b,
+ .analysis-v3-legend b,.analysis-v3-legend strong,.goal-detail-hero strong){
+  color:var(--premium-ink)!important;
+}
+html[data-theme] :is(.home-money-v3-copy>p,.future-v3-card>p,.future-v3-event small,
+ .future-v3-eyebrow,.income-v3-row small,.bills-v3-copy small,.analysis-v3-legend small,
+ .plans-v3-dream-top p,.plans-v3-other small,.tip p,.request-card .request-from,
+ .request-card .response-text b){color:var(--premium-subtle)!important}
+html[data-theme] :is(.future-v3-tabs,.income-v3-tabs,.analysis-v3-people,.bills-v3-tabs,.plans-v3-tabs,
+ .topic-tabs,.segmented,.filters){
+  background:var(--premium-pill)!important;border:1px solid var(--premium-hairline)!important;
+  box-shadow:inset 0 1px 2px rgba(6,17,34,.045)!important;border-radius:20px;
+}
+html[data-theme] :is(.future-v3-tabs,.income-v3-tabs,.analysis-v3-people,.bills-v3-tabs,.plans-v3-tabs,.topic-tabs) button{
+  color:var(--premium-subtle)!important;border-radius:15px;
+}
+html[data-theme] :is(.future-v3-tabs,.income-v3-tabs,.analysis-v3-people,.bills-v3-tabs,.plans-v3-tabs,.topic-tabs) button.active{
+  background:var(--premium-selected)!important;color:var(--premium-ink)!important;
+  box-shadow:0 2px 7px rgba(10,22,40,.11),var(--premium-highlight)!important;
+}
+html[data-theme="dark"] :is(.future-v3-tabs,.income-v3-tabs,.analysis-v3-people,.bills-v3-tabs,.plans-v3-tabs,.topic-tabs) button.active{
+  color:#f8deb0!important;border:1px solid rgba(235,200,136,.12)
+}
+html[data-theme] :is(.future-v3-more,.bills-v3-more,.plans-v3-more,.analysis-v3-tabs,.filters) button{
+  border-radius:99px;background:var(--premium-surface-glass)!important;
+  color:var(--premium-subtle)!important;border:1px solid var(--premium-hairline)!important;
+}
+html[data-theme] :is(.future-v3-more,.bills-v3-more,.plans-v3-more,.analysis-v3-tabs) button.active{
+  background:var(--premium-soft)!important;color:var(--premium-ink)!important;
+  border-color:var(--premium-hairline)!important;
+}
+html[data-theme] :is(.bills-v3-row,.income-v3-row,.analysis-v3-latest-row,.future-v3-event,.home-latest-row,.tl-row){
+  border-color:var(--premium-separator)!important;
+}
+html[data-theme] :is(.bills-v3-row,.income-v3-row,.analysis-v3-latest-row,.future-v3-event,.home-latest-row,.tl-row):hover{
+  background:var(--premium-soft)!important;
+}
+html[data-theme] :is(.future-v3-cap,.request-card .impact,.request-card .response-text,.bills-v3-split,
+ .plans-v3-people>div,.plans-v3-person,.bank-original,.form-note,.personal-budget,
+ .income-v3-insight,.analysis-v3-insight){
+  background:var(--premium-soft)!important;border-color:var(--premium-hairline)!important;
+  color:var(--premium-ink)!important;
+}
+html[data-theme] :is(.home-progress,.plans-v3-progress,.home-dream-card-v3 .home-progress){
+  background:var(--premium-soft)!important;
+}
+html[data-theme] .analysis-v3-donut:after{background:var(--premium-surface)!important}
+html[data-theme] :is(.future-v3-event-icon,.bills-v3-icon,.income-v3-icon,.plans-v3-illustration,.home-plus-dot){
+  box-shadow:inset 0 0 0 1px var(--premium-hairline);
+}
+html[data-theme] .tip-icon{background:var(--premium-soft);color:var(--premium-ink)}
+/* One floating frosted tab bar for all six routes. */
+html[data-theme] .mobile-nav{
+  background:var(--premium-surface-glass)!important;
+  border:1px solid var(--premium-hairline)!important;
+  box-shadow:0 10px 38px -8px rgba(10,25,49,.25),var(--premium-highlight)!important;
+  -webkit-backdrop-filter:blur(26px) saturate(1.25)!important;
+  backdrop-filter:blur(26px) saturate(1.25)!important;
+  border-radius:23px!important;
+}
+html[data-theme] .mobile-nav button{color:var(--premium-subtle)!important;border-radius:17px!important}
+html[data-theme] body[data-route] .mobile-nav button.active,
+html[data-theme] body[data-route="incomes"] .mobile-nav button[data-route="future"]{
+  background:var(--premium-soft)!important;color:var(--premium-ink)!important;
+  box-shadow:var(--premium-highlight)!important;
+}
+html[data-theme] body[data-route] .mobile-nav button.active svg,
+html[data-theme] body[data-route="incomes"] .mobile-nav button[data-route="future"] svg{
+  color:var(--premium-accent-ink)!important;background:transparent!important;box-shadow:none!important;
+}
+/* Forms, settings and modal sheets should be as polished as page cards. */
+html[data-theme] dialog,
+html[data-theme] dialog[data-kind="cloud-account"],
+html[data-theme] dialog .modal-wrap,
+html[data-theme] dialog[data-kind="ask"] .modal-wrap,
+html[data-theme] dialog[data-kind="connect-intro"] .modal-wrap,
+html[data-theme] dialog[data-kind="ledger-detail"] .modal-wrap,
+html[data-theme] dialog[data-kind="ledger-edit"] .modal-wrap{
+  background:var(--premium-surface)!important;color:var(--premium-ink)!important;
+  border-color:var(--premium-hairline)!important;
+}
+html[data-theme] dialog{box-shadow:0 24px 80px rgba(5,14,30,.32)!important}
+html[data-theme] dialog::backdrop{background:rgba(6,14,26,.60)!important;backdrop-filter:blur(8px)}
+html[data-theme] .modal-head h2,html[data-theme] dialog[data-kind] .modal-head h2{
+  color:var(--premium-ink)!important;font-weight:760!important;letter-spacing:-.7px;
+}
+html[data-theme] :is(.field input,.field select,.field textarea,.money-input,
+ .ai-grid input,.ai-grid select,.bank-search,.bank-choice-card,.bank-other,.bank-consent-card,
+ .cloud-action,.cloud-sync-button,.income-v3-month,.month-input,
+ .chat-v3 .chat-form textarea){
+  background:var(--premium-raised)!important;color:var(--premium-ink)!important;
+  border-color:var(--premium-hairline)!important;border-radius:14px;
+}
+html[data-theme] :is(input,textarea)::placeholder{color:var(--premium-subtle)!important;opacity:.85}
+html[data-theme] .field :is(input,textarea,select):focus{
+  border-color:var(--premium-accent)!important;
+  box-shadow:0 0 0 3px rgba(207,170,105,.16)!important;
+}
+html[data-theme] .btn:not(.primary):not(.danger){
+  background:var(--premium-raised)!important;color:var(--premium-ink)!important;
+  border:1px solid var(--premium-hairline)!important;
+  box-shadow:var(--premium-highlight)!important;
+}
+html[data-theme] .btn.primary{
+  background:linear-gradient(135deg,#e7c995 0%,#d4a960 100%)!important;
+  color:var(--premium-text-on-accent)!important;
+  border:1px solid rgba(170,120,55,.14)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.34),0 7px 16px -10px rgba(157,111,44,.5)!important;
+}
+html[data-theme] :is(.home-v3 .home-spend-cta,.future-v3-nudge>button,
+ .income-v3-add,.analysis-v3-add,.bills-v3-add,.plans-v3-save){
+  background:linear-gradient(130deg,#e8c78c,#d6ad6a)!important;color:#182942!important;
+}
+html[data-theme] :is(.photo-settings-card,.ai-settings-card,.cloud-connected,.cloud-restore-notice,
+ .cloud-action-primary,.bank-choice-card.selected,.bank-privacy-note){
+  background:var(--premium-raised)!important;color:var(--premium-ink)!important;
+  border:1px solid var(--premium-hairline)!important;
+}
+html[data-theme] .profile-photo-inner{background:var(--premium-soft)}
+html[data-theme] :is(.settings-row,.cloud-profile,.cloud-sync-section,.personal-budget-row){
+  border-color:var(--premium-separator)!important;
+}
+html[data-theme] :is(.cloud-account-layout,.cloud-action-copy strong,.cloud-account-layout h3,
+ .cloud-restore-counts,.cloud-profile strong){color:var(--premium-ink)!important}
+html[data-theme] :is(.cloud-action-copy small,.cloud-profile>div>span,.cloud-section-description,
+ .cloud-sync-row p,.settings-row p){color:var(--premium-subtle)!important}
+/* Chat stays legible; alternating messages use subtly different materials. */
+html[data-theme] :is(.chat-panel,.chat-v3,.chat-v3 .chat-head,.chat-v3 .chat-log,
+ .chat-v3 .chat-suggest,.chat-v3 .chat-form,.chat-v3 .chat-foot,.chat-context){
+  background:var(--premium-surface)!important;color:var(--premium-ink)!important;
+  border-color:var(--premium-hairline)!important;
+}
+html[data-theme] :is(.chat-msg.bot,.chat-v3 .chat-msg.bot,.chat-v3 .chip-btn){
+  background:var(--premium-raised)!important;color:var(--premium-ink)!important;
+  border:1px solid var(--premium-hairline)!important;
+}
+html[data-theme] .chat-v3 .chat-msg.bot b{color:var(--premium-ink)!important}
+html[data-theme] .chat-v3 .chat-msg.user{background:#304768!important;color:#f3f7ff!important}
+html[data-theme] .chat-v3 .chat-head small{color:var(--premium-subtle)!important}
+html[data-theme] .toast{background:var(--premium-surface)!important;color:var(--premium-ink)!important}
+html[data-theme] .toast-zone{z-index:150}
+/* Natural dimensionality without tinting content itself. */
+html[data-theme] :is(.home-more-v3 .home-quick-entry,.plans-v3-create,.future-v3-sim,
+ .income-v3-calendar,.income-v3-adjust){box-shadow:var(--premium-highlight),var(--premium-shadow)!important}
+html[data-theme] .home-section-title .text-link,
+html[data-theme] :is(.text-link,.plans-v3-detail-link){color:var(--premium-accent-ink)!important}
+html[data-theme] .sidebar{background:var(--premium-surface-glass)!important;border-color:var(--premium-hairline)!important}
+html[data-theme] .side-note,html[data-theme] .side-couple{
+  background:var(--premium-raised)!important;border:1px solid var(--premium-hairline)!important;
+  box-shadow:var(--premium-highlight)!important;color:var(--premium-ink);
+}
+html[data-theme] .nav-item{color:var(--premium-subtle)!important}
+html[data-theme] .nav-item.active{color:var(--premium-ink)!important;background:var(--premium-soft)!important}
+html[data-theme] .nav-item:hover{background:var(--premium-soft)!important;color:var(--premium-ink)!important}
+/* Auth/onboarding shares the same background and real theme palette. */
+html[data-theme] #auth-gate{background:transparent!important;color:var(--premium-ink)!important}
+html[data-theme] .auth-card{
+  background:var(--premium-surface-glass)!important;color:var(--premium-ink)!important;
+  border-color:var(--premium-hairline)!important;box-shadow:var(--premium-shadow-float)!important;
+  -webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);
+}
+html[data-theme] .auth-card :is(h1,h2,h3,b,strong){color:var(--premium-ink)!important}
+/* Accessibility, careful edge spacing and no horizontal clipping on Android. */
+html[data-theme] :is(button,a,input,textarea,select):focus-visible{
+  outline:2px solid var(--premium-accent)!important;outline-offset:2px;
+}
+html[data-theme] :is(.app-content,.columns,.future-v3-surface,.home-v3,.chat-v3,.top-heading){min-width:0}
+@media(max-width:760px){
+  html[data-theme] .workspace{
+    padding-left:max(16px,env(safe-area-inset-left,0px))!important;
+    padding-right:max(16px,env(safe-area-inset-right,0px))!important;
+  }
+  html[data-theme] .topbar{gap:10px!important}
+  html[data-theme] .mobile-brand{margin-bottom:19px}
+  html[data-theme] #main-title{font-size:clamp(29px,8vw,36px)!important}
+  html[data-theme] :is(.home-greeting-v3,.future-v3-head,.income-v3-head,.analysis-v3-head,.bills-v3-head,.plans-v3-head) h2{
+    font-size:clamp(29px,8vw,37px)!important;line-height:1.08!important;
+  }
+  html[data-theme] .header-quick-btn{width:39px;height:39px;flex-basis:39px}
+  html[data-theme] .profile-photo-button{width:44px;height:44px}
+  html[data-theme] .mobile-nav{left:11px!important;right:11px!important}
+}
+@media(max-width:380px){
+  html[data-theme] .header-actions{gap:3px}
+  html[data-theme] .header-quick-btn{width:35px;height:37px;flex-basis:35px;border-radius:12px}
+  html[data-theme] .top-tools{gap:4px!important}
+  html[data-theme] .profile-photo-button{width:44px;height:44px}
+}
+@media(prefers-reduced-transparency:reduce){
+  html[data-theme] .mobile-nav,html[data-theme] .header-quick-btn,
+  html[data-theme] .auth-card{background:var(--premium-surface)!important;backdrop-filter:none!important}
+}
+
+/* Final dark contrast audit — content that legacy styles kept light or navy. */
+html[data-theme="dark"] .empty{
+  background:linear-gradient(152deg,#213047 0%,#19283b 100%)!important;
+  color:#e5edf9!important;
+  border:1px dashed rgba(209,225,248,.2)!important;
+  box-shadow:var(--premium-highlight),0 10px 22px rgba(0,0,0,.14)!important;
+}
+html[data-theme="dark"] .empty h3{color:#f0f5fc!important}
+html[data-theme="dark"] .empty p{color:#b3c0d3!important}
+html[data-theme="dark"] .empty svg{color:#d4b078!important}
+html[data-theme="dark"] :is(.goal-title,.goal-panel h2,.home-empty-row b,.home-insight-card h3,
+ .home-dream-card-v3 h3,.home-dream-progress b,.home-latest-copy b,.tip h3){
+  color:#f0f4fc!important;
+}
+html[data-theme="dark"] :is(.goal-sub,.home-empty-row small,.home-money-eyebrow,
+ .home-dream-card-v3 p,.future-v3-empty p,.plans-v3-empty p,.home-insight-card p,
+ .bills-v3-list small,.income-v3-calendar small,.plans-v3-dream-top p){
+  color:#b3bfd2!important;
+}
+html[data-theme="dark"] .home-money-link{
+  background:linear-gradient(125deg,#26384e,#213046)!important;
+  color:#f0c982!important;
+  border-color:var(--premium-hairline)!important;
+}
+html[data-theme="dark"] .home-money-link :is(span,b,svg){color:#f0c982!important}
+html[data-theme="dark"] :is(.home-register-cta,.goal-panel .btn.secondary,
+ .bills-v3-summary>button:not(.bills-v3-income)){
+  background:linear-gradient(155deg,#30445f,#28394f)!important;
+  border:1px solid rgba(212,229,248,.14)!important;
+  color:#eef4fd!important;
+  box-shadow:var(--premium-highlight),0 7px 18px -10px rgba(0,0,0,.40)!important;
+}
+html[data-theme="dark"] :is(.home-register-cta,.goal-panel .btn.secondary,
+ .bills-v3-summary>button:not(.bills-v3-income)) :is(span,svg,b){
+  color:#f0f4fc!important;
+}
+html[data-theme="dark"] .bills-v3-income{
+  border-color:var(--premium-hairline)!important;
+  color:#f0cc8a!important;
+}
+html[data-theme="dark"] .bills-v3-income :is(span,b,svg){color:#f0cc8a!important}
+html[data-theme="dark"] .ask-v3-impact{
+  background:linear-gradient(120deg,#223d3a,#213347)!important;
+  color:#c8e8df!important;border:1px solid rgba(155,213,190,.14)!important;
+}
+html[data-theme="dark"] .ask-v3-impact strong{color:#a6e1cb!important}
+html[data-theme="dark"] .ask-v3-intro small{color:#b1bfd1!important}
+html[data-theme="dark"] .bills-v3-list .home-empty-row{color:#b7c6d8!important}
+html[data-theme="dark"] .ch-tip{
+  background:#293a51!important;color:#edf5ff!important;
+  border:1px solid var(--premium-hairline)!important;
+}
+html[data-theme="dark"] .ch-tick,html[data-theme="dark"] .ch-label,
+html[data-theme="dark"] .yc-tick{fill:#a8b8cd!important}
+html[data-theme="dark"] .yc-scen{stroke:#dcb778!important}
+html[data-theme="dark"] .yc-dot:not(.base){fill:#dcb778!important}
+html[data-theme="dark"] .yc-val:not(.base){fill:#f0ce90!important}
+html[data-theme="dark"] .lg.scen:before{background:#dcb778!important}
+@media(max-width:760px){
+  html[data-theme] .topbar{align-items:flex-start!important}
+  html[data-theme] .top-tools{align-self:flex-start!important}
+}
+
+/* Home dark mode: saving-plan CTA and insights must not appear as bright white slabs. */
+html[data-theme="dark"] .home-dream-save{
+  background:linear-gradient(155deg,#31435d,#273a51)!important;
+  border:1px solid rgba(214,229,250,.17)!important;
+  color:#eff5ff!important;
+  box-shadow:var(--premium-highlight)!important;
+}
+html[data-theme="dark"] .home-dream-save :is(svg,span,b){color:#eff5ff!important}
+html[data-theme="dark"] .home-insight-card{
+  background:linear-gradient(128deg,#213a38,#1b3337)!important;
+  border:1px solid rgba(156,216,193,.16)!important;
+  color:#e0f1ec!important;
+  box-shadow:var(--premium-highlight),var(--premium-shadow)!important;
+}
+html[data-theme="dark"] .home-insight-card :is(b,h3,svg,strong){color:#d9eee7!important}
+html[data-theme="dark"] .home-insight-card :is(p,small,span){color:#adccc1!important}

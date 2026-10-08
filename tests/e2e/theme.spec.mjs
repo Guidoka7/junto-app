@@ -18,20 +18,20 @@ test('modo escuro alterna ao lado do sino, salva preferência e restaura no Andr
   await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
   await expect(toggle).toHaveAttribute('aria-pressed','true');
   await expect(toggle).toHaveAttribute('aria-label','Ativar modo claro');
-  await expect.poll(()=>page.evaluate(()=>getComputedStyle(document.body).backgroundColor)).toBe('rgb(16, 23, 34)');
-  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content','#101722');
+  await expect.poll(()=>page.evaluate(()=>getComputedStyle(document.body).backgroundImage.includes('radial-gradient'))).toBe(true);
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content','#0f1725');
   expect(await page.evaluate(()=>localStorage.getItem('junto-theme-v1'))).toBe('dark');
   expect(await page.evaluate(()=>JSON.stringify(window.JuntoApp.getState()))).toBe(original);
   await bell.click();
   await expect(page.locator('#modal')).toHaveAttribute('open','');
-  await expect.poll(()=>page.evaluate(()=>getComputedStyle(document.querySelector('#modal')).backgroundColor)).toBe('rgb(25, 38, 55)');
+  await expect.poll(()=>page.evaluate(()=>getComputedStyle(document.querySelector('#modal')).backgroundColor)).toBe('rgb(27, 41, 60)');
   await page.reload();
   await expect(page.locator('#authenticated-app')).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
   await expect(page.locator('#header-actions [data-action="toggle-theme"]')).toHaveAttribute('aria-pressed','true');
   await page.locator('#header-actions [data-action="toggle-theme"]').click();
   await expect(page.locator('html')).toHaveAttribute('data-theme','light');
-  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content','#F5F5F7');
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content','#f7f8fb');
   expect(await page.evaluate(()=>localStorage.getItem('junto-theme-v1'))).toBe('light');
 });
 

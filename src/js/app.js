@@ -1588,6 +1588,7 @@ ${JSON.stringify(chatContext())}`;
     return `<div class="can-card ${level}"><div class="can-head"><span>${icon(level==='ok'?'circleCheck':level==='tight'?'info':'x')}</span><div><b>${head[0]}</b><small>${head[1]}</small></div></div><ul>${lines.map(l=>`<li>${l}</li>`).join('')}</ul><div class="can-actions"><button type="button" class="btn ${level==='no'?'secondary':'primary'}" data-action="can-buy">${icon('cart')}Comprei, registrar</button><button type="button" class="btn ${level==='no'?'primary':'secondary'}" data-action="can-wait">Vou esperar</button></div></div>`;
   }
   /* JUNTO_ORGANIZED */
+  /* JUNTO_SETUP */
   function render(){if(!appAccess)return;if(cloudSlot)active=cloudSlot;if(isSolo()){active='a';if(futureTab==='people')futureTab='forecast';}normalizeRoute();document.body.classList.toggle('solo',isSolo());renderNav();document.body.dataset.route=route;for(const k in chartStore)delete chartStore[k];$('#app-content').innerHTML=withFinanceView(viewMode(),()=>viewFor()());arrangeContextBar();renderPeer();if(chatOpen)renderChat();soloizeAll();}
   let modalReturnFocus=null;
   function modalHead(title){return `<div class="modal-head"><h2 id="modal-title">${esc(title)}</h2><button class="icon-btn" data-action="close" aria-label="Fechar">${icon('x')}</button></div>`;}

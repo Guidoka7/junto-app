@@ -530,6 +530,7 @@ function homeV4() {
   ]
     .filter(Boolean)
     .join("");
+  setupAutoOffer();
   return `<div class="j-page j-home">
     <header class="j-hello"><div><span class="j-eyebrow">${solo ? "Modo individual" : "Juntô a dois"}</span><h2>${hello}, ${esc(me)}.</h2></div></header>
     ${banners ? `<div class="j-banners">${banners}</div>` : ""}
@@ -548,13 +549,16 @@ function homeV4() {
       <button class="j-cta primary" data-action="expense">${icon("plus")}<span>Registrar gasto</span></button>
       <button class="j-cta" data-action="${solo ? "can-spend" : "ask"}">${icon(solo ? "sparkle" : "chat")}<span>${solo ? "Posso gastar?" : "Amor, posso gastar?"}</span></button>
     </div>
+    ${setupCard("home")}
     ${
-      Bn.score != null
+      !setupDone()
+        ? ""
+        : Bn.score != null
         ? `<button class="j-card j-score" data-action="go" data-route="analysis" data-kind="analysis" data-value="summary">${ring(Bn.score)}<span><small>Saúde financeira${solo ? "" : " · sua"}</small><b>${Bn.scoreLabel}</b><em>${esc(Bn.parts.slice().sort((a, b) => a.pts / a.max - b.pts / b.max)[0].note)}</em></span><span class="j-chev" aria-hidden="true">›</span></button>`
         : `<button class="j-card j-score" data-action="income-new">${icon("coins")}<span><small>Pra análise ficar sob medida</small><b>Conta quanto você ganha</b><em>Salário, semanal ou comissão — o Juntô monta tudo a partir disso.</em></span><span class="j-chev" aria-hidden="true">›</span></button>`
     }
     ${
-      insights.length
+      insights.length && setupDone()
         ? `<section class="j-block">${sectionTitle("O Juntô notou", goLink("Ver análise", "analysis", "analysis", "summary"))}<div class="j-insights">${insights.map(insightCard).join("")}</div></section>`
         : ""
     }
@@ -792,7 +796,7 @@ function summaryPanel() {
     solo = isSolo(),
     me = first(user().name);
   if (!Bn.inc)
-    return `${emptyBox("coins", "Primeiro, a sua renda.", "A análise do Juntô parte de quanto você ganha e quando o dinheiro cai. Cadastre salário, renda semanal ou comissão — dá pra ajustar depois.", `<button class="btn primary" data-action="income-new">Cadastrar renda</button><button class="btn ghost" data-action="route" data-route="incomes">Ver entradas</button>`)}${donutCard()}`;
+    return `${setupCard("analysis")}${emptyBox("coins", "Primeiro, a sua renda.", "A análise do Juntô parte de quanto você ganha e quando o dinheiro cai. Cadastre salário, renda semanal ou comissão — dá pra ajustar depois.", `<button class="btn primary" data-action="income-new">Cadastrar renda</button><button class="btn ghost" data-action="route" data-route="incomes">Ver entradas</button>`)}${donutCard()}`;
   const segs = [
     ["Contas fixas", Bn.fixed, "fixed", "Aluguel, contas e assinaturas."],
     ["Essenciais", Bn.essential, "ess", "Mercado, transporte e saúde."],
@@ -815,9 +819,9 @@ function summaryPanel() {
   const top = Bn.insights.slice(0, 4),
     more = Bn.insights.slice(4);
   const notes = `<section class="j-block">${sectionTitle("O Juntô notou")}<div class="j-insights">${top.map(insightCard).join("")}</div>${more.length ? `<details class="j-more j-more-list"><summary>Ver mais ${plural(more.length, "leitura", "leituras")}</summary><div class="j-insights">${more.map(insightCard).join("")}</div></details>` : ""}</section>`;
-  return `${score}${notes}${split}${incomeCard()}${donutCard()}${monthByMonth()}${
+  return `${setupCard("analysis")}${score}${notes}${split}${incomeCard()}${donutCard()}${monthByMonth()}${
     solo ? "" : `<section class="j-block">${sectionTitle("Cada um")}<div class="person-grid">${personCard("a")}${personCard("b")}</div></section>`
-  }`;
+  }${setupDone() ? `<button class="j-card j-setup-redo" data-action="setup-open"><span>✦</span><span><b>Refazer meu raio-x</b><small>Mudou salário, conta ou rotina? Atualiza em 2 minutos.</small></span><span class="j-chev" aria-hidden="true">›</span></button>` : ""}`;
 }
 function incomeCard() {
   const fs = withFinanceView("personal", () => financeState()),

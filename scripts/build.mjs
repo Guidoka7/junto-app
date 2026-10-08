@@ -12,8 +12,9 @@ export async function buildWeb(){
   const appPath=join(dist,'js/app.js'),app=await readFile(appPath,'utf8');
   if(!app.includes('/* JUNTO_APP_API */'))throw new Error('Marcador da integração ausente.');
   if(!app.includes('/* JUNTO_ORGANIZED */'))throw new Error('Marcador das telas organizadas ausente.');
-  const organized=await readFile(join(src,'features/organized.js'),'utf8'),api=await readFile(join(src,'features/app-api.js'),'utf8');
-  await writeFile(appPath,app.replace('/* JUNTO_ORGANIZED */',()=>organized).replace('/* JUNTO_APP_API */',()=>api));
+  if(!app.includes('/* JUNTO_SETUP */'))throw new Error('Marcador do raio-x inicial ausente.');
+  const organized=await readFile(join(src,'features/organized.js'),'utf8'),setup=await readFile(join(src,'features/setup.js'),'utf8'),api=await readFile(join(src,'features/app-api.js'),'utf8');
+  await writeFile(appPath,app.replace('/* JUNTO_ORGANIZED */',()=>organized).replace('/* JUNTO_SETUP */',()=>setup).replace('/* JUNTO_APP_API */',()=>api));
   await rm(join(dist,'features'),{recursive:true,force:true});
   await build({absWorkingDir:root,entryPoints:['src/js/native.js','src/js/banking.js','src/js/cloud.js','src/js/budget.js'],outdir:join(dist,'js'),bundle:true,format:'iife',platform:'browser',target:['chrome109','safari16'],legalComments:'eof'});
   const config={url:process.env.SUPABASE_URL||'',publishableKey:process.env.SUPABASE_PUBLISHABLE_KEY||'',appUrl:String(process.env.JUNTO_APP_URL||'').replace(/\/+$/,'')};

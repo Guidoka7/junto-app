@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const must = ['src/index.html', 'src/css/app.css', 'src/css/mobile-compact.css', 'src/css/refine.css', 'src/js/app.js', 'src/js/banking.js', 'src/js/cloud.js', 'src/features/app-api.js', 'src/features/organized.js', 'src/features/sync-core.js', 'src/manifest.webmanifest', 'src/sw.js', 'src/icons/icon-512.png', 'capacitor.config.json'];
+const must = ['src/index.html', 'src/css/app.css', 'src/css/mobile-compact.css', 'src/css/refine.css', 'src/js/app.js', 'src/js/banking.js', 'src/js/cloud.js', 'src/features/app-api.js', 'src/features/organized.js', 'src/features/setup.js', 'src/features/sync-core.js', 'src/manifest.webmanifest', 'src/sw.js', 'src/icons/icon-512.png', 'capacitor.config.json'];
 let ok = true;
 for (const f of must) {
   try { await access(join(root, f)); } catch { console.error(`✗ falta ${f}`); ok = false; }
@@ -40,7 +40,7 @@ try {
 // Impede publicar controles visuais sem fluxo correspondente.
 try {
   // As telas organizadas são inseridas em app.js no build; auditamos as duas fontes juntas.
-  const app = (await readFile(join(root, 'src/js/app.js'), 'utf8')) + (await readFile(join(root, 'src/features/organized.js'), 'utf8'));
+  const app = (await readFile(join(root, 'src/js/app.js'), 'utf8')) + (await readFile(join(root, 'src/features/organized.js'), 'utf8')) + (await readFile(join(root, 'src/features/setup.js'), 'utf8'));
   const unique = xs => [...new Set(xs)].sort();
   const actions = unique([...app.matchAll(/data-action=["'`]([^"'`$<>{}\s]+)["'`]/g)].map(m => m[1]));
   const actionHandlers = unique([...app.matchAll(/action===['"]([^'"]+)['"]/g)].map(m => m[1]));

@@ -31,3 +31,11 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
+      - name: Capturas visuais premium (modo claro e escuro)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junto-premium-visual-${{ github.run_id }}
+          path: test-results/premium-*.png
+          if-no-files-found: ignore
+          retention-days: 3

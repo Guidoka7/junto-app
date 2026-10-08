@@ -45,6 +45,7 @@ for(const theme of ['light','dark']){
       expect(appearance.cardGradient,`${theme}/${route}: flat opaque cards`).toBe(true);
       expect(appearance.overflow,`${theme}/${route}: horizontal overflow`).toBe(false);
       expect(appearance.quickButtons).toBe(2);
+      await page.waitForTimeout(420); // aguardar transição de opacidade da rota antes da captura
       await page.screenshot({path:`test-results/premium-${theme}-${route}.png`});
     }
     await page.locator('#header-actions [data-action="toggle-theme"]').click();

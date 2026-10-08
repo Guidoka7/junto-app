@@ -987,3 +987,6 @@ html[data-theme] .profile-photo-inner {
   contain: paint;
   isolation: isolate;
 }
+html[data-theme="dark"] .personal-budget-saved {
+  background: rgba(118, 118, 128, 0.2) !important;
+}

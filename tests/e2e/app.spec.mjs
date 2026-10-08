@@ -53,6 +53,21 @@ test('a debt paid during onboarding does not repeat every day in the month forec
  await expect(page.locator('.future-v3-card .j-big')).not.toHaveClass(/neg/);await expect(page.locator('[data-action="personal-budget"]')).toBeVisible();
 });
 
+test('meu orçamento aceita vírgula e %, explica data antiga e mostra o que ficou salvo',async({page})=>{
+ await page.goto('/');await personal(page,200000);
+ await page.evaluate(()=>{const s=window.JuntoApp.getState();s.incomes=[{id:'sal',name:'Salário',person:'a',amount:300000,rule:'business',nth:5,countSat:true,since:'2026-01-01'}];window.JuntoApp.applyState(s);});
+ await page.locator('#mobile-nav [data-route="analysis"]').click();await page.locator('.j-seg [data-value="forecast"]').click();
+ await page.locator('[data-action="personal-budget"]').first().click();
+ await page.locator('#budget-fare').fill('6');await page.locator('#budget-principal').fill('1.500,00');await page.locator('#budget-rate').fill('2,5%');await page.locator('#budget-minimum').fill('');
+ await page.locator('#budget-since').fill('2024-05-10');await page.locator('[data-form="personal-budget"] [type="submit"]').click();
+ await expect(page.locator('#form-error')).toContainText('passa de 1 ano');
+ const today=await page.evaluate(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;});
+ await page.locator('#budget-since').fill(today);await page.locator('[data-form="personal-budget"] [type="submit"]').click();
+ await expect(page.locator('#modal')).not.toBeVisible();
+ expect(await page.evaluate(()=>window.JuntoApp.getState().settings.personalBudget.a)).toMatchObject({fare:600,trips:2,debtPrincipal:150000,debtRate:2.5,debtMinimum:0,debtSince:today});
+ await expect(page.locator('.personal-budget-saved')).toContainText('2 × R$ 6,00');await expect(page.locator('.personal-budget-saved')).toContainText('2,5% ao mês');
+});
+
 test('personal budget import preserves cash and receipts, applies weekly benefits and is idempotent',async({page})=>{
  await page.goto('/');await personal(page,300000);
  await page.evaluate(()=>{const s=window.JuntoApp.getState();s.incomes=[{id:'existing',name:'Salário',person:'a',amount:150000,rule:'business',nth:5,countSat:true,since:'2026-01-01'}];window.JuntoApp.applyState(s);});

@@ -31,9 +31,9 @@ test('foto do perfil ajusta zoom e posição sem desmontar os controles',async({
     input.dispatchEvent(new Event('change',{bubbles:true}));
   });
   await expect(page.locator('#photo-zoom-value')).toHaveText('180%');
-  await expect(page.locator('.photo-preview')).toHaveAttribute('style',/--profile-pan-y:40.00%/);
+  await expect(page.locator('.photo-preview')).toHaveAttribute('style',/--profile-pan-y:\s*40\.00%/);
   await expect.poll(()=>page.evaluate(()=>window.JuntoApp.getState().settings.profileZoom)).toBe(1.8);
-  await expect(page.locator('.profile-photo-button').first()).toHaveAttribute('style',/--profile-pan-y:40.00%/);
+  await expect(page.locator('.profile-photo-button').first()).toHaveAttribute('style',/--profile-pan-y:\s*40\.00%/);
   await page.locator('[data-action="reset-couple-photo-frame"]').click();
   await expect(page.locator('#profile-zoom')).toHaveValue('1.08');
   await expect(page.locator('#profile-y')).toHaveValue('50');

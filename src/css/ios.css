@@ -1,0 +1,982 @@
+/*
+ * Juntô — acabamento estilo iOS (V13).
+ * Última camada de estilo. Claro: fundo agrupado #F2F2F7 com cartões brancos.
+ * Escuro: preto verdadeiro com superfícies elevadas #1C1C1E/#2C2C2E, como no iPhone.
+ * Cada área ganha um brilho próprio no topo da tela, que se dissolve no fundo.
+ */
+
+/* ---------- Tokens ---------- */
+:root[data-theme="light"],
+:root:not([data-theme="dark"]) {
+  --ios-canvas: #f2f2f7;
+  --ios-card: #ffffff;
+  --ios-card-2: #f7f7fa;
+  --ios-fill-1: rgba(118, 118, 128, 0.12);
+  --ios-fill-2: rgba(118, 118, 128, 0.08);
+  --ios-label-1: #111216;
+  --ios-label-2: rgba(60, 60, 67, 0.64);
+  --ios-label-3: rgba(60, 60, 67, 0.34);
+  --ios-sep: rgba(60, 60, 67, 0.13);
+  --ios-edge: rgba(0, 0, 0, 0.045);
+  --ios-bar: rgba(249, 249, 251, 0.8);
+  --ios-seg-on: #ffffff;
+  --ios-gold: #94702f;
+  --ios-gold-fill: #d9b46f;
+
+  --premium-canvas: var(--ios-canvas);
+  --premium-ink: var(--ios-label-1);
+  --premium-subtle: #6e6e76;
+  --premium-surface: var(--ios-card);
+  --premium-raised: var(--ios-card);
+  --premium-surface-glass: rgba(255, 255, 255, 0.78);
+  --premium-soft: #ececf1;
+  --premium-hairline: var(--ios-edge);
+  --premium-separator: var(--ios-sep);
+  --premium-shadow: 0 1px 2px rgba(0, 0, 0, 0.03), 0 10px 28px -18px rgba(20, 24, 40, 0.18);
+  --premium-shadow-float: 0 14px 40px -14px rgba(20, 24, 40, 0.24);
+  --premium-highlight: inset 0 0 0 0 transparent;
+  --premium-pill: var(--ios-fill-1);
+  --premium-selected: var(--ios-seg-on);
+  --premium-accent: #d4ad68;
+  --premium-accent-ink: var(--ios-gold);
+
+  --j-good: #1f8f47;
+  --j-good-soft: rgba(52, 199, 89, 0.13);
+  --j-warn: #b86a00;
+  --j-warn-soft: rgba(255, 149, 0, 0.13);
+  --j-bad: #d7263d;
+  --j-bad-soft: rgba(255, 59, 48, 0.11);
+  --j-info: #0a6fdf;
+  --j-info-soft: rgba(0, 122, 255, 0.11);
+  --j-gold-soft: rgba(212, 173, 104, 0.16);
+  --j-left: #34c759;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ios-canvas: #000000;
+  --ios-card: #1c1c1e;
+  --ios-card-2: #2c2c2e;
+  --ios-fill-1: rgba(118, 118, 128, 0.24);
+  --ios-fill-2: rgba(118, 118, 128, 0.16);
+  --ios-label-1: #ffffff;
+  --ios-label-2: rgba(235, 235, 245, 0.62);
+  --ios-label-3: rgba(235, 235, 245, 0.32);
+  --ios-sep: rgba(84, 84, 88, 0.55);
+  --ios-edge: rgba(255, 255, 255, 0.07);
+  --ios-bar: rgba(22, 22, 24, 0.78);
+  --ios-seg-on: #636366;
+  --ios-gold: #e8c486;
+  --ios-gold-fill: #e3bd7a;
+
+  --premium-canvas: var(--ios-canvas);
+  --premium-ink: #f5f5f7;
+  --premium-subtle: #9a9aa2;
+  --premium-surface: var(--ios-card);
+  --premium-raised: var(--ios-card);
+  --premium-surface-glass: rgba(44, 44, 46, 0.72);
+  --premium-soft: var(--ios-card-2);
+  --premium-hairline: var(--ios-edge);
+  --premium-separator: var(--ios-sep);
+  --premium-shadow: 0 0 0 0 transparent;
+  --premium-shadow-float: 0 18px 48px -14px rgba(0, 0, 0, 0.75);
+  --premium-highlight: inset 0 0 0 0 transparent;
+  --premium-pill: var(--ios-fill-1);
+  --premium-selected: var(--ios-seg-on);
+  --premium-accent: #e3bd7a;
+  --premium-accent-ink: var(--ios-gold);
+  --premium-splash: #1c1c1e;
+
+  /* Legado (app.css/dark.css usam estes nomes). */
+  --junto-canvas: var(--ios-canvas);
+  --junto-surface: var(--ios-card);
+  --junto-navy: #f5f5f7;
+  --junto-line: var(--ios-sep);
+  --junto-muted: #9a9aa2;
+  --junto-gold: #e3bd7a;
+  --junto-gold-soft: rgba(227, 189, 122, 0.14);
+  --ios-bg: var(--ios-canvas);
+  --ios-surface: rgba(28, 28, 30, 0.94);
+  --ios-surface-solid: var(--ios-card);
+  --ios-fill: var(--ios-card-2);
+  --ios-label: #f5f5f7;
+  --ios-secondary: #9a9aa2;
+  --ios-tertiary: #6e6e76;
+  --ios-separator: var(--ios-sep);
+  --ink: #f5f5f7;
+  --muted: #9a9aa2;
+  --paper: var(--ios-canvas);
+  --white: var(--ios-card);
+  --line: var(--ios-sep);
+  --soft: var(--ios-card-2);
+  --green: #2c2c2e;
+  --green2: #3a3a3c;
+  --navy: #2c2c2e;
+  --navy2: #3a3a3c;
+  --gold: #e3bd7a;
+  --lime: #e3bd7a;
+  --gold-ink: var(--ios-gold);
+  --gold-tint: rgba(227, 189, 122, 0.14);
+  --pos: #30d158;
+  --pos-bg: rgba(48, 209, 88, 0.14);
+  --bad: #ff6961;
+  --bad-bg: rgba(255, 69, 58, 0.15);
+  --warn: #ffb340;
+  --warn-bg: rgba(255, 159, 10, 0.15);
+  --shadow: none;
+
+  --j-good: #30d158;
+  --j-good-soft: rgba(48, 209, 88, 0.15);
+  --j-warn: #ffb340;
+  --j-warn-soft: rgba(255, 159, 10, 0.16);
+  --j-bad: #ff6961;
+  --j-bad-soft: rgba(255, 69, 58, 0.16);
+  --j-info: #64b5ff;
+  --j-info-soft: rgba(10, 132, 255, 0.18);
+  --j-gold-soft: rgba(227, 189, 122, 0.15);
+  --j-fixed: #6e8fc4;
+  --j-ess: #4fc39a;
+  --j-flex: #e3bd7a;
+  --j-left: #30d158;
+  --j-miss: #ff6961;
+}
+
+/* ---------- Brilho do topo, por área ----------
+ * Duas elipses suaves (uma cor principal e uma complementar) + um véu linear que
+ * some em ~460px. O resto da página fica no fundo neutro, sem faixa nem corte. */
+html[data-theme] body,
+html[data-theme] body[data-route] {
+  --glow-a: 212 173 104;
+  --glow-b: 88 116 196;
+  --glow-a-o: 0.3;
+  --glow-b-o: 0.22;
+  background:
+    radial-gradient(130% 430px at 0% -90px, rgb(var(--glow-a) / var(--glow-a-o)), rgb(var(--glow-a) / 0) 72%),
+    radial-gradient(95% 380px at 100% -70px, rgb(var(--glow-b) / var(--glow-b-o)), rgb(var(--glow-b) / 0) 74%),
+    linear-gradient(180deg, rgb(var(--glow-b) / calc(var(--glow-b-o) * 0.35)) 0px, rgb(var(--glow-b) / 0) 460px),
+    var(--ios-canvas) !important;
+  background-attachment: scroll !important;
+  background-repeat: no-repeat !important;
+  color: var(--premium-ink);
+}
+html[data-theme] body[data-route="ledger"] {
+  --glow-a: 64 140 255;
+  --glow-b: 90 200 250;
+}
+html[data-theme] body[data-route="analysis"] {
+  --glow-a: 108 98 236;
+  --glow-b: 191 110 240;
+}
+html[data-theme] body[data-route="goals"] {
+  --glow-a: 52 199 120;
+  --glow-b: 90 200 220;
+}
+html[data-theme] body[data-route="couple"] {
+  --glow-a: 255 92 130;
+  --glow-b: 255 165 90;
+}
+html[data-theme] body[data-route="incomes"] {
+  --glow-a: 48 190 160;
+  --glow-b: 120 210 120;
+}
+html[data-theme="light"] body[data-route] {
+  --glow-a-o: 0.24;
+  --glow-b-o: 0.18;
+}
+html[data-theme="light"] body[data-route="home"] {
+  --glow-a-o: 0.3;
+  --glow-b-o: 0.2;
+}
+html[data-theme="dark"] body[data-route] {
+  --glow-a-o: 0.34;
+  --glow-b-o: 0.24;
+}
+html[data-theme="dark"] body[data-route="home"] {
+  --glow-a-o: 0.28;
+  --glow-b-o: 0.3;
+}
+html[data-theme] .workspace,
+html[data-theme] .app-shell,
+html[data-theme] main {
+  background: transparent !important;
+}
+
+/* ---------- Tipografia: títulos grandes do iOS ---------- */
+.j-head h2,
+.j-hello h2 {
+  font-weight: 760 !important;
+  letter-spacing: -0.035em !important;
+}
+.j-eyebrow {
+  letter-spacing: 0.06em !important;
+  color: var(--premium-accent-ink) !important;
+}
+.j-head p {
+  color: var(--premium-subtle) !important;
+}
+.j-hero-value,
+.j-big,
+.j-month-stats b,
+.j-hero-stats b,
+.j-row-amount,
+.j-ring b {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Cabeçalho ---------- */
+html[data-theme] .brand,
+html[data-theme] .mobile-brand .brand {
+  color: var(--premium-ink) !important;
+}
+html[data-theme] .header-quick-btn {
+  border-radius: 50% !important;
+  background: var(--ios-fill-2) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: var(--premium-ink) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6);
+}
+html[data-theme="dark"] .header-quick-btn {
+  background: rgba(118, 118, 128, 0.22) !important;
+}
+html[data-theme="dark"] .header-theme-btn {
+  color: var(--ios-gold) !important;
+}
+html[data-theme] .profile-photo-button {
+  box-shadow: 0 0 0 2px var(--ios-canvas) !important;
+}
+html[data-theme="dark"] .profile-photo-button,
+html[data-theme="dark"] .profile-photo-button :is(span, b) {
+  color: #fff !important;
+}
+html[data-theme] .cloud-account-pill {
+  background: var(--ios-fill-2) !important;
+  color: var(--premium-subtle) !important;
+}
+
+/* ---------- Superfícies ---------- */
+html[data-theme] :is(.j-card, .j-insight) {
+  background: var(--ios-card) !important;
+  border: 0.5px solid var(--ios-edge) !important;
+  box-shadow: var(--premium-shadow) !important;
+}
+html[data-theme] .j-card {
+  border-radius: 22px;
+}
+html[data-theme="dark"] :is(.j-card, .j-insight) {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+/* Nada de faixa lateral: o tom vem do ícone, como nos widgets do iPhone. */
+.j-insight::before {
+  display: none !important;
+}
+html[data-theme] .j-row {
+  border-bottom-color: var(--ios-sep);
+}
+html[data-theme] .j-row:last-child {
+  border-bottom: 0;
+}
+html[data-theme] .j-ic {
+  border-radius: 12px;
+}
+html[data-theme] .j-section-title h3,
+html[data-theme] .j-section-title h4 {
+  letter-spacing: -0.02em;
+}
+html[data-theme="dark"] :is(.j-day > .j-list, .j-card.j-list) {
+  background: var(--ios-card) !important;
+}
+html[data-theme] .j-day > h4,
+html[data-theme] .j-day > header {
+  color: var(--premium-subtle);
+}
+html[data-theme] .j-more summary,
+html[data-theme] .j-note {
+  background: var(--ios-fill-2) !important;
+}
+html[data-theme] .j-empty,
+html[data-theme] .empty {
+  background: var(--ios-card) !important;
+  border: 0.5px dashed var(--ios-sep) !important;
+  box-shadow: none !important;
+}
+html[data-theme] .empty h3 {
+  color: var(--premium-ink) !important;
+}
+html[data-theme] .empty p {
+  color: var(--premium-subtle) !important;
+}
+
+/* Cartões e listas herdados (contas, metas, renda, previsão, desafios). */
+html[data-theme="dark"]
+  :is(.panel, .list-card, .request-card, .goal-card, .goal-panel, .person-card, .insight-card, .tip, .tip-list > *, .cal, .sim, .hist-panel, .future-v3-chart, .income-v3-surface > section, .ch-card, .challenge-card, .bill-card, .plan-card, .home-insight-card, .personal-budget, .month-detail) {
+  background: var(--ios-card) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+  box-shadow: none !important;
+}
+
+/* ---------- Herói "Livre pra curtir" ---------- */
+html[data-theme] .j-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 26px;
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(90% 120% at 100% 0%, rgba(227, 189, 122, 0.24), rgba(227, 189, 122, 0) 58%),
+    radial-gradient(80% 90% at 0% 100%, rgba(90, 120, 210, 0.22), rgba(90, 120, 210, 0) 62%),
+    linear-gradient(155deg, #213456 0%, #15233b 100%) !important;
+  box-shadow: 0 22px 44px -24px rgba(17, 30, 56, 0.7) !important;
+}
+html[data-theme="dark"] .j-hero {
+  background:
+    radial-gradient(90% 120% at 100% 0%, rgba(227, 189, 122, 0.2), rgba(227, 189, 122, 0) 58%),
+    radial-gradient(80% 90% at 0% 100%, rgba(94, 92, 230, 0.2), rgba(94, 92, 230, 0) 62%),
+    linear-gradient(155deg, #23232a 0%, #141418 100%) !important;
+  border-color: rgba(255, 255, 255, 0.09);
+  box-shadow: 0 24px 50px -26px rgba(0, 0, 0, 0.9) !important;
+}
+.j-hero-stats button {
+  background: rgba(255, 255, 255, 0.08) !important;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.j-hero-top > span {
+  color: #ecca8d !important;
+}
+
+/* ---------- Ações ---------- */
+html[data-theme] .j-cta {
+  border-radius: 16px !important;
+}
+html[data-theme] .j-cta.primary {
+  background: linear-gradient(180deg, #e8c88f 0%, #d6ae68 100%) !important;
+  color: #1d1a12 !important;
+  border: 0 !important;
+  box-shadow: 0 10px 22px -14px rgba(176, 130, 50, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
+}
+html[data-theme] .j-cta:not(.primary) {
+  background: var(--ios-card) !important;
+  border: 0.5px solid var(--ios-edge) !important;
+  box-shadow: var(--premium-shadow) !important;
+  color: var(--premium-ink) !important;
+}
+html[data-theme="dark"] .j-cta:not(.primary) {
+  border-color: rgba(255, 255, 255, 0.07) !important;
+}
+html[data-theme] .j-link,
+html[data-theme] .j-back {
+  color: var(--premium-accent-ink) !important;
+}
+
+/* ---------- Avisos no topo (pendências, contestação) ---------- */
+html[data-theme] .j-banner,
+html[data-theme] .j-banners .pending-banner {
+  border-radius: 18px !important;
+  border: 0.5px solid rgba(255, 159, 10, 0.28) !important;
+  background: var(--j-warn-soft) !important;
+  color: var(--premium-ink) !important;
+  box-shadow: none !important;
+}
+html[data-theme] .j-banner.green {
+  border-color: rgba(48, 209, 88, 0.28) !important;
+  background: var(--j-good-soft) !important;
+}
+html[data-theme] .j-banners .pending-banner {
+  display: grid !important;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 4px 10px;
+  align-items: start;
+  padding: 12px 14px !important;
+}
+html[data-theme] .j-banners .pending-banner > svg {
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  color: var(--j-warn) !important;
+}
+html[data-theme] .j-banners .pending-banner p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--premium-subtle) !important;
+}
+html[data-theme] .j-banners .pending-banner p b {
+  color: var(--premium-ink) !important;
+}
+html[data-theme] .j-banners .pending-banner button {
+  grid-column: 2;
+  justify-self: start;
+  padding: 0 !important;
+  min-height: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--j-warn) !important;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* ---------- Controle segmentado (UISegmentedControl) ---------- */
+html[data-theme] .j-seg {
+  padding: 2px !important;
+  gap: 0 !important;
+  border-radius: 11px !important;
+  background: var(--ios-fill-1) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+html[data-theme] .j-seg button {
+  min-height: 34px !important;
+  border-radius: 9px !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  color: var(--premium-ink) !important;
+  opacity: 0.86;
+}
+html[data-theme] .j-seg button.active {
+  opacity: 1;
+  background: var(--ios-seg-on) !important;
+  color: var(--premium-ink) !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 3px 1px rgba(0, 0, 0, 0.04) !important;
+}
+html[data-theme="dark"] .j-seg button.active {
+  color: #fff !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3) !important;
+}
+html[data-theme] .j-mini-seg {
+  background: var(--ios-fill-1) !important;
+  border: 0 !important;
+}
+html[data-theme] .j-mini-seg button.active {
+  background: var(--ios-seg-on) !important;
+}
+
+/* ---------- Filtros em pílula ---------- */
+html[data-theme] .j-chips button {
+  border: 0 !important;
+  background: var(--ios-fill-2) !important;
+  color: var(--premium-ink) !important;
+  font-weight: 600;
+}
+html[data-theme] .j-chips button.active {
+  background: var(--premium-ink) !important;
+  color: var(--ios-canvas) !important;
+}
+html[data-theme] .j-search,
+html[data-theme] .j-search input {
+  background: var(--ios-fill-2) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: var(--premium-ink) !important;
+}
+html[data-theme] .j-toggle {
+  background: var(--ios-fill-2) !important;
+  border: 0 !important;
+}
+
+/* ---------- Anel de saúde ---------- */
+html[data-theme] .j-ring::after {
+  background: var(--ios-card) !important;
+}
+
+/* ---------- Barra de abas flutuante (material do iOS) ---------- */
+html[data-theme] .mobile-nav {
+  background: var(--ios-bar) !important;
+  border: 0.5px solid var(--ios-edge) !important;
+  box-shadow: 0 12px 34px -12px rgba(0, 0, 0, 0.28) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(1.8) !important;
+  backdrop-filter: blur(30px) saturate(1.8) !important;
+  border-radius: 26px !important;
+}
+html[data-theme="dark"] .mobile-nav {
+  border-color: rgba(255, 255, 255, 0.09) !important;
+  box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.85) !important;
+}
+html[data-theme] .mobile-nav button {
+  color: #8e8e93 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+html[data-theme] body[data-route] .mobile-nav button.active {
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--premium-ink) !important;
+}
+html[data-theme] body[data-route] .mobile-nav button.active svg {
+  color: var(--premium-accent-ink) !important;
+}
+@media (max-width: 760px) {
+  .nav-ai-orb {
+    background: radial-gradient(70% 70% at 30% 25%, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 70%),
+      linear-gradient(150deg, #ecd09c 0%, #cfa35a 100%) !important;
+    color: #1d1a12 !important;
+    box-shadow: 0 10px 24px -8px rgba(176, 130, 50, 0.75), 0 0 0 4px var(--ios-canvas) !important;
+  }
+  html[data-theme="light"] .nav-ai-orb {
+    background: radial-gradient(70% 70% at 30% 25%, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0) 70%),
+      linear-gradient(150deg, #263c62 0%, #142540 100%) !important;
+    color: #ecca8d !important;
+    box-shadow: 0 10px 24px -8px rgba(20, 37, 64, 0.6), 0 0 0 4px var(--ios-canvas) !important;
+  }
+  html[data-theme] .mobile-nav .nav-ai {
+    color: var(--premium-ink) !important;
+  }
+}
+html[data-theme] .nav-badge,
+html[data-theme] .mobile-nav .badge {
+  background: #ff3b30 !important;
+  color: #fff !important;
+}
+
+/* ---------- Chat em folha, como no iOS ---------- */
+html[data-theme] .chat-panel {
+  background: var(--ios-canvas) !important;
+}
+html[data-theme] .chat-head,
+html[data-theme] .chat-context,
+html[data-theme] .chat-foot,
+html[data-theme] .chat-form {
+  background: var(--ios-bar) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.6);
+  border-color: var(--ios-sep) !important;
+}
+html[data-theme] .chat-msg.bot {
+  background: var(--ios-card) !important;
+  border: 0.5px solid var(--ios-edge) !important;
+  color: var(--premium-ink) !important;
+  box-shadow: none !important;
+}
+html[data-theme] .chat-suggest .chip-btn {
+  background: var(--ios-card) !important;
+  border: 0.5px solid var(--ios-edge) !important;
+  color: var(--premium-ink) !important;
+  box-shadow: none !important;
+}
+html[data-theme] #chat-input {
+  background: var(--ios-fill-2) !important;
+  border: 0 !important;
+  color: var(--premium-ink) !important;
+}
+html[data-theme] #chat-input:focus {
+  box-shadow: 0 0 0 2px rgba(227, 189, 122, 0.55) !important;
+}
+
+/* ---------- Folhas (modais) ---------- */
+html[data-theme="dark"] dialog,
+html[data-theme="dark"] dialog .modal-wrap {
+  background: var(--ios-card) !important;
+}
+html[data-theme="dark"] dialog :is(input, select, textarea) {
+  background: var(--ios-card-2) !important;
+  border-color: transparent !important;
+  color: var(--premium-ink) !important;
+}
+html[data-theme] dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45) !important;
+}
+
+/* ---------- Ajustes finos do escuro ---------- */
+html[data-theme] .j-search input {
+  background: transparent !important;
+}
+html[data-theme="dark"] .mobile-nav {
+  background: rgba(24, 24, 27, 0.94) !important;
+}
+html[data-theme="light"] .mobile-nav {
+  background: rgba(250, 250, 252, 0.94) !important;
+}
+html[data-theme="dark"] .plans-v3-illustration {
+  background: var(--j-gold-soft) !important;
+  color: var(--ios-gold) !important;
+  box-shadow: none !important;
+}
+html[data-theme="dark"] .avatar {
+  background-color: rgba(100, 181, 255, 0.2) !important;
+  color: #8cc8ff !important;
+  border-color: transparent !important;
+}
+html[data-theme="dark"] .avatar.b {
+  background-color: rgba(255, 105, 97, 0.2) !important;
+  color: #ff9a92 !important;
+}
+html[data-theme="dark"] :is(.plans-v3-people > div, .j-hero-stats button, .j-month-stats > *) {
+  border-color: transparent !important;
+}
+html[data-theme="dark"] .plans-v3-people > div {
+  background: var(--ios-card-2) !important;
+}
+
+/* ---------- Componentes herdados no escuro ----------
+ * O app antigo usa tons claros fixos em ícones, trilhos e painéis internos.
+ * Aqui eles ganham os equivalentes do iOS: preenchimentos translúcidos e cores do sistema. */
+html[data-theme="dark"] :is(.cat-ic, .item-tile, .md-ic, .income-v3-icon, .category-icon, .tip-icon) {
+  background: var(--ios-fill-1) !important;
+  color: #f5f5f7 !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+html[data-theme="dark"] :is(.cat-ic, .item-tile, .md-ic, .income-v3-icon, .category-icon, .tip-icon) svg {
+  color: inherit !important;
+}
+html[data-theme="dark"] :is(.cat-ic, .item-tile, .md-ic, .income-v3-icon, .category-icon).blue {
+  background: rgba(10, 132, 255, 0.18) !important;
+  color: #64b5ff !important;
+}
+html[data-theme="dark"] :is(.cat-ic, .item-tile, .md-ic, .income-v3-icon, .category-icon).lilac {
+  background: rgba(191, 90, 242, 0.2) !important;
+  color: #d29bff !important;
+}
+html[data-theme="dark"] :is(.cat-ic, .item-tile, .md-ic, .income-v3-icon, .category-icon):is(.orange, .gold) {
+  background: rgba(255, 159, 10, 0.18) !important;
+  color: #ffb340 !important;
+}
+html[data-theme="dark"] :is(.cat-ic, .item-tile, .md-ic, .income-v3-icon, .category-icon):is(.pink, .red) {
+  background: rgba(255, 55, 95, 0.18) !important;
+  color: #ff7a93 !important;
+}
+html[data-theme="dark"] :is(.cat-ic, .item-tile, .md-ic, .income-v3-icon, .category-icon).green {
+  background: rgba(48, 209, 88, 0.16) !important;
+  color: #4cd964 !important;
+}
+/* Painéis internos e trilhos */
+html[data-theme="dark"] :is(.md-nums > div, .cat-goal, .cal-stats > div, .sim-stats > div, .cut-seg, .seg-person, .plan-option, .ch-sug, .fixed-card) {
+  background: var(--ios-card-2) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+html[data-theme="dark"] .plan-option.reco {
+  box-shadow: inset 0 0 0 1.5px rgba(227, 189, 122, 0.55) !important;
+}
+html[data-theme="dark"] :is(.cat-track, .bar, .bar.spend, .cut-track, .goal-track, .progress) {
+  background: rgba(118, 118, 128, 0.28) !important;
+}
+html[data-theme="dark"] .cat-fill {
+  background: var(--ios-gold-fill) !important;
+}
+html[data-theme="dark"] :is(.cut-seg button.on, .seg-person button.active, .seg-person button.on) {
+  background: var(--ios-seg-on) !important;
+  color: #fff !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3) !important;
+}
+html[data-theme="dark"] :is(.cut-seg button, .seg-person button) {
+  color: rgba(235, 235, 245, 0.75) !important;
+}
+/* Textos secundários que eram cinza-azulado escuro */
+html[data-theme="dark"] :is(.cat-line, .cat-top, .fixed-action, .cal-d-sum, .ch-why, .steps li p, .cat-goal .muted, .md-nums dt, .cal-stats span, .sim-stats span) {
+  color: var(--ios-label-2) !important;
+}
+html[data-theme="dark"] :is(.cat-line b, .cat-top b, .cal-d-sum b) {
+  color: #f5f5f7 !important;
+}
+html[data-theme="dark"] :is(.cat-goal output, .ch-ring b, .income-v3-adjust h2, .income-v3-adjust > div > h2, .plan-option-top b, span > b) {
+  color: inherit;
+}
+html[data-theme="dark"] :is(.cat-goal output, .ch-ring b, .income-v3-adjust > div > h2, .incomes-base h2) {
+  color: #f5f5f7 !important;
+}
+html[data-theme="dark"] .cal-day.fut :is(.cd-n, .cd-v) {
+  color: rgba(232, 196, 134, 0.8) !important;
+}
+html[data-theme="dark"] .cat-goal-note {
+  color: #30d158 !important;
+}
+html[data-theme="dark"] .cat-goal input[type="range"] {
+  accent-color: var(--ios-gold-fill);
+  background: transparent !important;
+}
+html[data-theme="dark"] .plans-v3-other button > span:first-child {
+  background: var(--j-gold-soft) !important;
+  color: var(--ios-gold) !important;
+  box-shadow: none !important;
+}
+html[data-theme="dark"] :is(.plan-rule, .plan-year, .plan-option small) {
+  color: var(--ios-label-2) !important;
+}
+html[data-theme="dark"] :is(.plan-rule b, .plan-year b) {
+  color: #f5f5f7 !important;
+}
+html[data-theme="dark"] .couple-top-cta {
+  background: rgba(255, 55, 95, 0.16) !important;
+  color: #ff8aa2 !important;
+  border-color: transparent !important;
+}
+html[data-theme] .cut-row {
+  border-top-color: var(--ios-sep) !important;
+}
+/* Resultado dos cortes: mesmo acabamento do cartão principal do Início. */
+html[data-theme] .panel.cut-result {
+  background:
+    radial-gradient(90% 120% at 100% 0%, rgba(227, 189, 122, 0.22), rgba(227, 189, 122, 0) 58%),
+    linear-gradient(155deg, #213456 0%, #15233b 100%) !important;
+  color: #fff !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 22px 44px -24px rgba(17, 30, 56, 0.7) !important;
+}
+html[data-theme="dark"] .panel.cut-result {
+  background:
+    radial-gradient(90% 120% at 100% 0%, rgba(227, 189, 122, 0.2), rgba(227, 189, 122, 0) 58%),
+    linear-gradient(155deg, #23232a 0%, #141418 100%) !important;
+  box-shadow: none !important;
+}
+html[data-theme] .panel.cut-result :is(.cr-label, .cr-hint, small) {
+  color: rgba(235, 235, 245, 0.72) !important;
+}
+html[data-theme] .panel.cut-result :is(.cr-hint b, b) {
+  color: #fff !important;
+}
+html[data-theme] .panel.cut-result .cr-big {
+  color: #ecca8d !important;
+}
+html[data-theme] .panel.cut-result .btn {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #fff !important;
+  border: 0 !important;
+}
+html[data-theme="dark"] #app-content :is(li, ul, dl) {
+  border-color: var(--ios-sep) !important;
+}
+html[data-theme] :is(.range input, .sim input[type="range"], .cat-goal input[type="range"]) {
+  accent-color: var(--ios-gold-fill) !important;
+}
+html[data-theme="light"] :is(.range input, .sim input[type="range"]) {
+  accent-color: #1d3557 !important;
+}
+/* Calendário: intensidade em azul do sistema; previsto em dourado. */
+html[data-theme="dark"] .cal-day {
+  background: rgb(10 132 255 / calc(0.07 + var(--a) * 0.5)) !important;
+  color: #f5f5f7 !important;
+}
+html[data-theme="dark"] .cal-day.fut {
+  background: repeating-linear-gradient(135deg, rgb(227 189 122 / calc(0.1 + var(--a) * 0.3)) 0 5px, rgb(227 189 122 / calc(0.04 + var(--a) * 0.14)) 5px 10px) !important;
+}
+html[data-theme="dark"] .cal-day.zero {
+  background: rgba(48, 209, 88, 0.16) !important;
+  color: #30d158 !important;
+}
+html[data-theme="dark"] .cal-day.sel {
+  box-shadow: 0 0 0 2px #f5f5f7 !important;
+}
+html[data-theme="dark"] .cal-day.today {
+  box-shadow: inset 0 0 0 2px var(--ios-gold-fill) !important;
+}
+/* Linhas de lista do iOS: separador reto, sem pontas arredondadas. */
+html[data-theme] .j-row {
+  border-radius: 0 !important;
+}
+/* Gráfico mês a mês no escuro */
+html[data-theme="dark"] .hc-hatch-bg {
+  fill: #2c2c2e !important;
+}
+html[data-theme="dark"] .hc-hatch {
+  stroke: #5a5a60 !important;
+}
+html[data-theme="dark"] .hc-grid {
+  stroke: rgba(84, 84, 88, 0.55) !important;
+}
+html[data-theme="dark"] .hc-tick {
+  fill: rgba(235, 235, 245, 0.45) !important;
+}
+html[data-theme="dark"] .hc-col .hc-fixed {
+  fill: #4b5d82 !important;
+}
+html[data-theme="dark"] .hc-col.forecast .hc-fixed {
+  fill: #3b4966 !important;
+}
+html[data-theme="dark"] .hc-col.sel .hc-hit {
+  fill: rgba(227, 189, 122, 0.14) !important;
+}
+html[data-theme="dark"] .hc-col .hc-var {
+  fill: #a9b6d3;
+}
+html[data-theme="dark"] .lg.fx:before {
+  background: #4b5d82 !important;
+}
+html[data-theme] .j-split small {
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-weight: 600 !important;
+}
+/* Gráfico mês a mês: sem rótulos sobrepostos no celular (a legenda já explica). */
+.j-page :is(.hc-tick, .hc-sub) {
+  display: none;
+}
+
+/* ---------- Formulários (segmentado e atalhos de categoria) ---------- */
+html[data-theme] .segmented {
+  background: var(--ios-fill-1) !important;
+  border: 0 !important;
+  border-radius: 11px !important;
+  padding: 2px !important;
+  box-shadow: none !important;
+}
+html[data-theme] .segmented label {
+  border-radius: 9px !important;
+  color: var(--premium-ink) !important;
+  font-weight: 600 !important;
+}
+html[data-theme] .segmented label:has(input:checked) {
+  background: var(--ios-seg-on) !important;
+  color: var(--premium-ink) !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 3px 1px rgba(0, 0, 0, 0.04) !important;
+}
+html[data-theme="dark"] .segmented label:has(input:checked) {
+  color: #fff !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3) !important;
+}
+html[data-theme="dark"] .smart-category-picks button {
+  background: var(--ios-card-2) !important;
+  border-color: transparent !important;
+  color: #f5f5f7 !important;
+}
+html[data-theme="dark"] .smart-category-picks button svg {
+  color: var(--ios-gold) !important;
+}
+html[data-theme="dark"] .smart-category-picks button.selected,
+html[data-theme="dark"] .smart-category-picks button[aria-pressed="true"] {
+  background: rgba(227, 189, 122, 0.2) !important;
+  color: var(--ios-gold) !important;
+}
+
+/* ---------- Chat no escuro ---------- */
+html[data-theme="dark"] :is(.chat-panel, .chat-v3 .chat-log) {
+  background: #000 !important;
+}
+html[data-theme="dark"] .chat-v3 .chat-head,
+html[data-theme="dark"] .chat-v3 .chat-context,
+html[data-theme="dark"] .chat-v3 .chat-foot,
+html[data-theme="dark"] .chat-v3 .chat-form,
+html[data-theme="dark"] .chat-v3 .chat-suggest {
+  background: rgba(22, 22, 24, 0.92) !important;
+}
+html[data-theme="dark"] :is(.chat-mark, .chat-context span) {
+  background: rgba(227, 189, 122, 0.16) !important;
+  color: var(--ios-gold) !important;
+}
+html[data-theme] .chat-v3 .chat-send {
+  background: linear-gradient(180deg, #e8c88f 0%, #d6ae68 100%) !important;
+  color: #1d1a12 !important;
+}
+html[data-theme] .chat-v3 .chat-msg.bot {
+  border-radius: 20px 20px 20px 6px !important;
+}
+html[data-theme] .chat-v3 .chat-msg.user {
+  border-radius: 20px 20px 6px 20px !important;
+}
+html[data-theme="dark"] .chat-card {
+  background: var(--ios-card) !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+}
+html[data-theme="dark"] .chat-card :is(input, select, textarea) {
+  background: var(--ios-card-2) !important;
+  border-color: transparent !important;
+  color: #f5f5f7 !important;
+}
+html[data-theme="dark"] .chat-card .card-note {
+  background: rgba(48, 209, 88, 0.12) !important;
+  color: rgba(235, 245, 238, 0.86) !important;
+}
+html[data-theme="dark"] .chat-card .item-tile.known {
+  background: rgba(227, 189, 122, 0.16) !important;
+  color: var(--ios-gold) !important;
+}
+
+/* ---------- Folhas de detalhe no escuro (extrato, metas, pedidos) ---------- */
+html[data-theme="dark"] :is(.ledger-detail-hero strong, .ledger-detail-meta b, .ledger-split-detail b, .ledger-split-detail strong, .ask-v3-intro b, .connect-v3-perks b, .peer-live-card h3, dialog[data-kind="ask"] .modal-head h2, dialog[data-kind="connect-intro"] .modal-head h2, .ask-v3-form #request-amount) {
+  color: #f5f5f7 !important;
+}
+html[data-theme="dark"] :is(.ledger-detail-meta, .feature-card, .ledger-split-detail) {
+  background: var(--ios-card-2) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+html[data-theme="dark"] .ledger-action {
+  background: var(--ios-card-2) !important;
+  border-color: transparent !important;
+  color: #f5f5f7 !important;
+  box-shadow: none !important;
+}
+html[data-theme="dark"] .ledger-action b {
+  color: #f5f5f7 !important;
+}
+html[data-theme="dark"] .ledger-action.primary {
+  background: rgba(227, 189, 122, 0.18) !important;
+}
+html[data-theme="dark"] .ledger-action.primary :is(b, svg) {
+  color: var(--ios-gold) !important;
+}
+html[data-theme="dark"] .ledger-action.danger {
+  background: rgba(255, 69, 58, 0.14) !important;
+}
+html[data-theme="dark"] .ledger-action.danger :is(b, svg, span) {
+  color: #ff6961 !important;
+}
+html[data-theme="dark"] .ledger-status {
+  background: rgba(10, 132, 255, 0.18) !important;
+  color: #64b5ff !important;
+}
+html[data-theme="dark"] .contest.open {
+  background: rgba(255, 159, 10, 0.14) !important;
+  border-color: rgba(255, 159, 10, 0.25) !important;
+  color: #f5f5f7 !important;
+}
+html[data-theme="dark"] .ask-v3-intro span {
+  background: rgba(227, 189, 122, 0.16) !important;
+  color: var(--ios-gold) !important;
+}
+html[data-theme="dark"] [class*="-icon"]:is(.orange, .gold):not(svg) {
+  background: rgba(255, 159, 10, 0.18) !important;
+  color: #ffb340 !important;
+}
+html[data-theme="dark"] [class*="-icon"]:is(.blue):not(svg) {
+  background: rgba(10, 132, 255, 0.18) !important;
+  color: #64b5ff !important;
+}
+html[data-theme="dark"] [class*="-icon"]:is(.green):not(svg) {
+  background: rgba(48, 209, 88, 0.16) !important;
+  color: #4cd964 !important;
+}
+html[data-theme="dark"] [class*="-icon"]:is(.pink, .red):not(svg) {
+  background: rgba(255, 55, 95, 0.18) !important;
+  color: #ff7a93 !important;
+}
+html[data-theme="dark"] [class*="-icon"]:is(.lilac, .purple):not(svg) {
+  background: rgba(191, 90, 242, 0.2) !important;
+  color: #d29bff !important;
+}
+html[data-theme="dark"] .ledger-detail-hero {
+  background:
+    radial-gradient(90% 120% at 100% 0%, rgba(227, 189, 122, 0.16), rgba(227, 189, 122, 0) 60%),
+    var(--ios-card-2) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: #f5f5f7 !important;
+}
+html[data-theme="dark"] .ledger-detail-hero :is(small, span:not([class*="icon"]):not(.ledger-status)) {
+  color: var(--ios-label-2);
+}
+html[data-theme="dark"] .contest.open :is(p, q, blockquote, em, small) {
+  color: rgba(235, 235, 245, 0.72) !important;
+}
+/* Desktop: barra lateral e painel “Do outro lado” */
+html[data-theme="dark"] .sidebar {
+  background: rgba(18, 18, 20, 0.88) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+}
+html[data-theme="dark"] :is(.peer-live-card, .peer-rail .panel, .side-note, .side-couple) {
+  background: var(--ios-card) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+  box-shadow: none !important;
+  color: #f5f5f7 !important;
+}
+html[data-theme="dark"] .peer-live-card :is(p, small) {
+  color: var(--ios-label-2) !important;
+}
+html[data-theme] .j-card.j-month-stats {
+  display: grid !important;
+  margin-top: 0;
+  padding: 8px;
+}

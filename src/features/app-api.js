@@ -82,6 +82,7 @@
       };
     },
     freshState:freshPersonalState,
+    sampleState:(mode='couple')=>JSON.parse(JSON.stringify(mode==='solo'?seedSolo():seed())),
     applyState(data) {
       if (!validBackup(data)) throw new Error('O arquivo de finanças é inválido.');
       const next=migrate(structuredClone(data)); localStorage.setItem(KEY,JSON.stringify(next));

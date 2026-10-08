@@ -11,7 +11,9 @@ export async function buildWeb(){
   await rm(dist,{recursive:true,force:true});await cp(src,dist,{recursive:true});
   const appPath=join(dist,'js/app.js'),app=await readFile(appPath,'utf8');
   if(!app.includes('/* JUNTO_APP_API */'))throw new Error('Marcador da integração ausente.');
-  await writeFile(appPath,app.replace('/* JUNTO_APP_API */',await readFile(join(src,'features/app-api.js'),'utf8')));
+  if(!app.includes('/* JUNTO_ORGANIZED */'))throw new Error('Marcador das telas organizadas ausente.');
+  const organized=await readFile(join(src,'features/organized.js'),'utf8'),api=await readFile(join(src,'features/app-api.js'),'utf8');
+  await writeFile(appPath,app.replace('/* JUNTO_ORGANIZED */',()=>organized).replace('/* JUNTO_APP_API */',()=>api));
   await rm(join(dist,'features'),{recursive:true,force:true});
   await build({absWorkingDir:root,entryPoints:['src/js/native.js','src/js/banking.js','src/js/cloud.js','src/js/budget.js'],outdir:join(dist,'js'),bundle:true,format:'iife',platform:'browser',target:['chrome109','safari16'],legalComments:'eof'});
   const config={url:process.env.SUPABASE_URL||'',publishableKey:process.env.SUPABASE_PUBLISHABLE_KEY||'',appUrl:String(process.env.JUNTO_APP_URL||'').replace(/\/+$/,'')};

@@ -141,3 +141,16 @@ html[data-theme="dark"] :is(.pos,.badge.success){color:#8ad9b1}
 html[data-theme="dark"] :is(.bad,.neg,.form-error,.feature-error){color:#ff9caa}
 html[data-theme="dark"] :is(.text-link,.home-dream-card-v3 .text-link,.plans-v3-detail-link){color:#e9c17a}
 html[data-theme="dark"] :is(.btn.primary,.home-v3 .home-spend-cta,.future-v3-nudge>button,.income-v3-add,.analysis-v3-add,.bills-v3-add,.plans-v3-save){color:#10243d!important}
+
+/* Login, marca e componentes que não usam a paleta V3. */
+html[data-theme="dark"]{--bg:#101722;--surface:#1b293a}
+html[data-theme="dark"] :is(.brand,.mobile-brand .brand,.sidebar .brand){color:#eff5ff!important}
+html[data-theme="dark"] #auth-gate{background:#101722!important;color:#eaf2fd}
+html[data-theme="dark"] .auth-card{background:#1b293a!important;color:#eaf2fd;border-color:#35485e!important}
+html[data-theme="dark"] .auth-card :is(h1,h2,h3,b,strong){color:#edf4fe}
+html[data-theme="dark"] .auth-notice{background:#264035;color:#b2e4c5}
+html[data-theme="dark"] .onboard-title,html[data-theme="dark"] .onboard-title h2{color:#f2f6ff}
+html[data-theme="dark"] .bank-search input{color:#f0f5ff!important}
+html[data-theme="dark"] :is(.feature-panel,.ledger-detail,.cal-detail,.forecast-details){color:#edf4fe}
+html[data-theme="dark"] .sidebar .side-couple{border-color:#35485e}
+html[data-theme="dark"] :is(.future-v3-event-icon,.bills-v3-icon,.income-v3-icon,.plans-v3-illustration){filter:brightness(.88) saturate(.83)}

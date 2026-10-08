@@ -496,7 +496,7 @@
     const theme=mode==='dark'?'dark':'light';
     document.documentElement.dataset.theme=theme;
     document.documentElement.style.colorScheme=theme;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content',theme==='dark'?'#101722':'#F5F5F7');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content',theme==='dark'?'#0f1725':'#f7f8fb');
     document.querySelector('meta[name="color-scheme"]')?.setAttribute('content',theme);
     const actions=document.getElementById('header-actions');
     if(actions)actions.innerHTML=headerActions();

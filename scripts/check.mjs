@@ -61,6 +61,15 @@ try {
   } else {
     console.log(`✓ ${forms.length} formulários estáticos têm submit handler`);
   }
+
+  const prototypeCopy = ['Cadastro simulado','No app final','Código ilustrativo','Simular aceite','Web push real será ativado','vêm na próxima etapa'];
+  const leakedPrototypeCopy = prototypeCopy.filter(text => app.includes(text));
+  if (leakedPrototypeCopy.length) {
+    console.error('✗ texto de protótipo vazou para o app final:', leakedPrototypeCopy.join(' | '));
+    ok = false;
+  } else {
+    console.log('✓ sem textos de protótipo no fluxo final');
+  }
 } catch (e) {
   console.error('✗ não foi possível auditar ações e formulários:', e.message);
   ok = false;

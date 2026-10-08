@@ -1,0 +1,143 @@
+/* Juntô — tema noturno. Mantém a paleta azul-marinho/dourado e não altera imagens nem dados.
+   Carregado por último: substitui os fundos e os textos claros usados no legado e nas telas V3. */
+.header-actions{display:inline-flex;align-items:center;gap:5px;flex:0 0 auto}
+.header-quick-btn{position:relative;width:40px;height:40px;display:inline-grid;place-items:center;flex:0 0 40px;padding:0;border:1px solid var(--junto-line);border-radius:15px;background:var(--junto-surface);color:var(--junto-navy);box-shadow:0 3px 12px rgba(19,35,60,.06);transition:transform .16s,background .16s,border-color .16s}
+.header-quick-btn svg{width:19px;height:19px}
+.header-quick-btn:active{transform:scale(.94)}
+.header-quick-btn:hover{border-color:var(--junto-gold)}
+.header-notice-dot{position:absolute;width:8px;height:8px;right:8px;top:6px;border-radius:50%;background:#e14f77;border:1px solid var(--junto-surface)}
+@media(max-width:760px){.topbar .top-tools{gap:6px!important}.header-actions{gap:5px}.header-quick-btn{width:40px;height:40px;flex-basis:40px}.header-quick-btn svg{width:19px;height:19px}}
+@media(max-width:360px){.header-actions{gap:3px}.header-quick-btn{width:36px;height:40px;flex-basis:36px}.topbar .top-tools{gap:4px!important}}
+
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --junto-canvas:#101722;--junto-surface:#1b2737;--junto-navy:#edf4fe;--junto-line:#354254;
+  --junto-muted:#a8b4c4;--junto-gold:#e5bd77;--junto-gold-soft:#363021;--junto-success:#8ad9b1;
+  --junto-danger:#ff9caa;--junto-shadow:0 16px 35px rgba(0,0,0,.25);
+  --ios-bg:#101722;--ios-surface:rgba(27,39,55,.94);--ios-surface-solid:#1b2737;
+  --ios-fill:#253247;--ios-fill-2:#2d3b50;--ios-label:#edf4fe;--ios-secondary:#a8b4c4;
+  --ios-tertiary:#91a1b6;--ios-separator:rgba(211,226,245,.16);
+  --ink:#edf4fe;--muted:#a8b4c4;--paper:#101722;--white:#1b2737;--line:#354254;--soft:#28364a;
+  --green:#294465;--green2:#365a82;--navy:#294465;--navy2:#365a82;
+  --gold:#e5bd77;--lime:#e5bd77;--gold-ink:#e9c681;--gold-tint:#393221;
+  --pos:#8ad9b1;--pos-bg:#183c34;--bad:#ff9caa;--bad-bg:#432b37;
+  --warn:#f0ca80;--warn-bg:#3a3022;--shadow:0 10px 30px rgba(0,0,0,.26);
+}
+html[data-theme="dark"] body,html[data-theme="dark"] body[data-route]{
+  background:#101722!important;color:#edf4fe;
+}
+html[data-theme="dark"] .workspace,html[data-theme="dark"] .app-content{color:var(--junto-navy)}
+html[data-theme="dark"] .top-eyebrow,html[data-theme="dark"] .date-label,html[data-theme="dark"] .muted,
+html[data-theme="dark"] .small,html[data-theme="dark"] .caption,html[data-theme="dark"] .app-foot{color:var(--junto-muted)}
+html[data-theme="dark"] .sidebar{background:#162232;border-color:var(--junto-line)}
+html[data-theme="dark"] .side-note,html[data-theme="dark"] .side-couple,
+html[data-theme="dark"] .user-switch,html[data-theme="dark"] .profile-photo-button,
+html[data-theme="dark"] .header-quick-btn{background:#1b293b;color:#eaf2fd}
+html[data-theme="dark"] .nav-item,html[data-theme="dark"] .nav-item:hover{color:#bdcce0!important}
+html[data-theme="dark"] .nav-item.active{background:#2b3c53!important;color:#f4f7ff!important}
+html[data-theme="dark"] .header-theme-btn{color:#f0ca80}
+html[data-theme="dark"] .header-quick-btn:hover{background:#2a3b51}
+
+/* Navegação inferior com vidro escuro e estado ativo acessível. */
+html[data-theme="dark"] .mobile-nav{background:rgba(25,36,52,.96)!important;border:1px solid #35465b!important;box-shadow:0 -4px 32px rgba(0,0,0,.25)!important}
+html[data-theme="dark"] .mobile-nav button{color:#9fafc4!important}
+html[data-theme="dark"] .mobile-nav button.active,html[data-theme="dark"] body[data-route] .mobile-nav button.active,
+html[data-theme="dark"] body[data-route="incomes"] .mobile-nav button[data-route="future"]{background:#35445b!important;color:#f6d18c!important}
+html[data-theme="dark"] body[data-route] .mobile-nav button.active svg,
+html[data-theme="dark"] body[data-route="incomes"] .mobile-nav button[data-route="future"] svg{background:transparent!important;box-shadow:none!important}
+
+/* Superfícies compartilhadas pelas telas Solo/A Dois, cards e estados vazios. */
+html[data-theme="dark"] :is(
+ .panel,.insight-card,.list-card,.request-card,.plan-card,.save-panel,.sim,.hist-panel,
+ .stat,.fixed-card,.cat,.radar-item,.forecast-strip,.goal-panel,.peer-request,
+ .home-money-card-v3,.home-dream-card-v3,.home-more-v3 .home-quick-entry,.home-more-v3 .home-latest,
+ .future-v3-card,.future-v3-sim,.future-v3-empty,.income-v3-total,.income-v3-list,
+ .income-v3-toolbar,.income-v3-calendar,.income-v3-adjust,.analysis-v3-card,
+ .analysis-v3-latest,.bills-v3-summary,.bills-v3-list,.plans-v3-dream,
+ .plans-v3-other,.plans-v3-empty,.plans-v3-create
+){background:#1b293a!important;border-color:#344458!important;box-shadow:0 12px 30px rgba(0,0,0,.14)!important;color:#edf4fe}
+html[data-theme="dark"] :is(
+ .future-v3-tabs,.income-v3-tabs,.analysis-v3-people,.bills-v3-tabs,.plans-v3-tabs,
+ .topic-tabs,.request-tabs,.filters,.bank-search
+){background:#253247!important;border-color:#3a4a60!important;box-shadow:none!important}
+html[data-theme="dark"] :is(.future-v3-tabs,.income-v3-tabs,.analysis-v3-people,.bills-v3-tabs,.plans-v3-tabs,.topic-tabs) button{color:#b6c3d5}
+html[data-theme="dark"] :is(.future-v3-tabs,.income-v3-tabs,.analysis-v3-people,.bills-v3-tabs,.plans-v3-tabs,.topic-tabs) button.active{background:#394b63!important;color:#f7d695!important;box-shadow:none!important}
+html[data-theme="dark"] :is(.future-v3-more,.bills-v3-more,.plans-v3-more,.analysis-v3-tabs,.filters) button,
+html[data-theme="dark"] :is(.filter,.home-more-v3 .home-category-chips button:nth-child(n)){background:#253449!important;color:#dae5f4!important;border-color:#41536a!important}
+html[data-theme="dark"] :is(.future-v3-more,.bills-v3-more,.plans-v3-more,.analysis-v3-tabs) button.active,
+html[data-theme="dark"] .filter.selected{background:#3e3627!important;color:#f3d595!important;border-color:#6d5938!important}
+
+/* Tipografia: sobrescreve o azul escuro fixo das páginas V3 sem alterar botões dourados. */
+html[data-theme="dark"] :is(
+ .home-greeting-v3,.future-v3-head,.income-v3-head,.analysis-v3-head,.bills-v3-head,.plans-v3-head
+) h2{color:#f2f6fc!important}
+html[data-theme="dark"] :is(
+ .home-money-v3-value strong,.home-section-title h2,.home-dream-card-v3 h2,
+ .future-v3-total,.future-v3-event b,.future-v3-event>strong,.future-v3-nudge h3,
+ .future-v3-sim-head h2,.future-v3-empty h3,
+ .income-v3-total strong,.income-v3-row b,.income-v3-row>strong,.income-v3-toolbar h2,
+ .analysis-v3-donut b,.analysis-v3-legend b,.analysis-v3-legend strong,
+ .analysis-v3-all span,.analysis-v3-insight h3,.analysis-v3-latest-row b,.analysis-v3-latest-row strong,
+ .bills-v3-summary>div>strong,.bills-v3-copy>b,.bills-v3-row>strong,.bills-v3-split b,
+ .plans-v3-dream-top h3,.plans-v3-progress-meta b,.plans-v3-people b,
+ .plans-v3-person b,.plans-v3-other b,.plans-v3-other strong,.plans-v3-empty h3
+){color:#f0f5ff!important}
+html[data-theme="dark"] :is(.home-greeting-v3,.future-v3-head,.income-v3-head,.analysis-v3-head,.bills-v3-head,.plans-v3-head) p{color:#adb9c9!important}
+html[data-theme="dark"] :is(.future-v3-card,.income-v3-total,.income-v3-list,.income-v3-toolbar,.analysis-v3-card,.analysis-v3-latest,.bills-v3-summary,.bills-v3-list,.plans-v3-dream,.plans-v3-other) :is(p,small,em){color:#abb9ca}
+html[data-theme="dark"] .home-money-v3-copy>p,html[data-theme="dark"] .home-more-v3>summary,
+html[data-theme="dark"] .home-money-v3-value .icon-btn{color:#aab8c9!important}
+html[data-theme="dark"] :is(.home-progress,.plans-v3-progress,.home-dream-card-v3 .home-progress){background:#2e4055!important}
+html[data-theme="dark"] :is(.home-latest-row,.analysis-v3-latest-row,.future-v3-event,.income-v3-row,button.bills-v3-row,.plans-v3-other>button,.tl-row):hover{background:#28394e!important}
+html[data-theme="dark"] :is(.request-card .impact,.request-card .response-text,.bank-original,.form-note,.personal-budget,.connect-perks.in-modal){background:#27374b!important;color:#d8e4f3!important}
+html[data-theme="dark"] :is(.future-v3-cap,.future-v3-nudge,.income-v3-insight,.analysis-v3-insight,.plans-v3-people>div,.plans-v3-person,.bills-v3-split,.goal-detail-hero){background:#23374a!important;border-color:#3a5261!important}
+html[data-theme="dark"] :is(.future-v3-nudge p,.future-v3-cap b,.income-v3-insight p,.analysis-v3-insight p,.goal-detail-hero strong){color:#cfe3dc!important}
+html[data-theme="dark"] .analysis-v3-donut:after{background:#1b293a}
+html[data-theme="dark"] .photo-preview-empty,html[data-theme="dark"] .profile-photo-inner{background:#27364b;color:#edf4fe}
+html[data-theme="dark"] .profile-unread-dot{border-color:#1b293a}
+
+/* Pedidos, formulários, cartões de bancos, alertas e configurações. */
+html[data-theme="dark"] dialog,html[data-theme="dark"] dialog[data-kind="cloud-account"],
+html[data-theme="dark"] dialog .modal-wrap,
+html[data-theme="dark"] dialog[data-kind="ask"] .modal-wrap,
+html[data-theme="dark"] dialog[data-kind="connect-intro"] .modal-wrap,
+html[data-theme="dark"] dialog[data-kind="ledger-detail"] .modal-wrap,
+html[data-theme="dark"] dialog[data-kind="ledger-edit"] .modal-wrap{background:#192637!important;color:#edf4fe!important;border-color:#34465b!important}
+html[data-theme="dark"] dialog::backdrop{background:rgba(3,7,13,.74)!important}
+html[data-theme="dark"] .modal-head h2,html[data-theme="dark"] dialog[data-kind] .modal-head h2{color:#f0f5ff!important}
+html[data-theme="dark"] :is(.field input,.field select,.field textarea,.money-input,.chat-form textarea,
+ .ai-grid input,.ai-grid select,.bank-search,.bank-choice-card,.bank-other,.bank-consent-card,
+ .cloud-action,.cloud-sync-button,.filter,.btn.secondary,.btn.ghost,
+ .settings-row input,.settings-row select, .month-input,.income-v3-month){
+ background:#26364a!important;color:#f0f5ff!important;border-color:#41536a!important}
+html[data-theme="dark"] :is(input,textarea)::placeholder{color:#98a8bb!important;opacity:1}
+html[data-theme="dark"] :is(.btn.secondary,.btn.ghost,.cloud-action,.cloud-sync-button):hover{background:#34475f!important}
+html[data-theme="dark"] :is(.photo-settings-card,.ai-settings-card,.bank-choice-card.selected,.cloud-action-primary,.cloud-connected,.cloud-restore-notice,.cloud-pending-note){background:#263448!important;border-color:#47556b!important;color:#e7effa!important}
+html[data-theme="dark"] :is(.settings-row,.cloud-profile,.cloud-sync-section,.personal-budget-row,.activity-v3 .activity-row){border-color:#35485d!important}
+html[data-theme="dark"] :is(.settings-row p,.cloud-profile>div>span,.cloud-section-description,.cloud-action-copy small,.cloud-sync-row p,.cloud-restore-notice p,.cloud-action-chevron,.photo-settings-copy p){color:#aab8c9!important}
+html[data-theme="dark"] :is(.cloud-account-layout,.cloud-account-layout h3,.cloud-action,.cloud-backup-actions .cloud-action,
+ .cloud-restore-counts,.cloud-profile strong,.cloud-action-copy strong){color:#eaf2fd!important}
+html[data-theme="dark"] :is(.cloud-profile-avatar,.cloud-action-icon,.bank-consent-icon){background:#35475f!important;color:#ebd098!important}
+html[data-theme="dark"] .bank-privacy-note{background:#263c56!important;color:#b5d3ff!important}
+html[data-theme="dark"] :is(.bank-choice-check,.photo-preview){background:#1b293a}
+html[data-theme="dark"] .ai-settings-card{background:linear-gradient(160deg,#26364a,#1c293a)!important}
+html[data-theme="dark"] :is(.ai-status,.ai-test-result){background:#31465c;color:#dce7f5}
+html[data-theme="dark"] :is(.badge,.badge.success,.badge.warn,.badge.bad,.bank-status-chip){background:#31435a;color:#f0d38d}
+
+/* Chat e recomendações não podem manter placas brancas ao abrir o modo escuro. */
+html[data-theme="dark"] :is(.chat-panel,.chat-v3,.chat-v3 .chat-head,.chat-v3 .chat-log,
+ .chat-v3 .chat-suggest,.chat-v3 .chat-form,.chat-v3 .chat-foot,.chat-context){background:#192637!important;border-color:#3a4b60!important;color:#edf4fe!important}
+html[data-theme="dark"] :is(.chat-msg.bot,.chat-v3 .chat-msg.bot,.chat-v3 .chip-btn,.chat-v3 .chat-form textarea){background:#27384b!important;color:#e9f2fd!important;border-color:#42536a!important}
+html[data-theme="dark"] .chat-v3 .chat-msg.bot b{color:#f5f8ff!important}
+html[data-theme="dark"] .chat-v3 .chat-msg.user{background:#344d70!important;color:#f0f5ff!important}
+html[data-theme="dark"] .chat-v3 .chat-send{background:#334d6d;color:#f3d28f}
+html[data-theme="dark"] .chat-v3 .chat-head small{color:#b3bed0!important}
+html[data-theme="dark"] :is(.chat-card,.smart-category-picks button,.tip,.tip-list>div,.feature-actions button){border-color:#41536a}
+html[data-theme="dark"] :is(.chat-v3 .card-note,.chat-msg.bot.gemini-error){background:#293b4b;color:#d7e7ef}
+
+/* Avisos, importações e feedback mantêm contraste sem estourar o brilho. */
+html[data-theme="dark"] :is(.toast,.notification,.notice,.cal-record,.goal-detail-hero){border-color:#394d64}
+html[data-theme="dark"] :is(.toast,.notification,.notice){background:#27384d;color:#eaf2fd}
+html[data-theme="dark"] :is(.pos,.badge.success){color:#8ad9b1}
+html[data-theme="dark"] :is(.bad,.neg,.form-error,.feature-error){color:#ff9caa}
+html[data-theme="dark"] :is(.text-link,.home-dream-card-v3 .text-link,.plans-v3-detail-link){color:#e9c17a}
+html[data-theme="dark"] :is(.btn.primary,.home-v3 .home-spend-cta,.future-v3-nudge>button,.income-v3-add,.analysis-v3-add,.bills-v3-add,.plans-v3-save){color:#10243d!important}

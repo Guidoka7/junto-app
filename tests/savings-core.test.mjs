@@ -28,3 +28,42 @@ test('unknown trip or missing routine asks for context without inventing an avoi
 test('routine transport cheaper than the bus reference creates no cut; snacks suggest half of the recorded cost',()=>{
  const s=base();s.transactions=[tx('a','Uber trabalho',900),tx('b','Lanche',2001,'a',today,'Lanches')];const r=savingsReport(personalFinance(s,'a'),'a',today);assert.deepEqual(r.opportunities.map(o=>[o.key,o.saving]),[['snacks',1001]]);
 });
+
+test('lanche registrado como Alimentação continua opcional sem penalizar refeições essenciais',()=>{
+ const s=base();s.transactions=[
+  tx('lanche','Lanche da tarde',1500,'a',today,'Alimentação'),
+  tx('marmita','Marmita do almoço',2800,'a',today,'Alimentação'),
+  tx('delivery','Delivery refrigerante',2100,'a',today,'Alimentação'),
+  tx('almoco','Almoço no trabalho',3000,'a',today,'Restaurantes'),
+  tx('partner','Chocolate da outra pessoa',4000,'b',today,'Alimentação')
+ ];
+ assert.equal(classifyExpense(s.transactions[0]).kind,'optional');
+ assert.equal(classifyExpense(s.transactions[1]).kind,'essential');
+ assert.equal(classifyExpense(s.transactions[2]).kind,'optional');
+ assert.equal(classifyExpense(s.transactions[3]).kind,'essential');
+ const a=savingsReport(personalFinance(s,'a'),'a',today),b=savingsReport(personalFinance(s,'b'),'b',today);
+ assert.equal(a.opportunities.find(o=>o.key==='snacks').total,3600);
+ assert.equal(a.opportunities.find(o=>o.key==='snacks').saving,1800);
+ assert.equal(b.opportunities.find(o=>o.key==='snacks').total,4000);
+ assert.ok(!a.avoidable.partner);
+ assert.ok(!a.avoidable.marmita);
+ assert.ok(!a.avoidable.almoco);
+});
+
+test('corrida para o trabalho é reconhecida em Outros, sem chamar corridas sem contexto de supérfluas',()=>{
+ const s=base();s.transactions=[
+  tx('work','Uber trabalho',4000,'a',today,'Outros'),
+  tx('unknown','99 Pop',4200,'a',today,'Outros'),
+  tx('necessary','Táxi hospital',5000,'a',today,'Outros'),
+  tx('bus','Passagem ônibus',1100,'a',today,'Outros')
+ ];
+ const r=savingsReport(personalFinance(s,'a'),'a',today);
+ assert.equal(classifyExpense(s.transactions[0]).kind,'transport-extra');
+ assert.equal(classifyExpense(s.transactions[1]).kind,'review');
+ assert.equal(classifyExpense(s.transactions[2]).kind,'essential');
+ assert.equal(classifyExpense(s.transactions[3]).kind,'essential');
+ assert.equal(r.opportunities.find(o=>o.key==='commute').saving,2900);
+ assert.equal(r.unknownRide.id,'unknown');
+ assert.ok(!r.avoidable.unknown);
+ assert.ok(!r.avoidable.necessary);
+});

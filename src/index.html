@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#F5F5F7">
   <meta name="color-scheme" content="light">
+  <script src="js/theme-init.js"></script>
   <meta name="description" content="Juntô — controle financeiro individual ou em dupla, com previsão do mês, calendário, desafios de economia e plano de guardar primeiro.">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -18,6 +19,7 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/mobile-compact.css">
   <link rel="stylesheet" href="css/refine.css">
+  <link rel="stylesheet" href="css/dark.css">
 </head>
 <body data-auth="locked">
   <section id="auth-gate" aria-live="polite"><div class="auth-card"><h1>Juntô</h1><p>Verificando acesso…</p></div></section>
@@ -33,7 +35,7 @@
     <header class="topbar">
       <div class="mobile-brand"><div class="brand" data-brand></div></div>
       <div class="top-heading"><p class="top-eyebrow" id="couple-label">Nossa vida, em dia</p><h1 id="main-title">Nosso dinheiro</h1></div>
-      <div class="top-tools"><span class="date-label" id="month-label"></span><div id="couple-cta"></div><div id="desktop-user-switch"></div><div id="mobile-user-switch"></div></div>
+      <div class="top-tools"><span class="date-label" id="month-label"></span><div id="couple-cta"></div><div id="header-actions" class="header-actions" role="group" aria-label="Notificações e aparência"></div><div id="desktop-user-switch"></div><div id="mobile-user-switch"></div></div>
     </header>
     <div class="columns"><section class="app-content" id="app-content" aria-label="Área financeira principal"></section><aside class="peer-rail" id="peer-rail" aria-label="Área da outra pessoa"></aside></div>
     <footer class="app-foot"><span>Juntô · amor, planos e uns boletos no caminho.</span></footer>

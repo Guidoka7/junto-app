@@ -5,7 +5,9 @@ import {saveDownload} from '../features/download.js';
 window.JuntoDownload=saveDownload;
 if(Capacitor.isNativePlatform()){
   document.documentElement.classList.add('native-app');
-  SystemBars.setStyle({style:SystemBarsStyle.Light}).catch(()=>{});
+  const updateSystemBars=()=>SystemBars.setStyle({style:document.documentElement.dataset.theme==='dark'?SystemBarsStyle.Dark:SystemBarsStyle.Light}).catch(()=>{});
+  window.addEventListener('junto-theme-change',updateSystemBars);
+  updateSystemBars();
   window.addEventListener('load',()=>SplashScreen.hide().catch(()=>{}));
   App.addListener('backButton',()=>{
     const modal=document.getElementById('modal');if(modal?.open){window.JuntoApp.closeModal();return;}

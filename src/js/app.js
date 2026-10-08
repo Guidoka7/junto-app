@@ -2,6 +2,7 @@
   'use strict';
   const KEY = 'junto-prototype-v2';
   const PROFILE = 'junto-profile-v1';
+  const THEME_KEY = 'junto-theme-v1';
   const $ = (q) => document.querySelector(q);
   const uid = () => globalThis.crypto?.randomUUID?.() || ('j' + Date.now().toString(36) + Math.random().toString(36).slice(2));
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -12,6 +13,8 @@
     heart:'<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0l-1 1-1-1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/>',
     activity:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
     bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/>',
+    moon:'<path d="M20.9 13.4A9 9 0 0 1 10.6 3.1 9 9 0 1 0 20.9 13.4Z"/>',
+    sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/>',
     settings:'<path d="m9 3-.5 2-2 1-2-.5-2 3 1.5 1.5v3L2.5 15l2 3 2-.5 2 1 .5 2h4l.5-2 2-1 2 .5 2-3-1.5-2v-3L20 8l-2-3-2 .5-2-1-.5-1.5z"/><circle cx="11.5" cy="12" r="3"/>',
     plus:'<path d="M12 5v14M5 12h14"/>',
     sparkle:'<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5ZM20 2v4M18 4h4"/>',
@@ -483,6 +486,23 @@
   }
   const routes=[['home','home','Hoje','Hoje',1],['future','trend','O que vem aí','Futuro',1],['analysis','scan','Raio-X dos gastos','Raio-X',1],['incomes','coins','Entradas','Entradas',0],['bills','wallet','Nossas contas','Contas',1],['requests','chat','Nossos combinados','Combinar',1],['goals','heart','Nossos planos','Planos',1],['activity','activity','Aconteceu por aqui','Atividade',0]];
   function switcher(){return profilePhotoButton();}
+  function themeIsDark(){return document.documentElement.dataset.theme==='dark';}
+  function headerActions(){
+    const dark=themeIsDark(),count=unread(),noticeLabel=count?`Notificações: ${count} ${count===1?'não lida':'não lidas'}`:'Ver notificações';
+    const nextLabel=dark?'Ativar modo claro':'Ativar modo escuro';
+    return `<button type="button" class="header-quick-btn header-notice-btn" data-action="notifications" aria-label="${noticeLabel}" title="${noticeLabel}">${icon('bell')}${count?'<span class="header-notice-dot" aria-hidden="true"></span>':''}</button><button type="button" class="header-quick-btn header-theme-btn" data-action="toggle-theme" aria-pressed="${dark}" aria-label="${nextLabel}" title="${nextLabel}">${icon(dark?'sun':'moon')}</button>`;
+  }
+  function applyTheme(mode){
+    const theme=mode==='dark'?'dark':'light';
+    document.documentElement.dataset.theme=theme;
+    document.documentElement.style.colorScheme=theme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content',theme==='dark'?'#101722':'#F5F5F7');
+    document.querySelector('meta[name="color-scheme"]')?.setAttribute('content',theme);
+    const actions=document.getElementById('header-actions');
+    if(actions)actions.innerHTML=headerActions();
+    window.dispatchEvent(new CustomEvent('junto-theme-change',{detail:{theme}}));
+    try{localStorage.setItem(THEME_KEY,theme);}catch{}
+  }
   function renderNav(){
     $('#desktop-nav').innerHTML=routes.filter(x=>!(isSolo()&&x[0]==='requests')).map(([r,i,n])=>`<button class="nav-item ${route===r?'active':''}" data-action="route" data-route="${r}" ${route===r?'aria-current="page"':''}>${icon(i)}<span>${n}</span>${r==='requests'&&pending().length?`<span class="count">${pending().length}</span>`:''}</button>`).join('')+`<button class="nav-item nav-chat" data-action="chat-open">${icon('sparkle')}<span>Pergunte ao Juntô</span></button>`;
     $('#mobile-nav').innerHTML=routes.filter(x=>x[4]&&!(isSolo()&&x[0]==='requests')).map(([r,i,,n])=>`<button class="${route===r?'active':''}" data-action="route" data-route="${r}" ${route===r?'aria-current="page"':''}>${icon(i)}<span>${n}</span>${r==='requests'&&pending().length?`<span class="count">${pending().length}</span>`:''}</button>`).join('');
@@ -490,6 +510,7 @@
     $('#main-title').textContent=title;$('#couple-label').textContent=isSolo()?`${user('a').name} · modo individual`:`${user('a').name} & ${user('b').name}`;{const sc=$('.side-caption');if(sc)sc.textContent=isSolo()?'Meu espaço':'Nosso espaço';const sn=$('.side-note p'),ss=$('.side-note span');if(sn)sn.innerHTML=isSolo()?'Organizar sozinho é o primeiro passo.<br>A dois, fica ainda melhor.':'Amor não paga boleto.<br>Mas uma dupla organizada, sim.';if(ss)ss.textContent=isSolo()?'Um gasto de cada vez.':'Um combinado de cada vez.';const dx=$('.extra-demo-text');if(dx)dx.textContent=isSolo()?'Modo individual. Seu controle financeiro completo.':'Dois perfis. Uma mesma vida financeira.';const ob=document.querySelector('.demo-strip [data-action="onboard"]');if(ob)ob.textContent=isSolo()?'Criar minha conta':'Criar nossa dupla';}
     $('#month-label').innerHTML=icon('calendar')+' '+esc(new Date().toLocaleDateString('pt-BR',{month:'long',year:'numeric'}));
     $('#desktop-user-switch').innerHTML=switcher();$('#mobile-user-switch').innerHTML=switcher();
+    if($('#header-actions'))$('#header-actions').innerHTML=headerActions();
     const coupleCTA=$('#couple-cta');if(coupleCTA)coupleCTA.innerHTML=isSolo()?`<button class="couple-top-cta" data-action="connect" aria-label="Conectar no Juntô a dois">${icon('heart')}<span>Juntô a dois</span></button>`:'';
     $('#side-couple').innerHTML=isSolo()?`<div class="av-stack">${avatar('a')}</div><div><strong>${esc(first(user('a').name))}</strong><small>Modo individual</small></div><button class="icon-btn" data-action="settings" aria-label="Ajustes">${icon('settings')}</button>`:`<div class="av-stack">${avatar('a')}${avatar('b')}</div><div><strong>${esc(first(user('a').name))} & ${esc(first(user('b').name))}</strong><small>Nossa dupla</small></div><button class="icon-btn" data-action="settings" aria-label="Personalizar a dupla">${icon('settings')}</button>`;
   }
@@ -1858,6 +1879,7 @@ ${JSON.stringify(chatContext())}`;
     if(action==='delete-tx'){const t=state.transactions.find(x=>x.id===id);if(!t)return;const neutral=t.balanceDelta===0;return openModal('Excluir este gasto?',`<p class="modal-sub"><b>${esc(t.name)}</b> · ${cash(t.amount)}. ${neutral?'Esse movimento foi importado sem ajuste de saldo, então excluir não vai mexer no saldo.':'O valor volta para o saldo de quem pagou.'} O lançamento sai do histórico.</p><form class="form" data-form="delete-tx" data-id="${id}">${formEnd(neutral?'Excluir lançamento':'Excluir e estornar')}</form>`,'remove');}
     if(action==='delete-bill'){const b=state.bills.find(x=>x.id===id);if(!b)return;return openModal('Excluir esta conta?',`<p class="modal-sub"><b>${esc(b.name)}</b> · ${cash(b.amount)}.${b.status==='paid'?' O pagamento será estornado de acordo com o ajuste de saldo usado no registro.':' Ela será removida do planejamento.'}${b.recurring?' Como é uma conta fixa, a repetição dos próximos meses também será encerrada.':''}</p><form class="form" data-form="delete-bill" data-id="${id}">${formEnd(b.recurring?'Excluir e parar repetição':'Excluir conta')}</form>`,'remove');}
     if(action==='reopen-bill'){const b=state.bills.find(x=>x.id===id);if(!b||b.status!=='paid')return;return openModal('Reabrir esta conta?',`<p class="modal-sub">O pagamento de <b>${esc(b.name)}</b> será desfeito, o valor voltará ao saldo e a conta aparecerá novamente em “A pagar”.</p><form class="form" data-form="reopen-bill" data-id="${id}">${formEnd('Reabrir conta')}</form>`,'remove');}
+    if(action==='toggle-theme'){applyTheme(themeIsDark()?'light':'dark');return;}
     if(action==='notifications')return notificationsModal();
     if(action==='settings')return settingsModal();
     if(action==='about')return aboutModal();

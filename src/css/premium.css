@@ -364,7 +364,7 @@ html[data-theme] :is(.app-content,.columns,.future-v3-surface,.home-v3,.chat-v3,
     font-size:clamp(29px,8vw,37px)!important;line-height:1.08!important;
   }
   html[data-theme] .header-quick-btn{width:39px;height:39px;flex-basis:39px}
-  html[data-theme] .profile-photo-button{width:51px;height:51px}
+  html[data-theme] .profile-photo-button{width:44px;height:44px}
   html[data-theme] .mobile-nav{left:11px!important;right:11px!important}
 }
 @media(max-width:380px){
@@ -440,3 +440,20 @@ html[data-theme="dark"] .lg.scen:before{background:#dcb778!important}
   html[data-theme] .topbar{align-items:flex-start!important}
   html[data-theme] .top-tools{align-self:flex-start!important}
 }
+
+/* Home dark mode: saving-plan CTA and insights must not appear as bright white slabs. */
+html[data-theme="dark"] .home-dream-save{
+  background:linear-gradient(155deg,#31435d,#273a51)!important;
+  border:1px solid rgba(214,229,250,.17)!important;
+  color:#eff5ff!important;
+  box-shadow:var(--premium-highlight)!important;
+}
+html[data-theme="dark"] .home-dream-save :is(svg,span,b){color:#eff5ff!important}
+html[data-theme="dark"] .home-insight-card{
+  background:linear-gradient(128deg,#213a38,#1b3337)!important;
+  border:1px solid rgba(156,216,193,.16)!important;
+  color:#e0f1ec!important;
+  box-shadow:var(--premium-highlight),var(--premium-shadow)!important;
+}
+html[data-theme="dark"] .home-insight-card :is(b,h3,svg,strong){color:#d9eee7!important}
+html[data-theme="dark"] .home-insight-card :is(p,small,span){color:#adccc1!important}

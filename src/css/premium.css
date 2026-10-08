@@ -371,7 +371,7 @@ html[data-theme] :is(.app-content,.columns,.future-v3-surface,.home-v3,.chat-v3,
   html[data-theme] .header-actions{gap:3px}
   html[data-theme] .header-quick-btn{width:35px;height:37px;flex-basis:35px;border-radius:12px}
   html[data-theme] .top-tools{gap:4px!important}
-  html[data-theme] .profile-photo-button{width:46px;height:46px}
+  html[data-theme] .profile-photo-button{width:44px;height:44px}
 }
 @media(prefers-reduced-transparency:reduce){
   html[data-theme] .mobile-nav,html[data-theme] .header-quick-btn,

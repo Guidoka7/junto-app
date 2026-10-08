@@ -26,14 +26,15 @@ async function personal(page,balance=10000){await expect(page.locator('#authenti
 test('individual tips protect the bus and basic food while the shared history remains contestable',async({page})=>{
  await page.goto('/');await personal(page,100000);
  await page.evaluate(()=>{const s=window.JuntoApp.getState(),date=new Date().toISOString().slice(0,10);s.users.push({id:'b',name:'Bia',balance:80000,tone:'pink'});s.settings.personalBudget={a:{fare:550,trips:2}};s.incomes=[{id:'vt',name:'Vale transporte',person:'a',purpose:'transport',benefitDaily:1860,amount:9300,rule:'weekly',weekday:2,since:date}];s.transactions=[
-  {id:'uber-a',name:'Uber',item:'Corrida de app',amount:4000,payer:'a',by:'a',category:'Transporte',expenseContext:'work',date},
+  {id:'uber-a',name:'Uber',item:'Corrida de app',amount:4000,payer:'a',by:'a',category:'Outros',expenseContext:'work',date},
   {id:'food-a',name:'Almoço',amount:2500,payer:'a',by:'a',category:'Alimentação',date},
   {id:'cig-a',name:'2 cigarros',item:'Cigarro',amount:600,payer:'a',by:'a',category:'Hábitos',date},
+  {id:'lanche-a',name:'Lanche da tarde',item:'Lanche',amount:1200,payer:'a',by:'a',category:'Alimentação',date},
   {id:'choc-b',name:'Chocolate da Bia',amount:10000,payer:'b',by:'b',category:'Lanches',date},
   {id:'uber-b',name:'Uber trabalho Bia',amount:5000,payer:'b',by:'b',category:'Transporte',date}
  ];window.JuntoApp.applyState(s);});
  await page.locator('#mobile-nav [data-route="future"]').click();await page.locator('.future-v3-tabs [data-value="tips"]').click();
- const tips=page.locator('.tip-list');await expect(tips).toContainText('R$ 11,00');await expect(tips).toContainText('R$ 18,60');await expect(tips.locator('.tip').filter({hasText:'Seu Uber'})).toContainText('R$ 29,00');await expect(tips).toContainText('Cigarro');await expect(tips).not.toContainText('Bia');await expect(tips).not.toContainText('Chocolate');
+ const tips=page.locator('.tip-list');await expect(tips).toContainText('R$ 11,00');await expect(tips).toContainText('R$ 18,60');await expect(tips.locator('.tip').filter({hasText:'Seu Uber'})).toContainText('R$ 29,00');await expect(tips).toContainText('Cigarro');await expect(tips).toContainText('lanchinhos');await expect(tips).not.toContainText('Bia');await expect(tips).not.toContainText('Chocolate');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:'test-results/individual-tips.png'});
  await page.locator('#mobile-nav [data-route="analysis"]').click();await page.locator('.analysis-v3-tabs [data-value="history"]').click();await expect(page.locator('.month-transactions')).toContainText('Chocolate da Bia');await expect(page.locator('.month-transactions')).toContainText('Uber');
  await page.locator('.month-transactions [data-id="choc-b"]').click();await expect(page.locator('#modal [data-action="edit-tx"]')).toHaveCount(0);await page.locator('#modal [data-action="contest"]').click();await page.locator('#contest-note').fill('Vamos reduzir os lanches?');await page.locator('[data-form="contest"] [type="submit"]').click();

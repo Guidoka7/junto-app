@@ -18,6 +18,9 @@ let ledgerTab = "history",
   ledgerFilter = "all",
   ledgerMonth = 0,
   ledgerMine = true,
+  goalScope = "mine",
+  homeEveryone = false,
+  homeScopePerson = null,
   ledgerPerson = null,
   ledgerLastRoute = null,
   coupleTab = "requests";
@@ -55,7 +58,7 @@ function desktopNavHTML() {
 }
 function mobileNavHTML() {
   const [a, b, c, d] = NAV.map(([r, i, l]) => navItem(r, i, l, ""));
-  return `${a}${b}<button class="nav-ai" data-action="chat-open" aria-label="Conversar com o Juntô"><span class="nav-ai-orb">${icon("sparkle")}</span><span>Juntô</span></button>${c}${d}`;
+  return `${a}${b}<button type="button" class="nav-ai" data-action="chat-open" aria-expanded="false" aria-controls="chat-panel" aria-label="Conversar com o Juntô"><span class="nav-ai-orb">${icon("sparkle")}</span><span>Juntô</span></button>${c}${d}`;
 }
 // Rotas antigas continuam funcionando como atalhos para o novo lugar de cada coisa.
 function normalizeRoute() {
@@ -102,6 +105,7 @@ function normalizeRoute() {
   }
   if (!["goals", "plan", "challenges"].includes(planTab)) planTab = "goals";
   if (!["home", "ledger", "analysis", "goals", "couple", "incomes"].includes(route)) route = "home";
+  if (homeScopePerson !== active) { homeEveryone = false; goalScope = "mine"; homeScopePerson = active; }
   if (ledgerPerson !== active || (route === "ledger" && ledgerLastRoute !== "ledger")) {
     ledgerMine = true;
     ledgerFilter = "all";
@@ -110,10 +114,10 @@ function normalizeRoute() {
   ledgerLastRoute = route;
 }
 function viewFor() {
-  return { home: homeV4, ledger: ledgerView, analysis: analysisV4, goals: goalsView, couple: coupleView, incomes: () => `<div class="j-page">${incomesView()}</div>` }[route] || homeV4;
+  return { home: homeV4, ledger: ledgerView, analysis: analysisV4, goals: personalGoalsView, couple: coupleView, incomes: () => `<div class="j-page">${incomesView()}</div>` }[route] || homeV4;
 }
 function viewMode() {
-  return (route === "incomes" && incomeTab === "base") || (route === "analysis" && analysisTab === "categories") ? "personal" : "shared";
+  return route === "home" ? (homeEveryone ? "shared" : "personal") : route === "analysis" || route === "incomes" || route === "goals" ? "personal" : "shared";
 }
 
 // ---------- Peças de interface ----------
@@ -505,29 +509,30 @@ function eventRow(e) {
 // Saldo na conta: o meu e o da dupla somados (no modo solo, só o meu).
 function heroBalances() {
   const mine = user(active).balance;
-  if (isSolo())
-    return `<div class="j-hero-bal one"><button data-action="balance" data-user="${active}" aria-label="Ajustar meu saldo"><small>Saldo na conta</small><b class="num ${mine < 0 ? "neg" : ""}">${cash(mine)}</b></button></div>`;
+  if (isSolo() || !homeEveryone)
+    return `<div class="j-hero-bal one"><button data-action="balance" data-user="${active}" aria-label="Ajustar meu saldo"><small>${isSolo() ? "Saldo na conta" : "Meu saldo · " + esc(first(user().name))}</small><b class="num ${mine < 0 ? "neg" : ""}">${cash(mine)}</b></button></div>`;
   const o = other(), theirs = user(o).balance, both = mine + theirs;
   return `<div class="j-hero-bal"><button data-action="balance" data-user="${active}" aria-label="Ajustar meu saldo"><small>Meu saldo</small><b class="num ${mine < 0 ? "neg" : ""}">${cash(mine)}</b></button><i aria-hidden="true"></i><div><small>Juntos <em>${esc(first(user(o).name))}: ${cash(theirs)}</em></small><b class="num ${both < 0 ? "neg" : ""}">${cash(both)}</b></div></div>`;
 }
 function homeV4() {
   const solo = isSolo(),
-    available = free(),
+    available = homeEveryone ? free() : personalFree(),
     me = first(user().name),
     Bn = brain(),
-    cap = state.incomes.length ? dailyCap() : null,
-    eomPts = state.incomes.length ? simulate({ days: daysUntil(endOfMonthISO()) }) : [],
+    cap = state.incomes.some(i => homeEveryone || i.person === active) ? dailyCap() : null,
+    eomPts = state.incomes.some(i => homeEveryone || i.person === active) ? simulate({ days: daysUntil(endOfMonthISO()) }) : [],
     eom = eomPts.length ? eomPts[eomPts.length - 1].free : null,
-    toPay = state.bills.filter((b) => b.status === "open" && b.due.slice(0, 7) <= dateISO().slice(0, 7)).reduce((s, b) => s + b.amount, 0);
+    toPay = state.bills.filter((b) => b.status === "open" && b.due.slice(0, 7) <= dateISO().slice(0, 7)).reduce((s, b) => s + (homeEveryone ? b.amount : shareOf(b,active)), 0);
   const hour = new Date().getHours(),
     hello = hour < 5 ? "Boa madrugada" : hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
-  const g = state.goals.find((x) => x.saved < x.target) || state.goals[0],
+  const visibleGoals = state.goals.filter(g => homeEveryone || goalOwner(g) === active);
+  const g = visibleGoals.find((x) => x.saved < x.target) || visibleGoals[0],
     gp = g ? Math.min(100, Math.round((g.saved / g.target) * 100)) : 0,
     gPace = g ? state.plan?.monthly || goalPace(g) : 0;
-  const events = upcomingEvents(7).slice(0, 4),
-    latest = ledgerEntries(dateISO().slice(0, 7), { all: true }).slice(0, 4),
+  const events = upcomingEvents(7).filter(e => homeEveryone || (e.kind === "in" ? e.who === active : shareOf({amount:e.amount,payer:e.payer},active)>0)).map(e => homeEveryone || e.kind === "in" ? e : {...e,amount:shareOf({amount:e.amount,payer:e.payer},active),payer:active}).slice(0, 4),
+    latest = ledgerEntries(dateISO().slice(0, 7), { all: true, everyone: homeEveryone }).slice(0, 4),
     insights = Bn.insights.slice(0, 3);
-  const arrivals = pendingArrivals(45, cloudSlot || undefined);
+  const arrivals = pendingArrivals(45, cloudSlot || undefined).filter(x => homeEveryone || x.inc.person === active);
   const banners = [
     incoming().length
       ? `<button class="j-banner" data-action="go" data-route="couple" data-kind="couple" data-value="requests">${icon("chat")}<span><b>${esc(first(user(other()).name))} quer combinar ${incoming().length === 1 ? "um gasto" : `${incoming().length} gastos`}.</b><small>Responde rapidinho, o valor só sai se vocês combinarem.</small></span><em>Ver</em></button>`
@@ -541,12 +546,12 @@ function homeV4() {
     .join("");
   setupAutoOffer();
   return `<div class="j-page j-home">
-    <header class="j-hello"><div><span class="j-eyebrow">${solo ? "Modo individual" : "Juntô a dois"}</span><h2>${hello}, ${esc(me)}.</h2></div></header>
+    <header class="j-hello"><div><span class="j-eyebrow">${solo ? "Modo individual" : homeEveryone ? "Juntô a dois · visão combinada" : "Meu espaço pessoal"}</span><h2>${hello}, ${esc(me)}.</h2></div></header>
     ${banners ? `<div class="j-banners">${banners}</div>` : ""}
     <section class="j-hero" aria-label="Resumo financeiro">
-      <div class="j-hero-top"><span>Livre pra curtir</span><button class="icon-btn" data-action="hide" aria-label="${hidden ? "Mostrar" : "Ocultar"} valores">${icon(hidden ? "eyeOff" : "eye")}</button></div>
+      <div class="j-hero-top"><span>${homeEveryone ? "Livre da dupla" : "Meu dinheiro livre"}</span><div class="j-scope-actions">${solo ? "" : `<button type="button" class="j-toggle" data-action="home-scope" aria-pressed="${homeEveryone}">${homeEveryone ? "Só meus dados" : "Ver todos"}</button>`}<button class="icon-btn" data-action="hide" aria-label="${hidden ? "Mostrar" : "Ocultar"} valores">${icon(hidden ? "eyeOff" : "eye")}</button></div></div>
       <strong class="j-hero-value num ${available < 0 ? "neg" : ""}" id="free-amount">${signed(available, cash)}</strong>
-      <p>${available < 0 ? "O mês passou do livre. Vale revisar antes do próximo gasto." : "Contas, planos e combinados já separados."}</p>
+      <p>${available < 0 ? "O mês passou do livre. Vale revisar antes do próximo gasto." : homeEveryone ? "Contas, planos e combinados da dupla." : "Seus gastos, entradas e metas — sem misturar os valores da outra pessoa."}</p>
       ${heroBalances()}
       <div class="j-hero-stats">
         <button data-action="go" data-route="analysis" data-kind="analysis" data-value="forecast"><small>Por dia, hoje</small><b class="num">${cap == null ? "—" : cashR(cap)}</b></button>
@@ -578,10 +583,11 @@ function homeV4() {
     }</section>
     ${
       g
-        ? `<section class="j-card j-dream">${sectionTitle(solo ? "Meu próximo sonho" : "Nosso próximo sonho", goLink("Metas", "goals", "plan", "goals"))}<div class="j-dream-main"><span class="j-ic gold">${icon(g.icon || "heart")}</span><div><b>${esc(g.name)}</b><small>${cash(g.saved)} de ${cash(g.target)}${gPace > 0 && gp < 100 ? ` · chega em ${etaText(g.target - g.saved, gPace)}` : ""}</small></div><strong>${gp}%</strong></div><div class="j-progress"><span style="width:${gp}%"></span></div><button class="j-cta small" data-action="contribute" data-id="${g.id}">${icon("plus")}<span>Guardar um pouquinho</span></button></section>`
+        ? `<section class="j-card j-dream">${sectionTitle(homeEveryone ? "Próximo sonho da dupla" : "Meu próximo sonho", goLink("Metas", "goals", "plan", "goals"))}<div class="j-dream-main"><span class="j-ic gold">${icon(g.icon || "heart")}</span><div><b>${esc(g.name)}</b><small>${cash(g.saved)} de ${cash(g.target)}${gPace > 0 && gp < 100 ? ` · chega em ${etaText(g.target - g.saved, gPace)}` : ""}</small></div><strong>${gp}%</strong></div><div class="j-progress"><span style="width:${gp}%"></span></div><button class="j-cta small" data-action="contribute" data-id="${g.id}">${icon("plus")}<span>Guardar um pouquinho</span></button></section>`
         : `<button class="j-card j-dream-empty" data-action="new-goal">${icon("heart")}<span><b>Tem um sonho aí?</b><small>Dá um nome pra ele e o Juntô calcula quando chega.</small></span><em>Criar</em></button>`
     }
     ${challengeStrip()}
+    ${!solo && !homeEveryone ? `<button class="j-card j-couple-link" data-action="home-scope"><span class="j-avs">${avatar("a")}${avatar("b")}</span><span><b>Nosso espaço a dois</b><small>Ver planejamento combinado e totais da dupla</small></span><span class="j-chev" aria-hidden="true">›</span></button>` : ""}
     ${
       !solo
         ? `<button class="j-card j-couple-link" data-action="route" data-route="couple"><span class="j-avs">${avatar("a")}${avatar("b")}</span><span><b>A dupla</b><small>${pending().length ? `${plural(pending().length, "pedido em conversa", "pedidos em conversa")}` : "Nenhum pedido em aberto"} · ${cashR(approvedTotal())} combinados</small></span><span class="j-chev" aria-hidden="true">›</span></button>`
@@ -598,8 +604,8 @@ function ledgerYM(offset = ledgerMonth) {
   const T = new Date();
   return dateISO(new Date(T.getFullYear(), T.getMonth() + offset, 1)).slice(0, 7);
 }
-function ledgerEntries(ym, { all = false } = {}) {
-  const mine = ledgerMine && !isSolo() && !all,
+function ledgerEntries(ym, { all = false, everyone = false } = {}) {
+  const mine = ledgerMine && !isSolo() && !everyone,
     out = [];
   state.transactions.forEach((t) => {
     if (!all && t.date.slice(0, 7) !== ym) return;
@@ -804,7 +810,7 @@ function billsPanel() {
 // ---------- Análise ----------
 function analysisV4() {
   const solo = isSolo();
-  const head = pageHead(solo ? "Minha análise" : "Nossa análise", "Análise", "Feita com a sua renda e o seu jeito de gastar — nada de regra genérica.");
+  const head = pageHead("Minha análise", "Análise", "Feita com a sua renda e o seu jeito de gastar — nada de regra genérica.");
   const tabs = segTabs("analysis", analysisTab, [
     ["summary", "Resumo"],
     ["categories", "Categorias"],
@@ -844,7 +850,7 @@ function summaryPanel() {
     more = Bn.insights.slice(4);
   const notes = `<section class="j-block">${sectionTitle("O Juntô notou")}<div class="j-insights">${top.map(insightCard).join("")}</div>${more.length ? `<details class="j-more j-more-list"><summary>Ver mais ${plural(more.length, "leitura", "leituras")}</summary><div class="j-insights">${more.map(insightCard).join("")}</div></details>` : ""}</section>`;
   return `${setupCard("analysis")}${score}${notes}${split}${incomeCard()}${donutCard()}${monthByMonth()}${
-    solo ? "" : `<section class="j-block">${sectionTitle("Cada um")}<div class="person-grid">${personCard("a")}${personCard("b")}</div></section>`
+    solo || analysisPerson !== "both" ? "" : `<section class="j-block">${sectionTitle("Cada um")}<div class="person-grid">${personCard("a")}${personCard("b")}</div></section>`
   }${setupDone() ? `<button class="j-card j-setup-redo" data-action="setup-open"><span>✦</span><span><b>Refazer meu raio-x</b><small>Mudou salário, conta ou rotina? Atualiza em 2 minutos.</small></span><span class="j-chev" aria-hidden="true">›</span></button>` : ""}`;
 }
 function incomeCard() {
@@ -861,7 +867,7 @@ function incomeCard() {
 }
 function donutCard() {
   const solo = isSolo(),
-    perspective = solo ? "a" : analysisPerson,
+    perspective = solo ? "a" : (analysisPerson || active),
     ym = dateISO().slice(0, 7);
   const tx = state.transactions
     .filter((t) => t.date.slice(0, 7) === ym && !t.billId)
@@ -884,7 +890,7 @@ function donutCard() {
   });
   const people = solo
     ? ""
-    : `<div class="j-mini-seg">${[["both", "Nós"], ["a", active === "a" ? "Você" : first(user("a").name)], ["b", active === "b" ? "Você" : first(user("b").name)]]
+    : `<div class="j-mini-seg">${[[active, "Meu"], ["both", "Ver todos"]]
         .map(([v, l]) => `<button data-action="analysis-person" data-person="${v}" class="${perspective === v ? "active" : ""}" aria-pressed="${perspective === v}">${esc(l)}</button>`)
         .join("")}</div>`;
   return `<section class="j-card">${sectionTitle(`Pra onde foi em ${monthName(new Date())}`)}${people}<div class="j-donut-wrap"><div class="j-donut" style="background:conic-gradient(${stops.join(",")})"><div><b class="num">${cashR(total)}</b><small>dia a dia</small></div></div><ul class="j-legend compact">${rows
@@ -981,8 +987,8 @@ function chatThinking() {
 function chatChips() {
   const asked = new Set(chatLog.filter((m) => m.kind === "user").map((m) => norm(m.text)));
   const ym = dateISO().slice(0, 7), sums = {};
-  state.transactions.filter((t) => !t.billId && t.date.slice(0, 7) === ym && !isEssentialCat(t.category)).forEach((t) => (sums[t.category] = (sums[t.category] || 0) + t.amount));
-  const top = Object.entries(sums).sort((a, b) => b[1] - a[1])[0]?.[0], g = state.goals.find((x) => x.saved < x.target);
+  state.transactions.filter((t) => !t.billId && t.date.slice(0, 7) === ym && !isEssentialCat(t.category)).forEach((t) => (sums[t.category] = (sums[t.category] || 0) + shareOf(t, active)));
+  const top = Object.entries(sums).sort((a, b) => b[1] - a[1])[0]?.[0], g = state.goals.find((x) => goalOwner(x) === active && x.saved < x.target);
   const list = [
     ["💸", "Quanto posso gastar hoje?"],
     ["📅", state.incomes.length ? "Como fecha o mês?" : "O que preciso configurar pra prever o mês?"],
@@ -1045,6 +1051,8 @@ document.addEventListener("click", (event) => {
     window.scrollTo(0, y);
     return;
   }
+  if (action==='home-scope') { homeEveryone = !homeEveryone; render(); return; }
+  if (action==='goal-scope') { goalScope = el.dataset.value; render(); return; }
   if (action==='ledger-income') ledgerIncomeModal();
 });
 document.addEventListener("change", (event) => {

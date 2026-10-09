@@ -111,7 +111,6 @@ import {parseApkRelease,isNewerApk} from '../features/update-core.js';
     const button=event.target.closest('[data-action]');
     if (!button) return;
     const action=button.dataset.action;
-    if (action==='update-center') {open();return;}
     if (action==='update-check') {await check({manual:true});return;}
     if (action==='update-later') {
       if (available()) try{localStorage.setItem(SNOOZE_KEY,state.latest.version);}catch{}

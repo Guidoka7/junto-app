@@ -123,6 +123,14 @@ test('income form keeps variable amounts pending and exposes benefit workday rul
  await page.locator('#income-name').fill('Vale transporte');await page.locator('#income-amount').fill('111,60');await page.locator('[name="income-rule"][value="weekly"]').check();await page.locator('#income-weekday').selectOption('2');await page.locator('#income-purpose').selectOption('transport');await page.locator('#income-benefit-daily').fill('18,60');await page.locator('[name="income-benefit-saturday"]').check();await page.locator('[name="income-auto"]').check();await page.getByRole('button',{name:'Adicionar entrada',exact:true}).click();
  const inc=await page.evaluate(()=>window.JuntoApp.getState().incomes[0]);expect(inc.auto).toBe(false);expect(inc.variable).toBe(true);expect(inc.benefitDaily).toBe(1860);expect(inc.benefitSaturday).toBe(true);
 });
+
+test('guardar primeiro respects the personal budget instead of defaulting to ten percent',async({page})=>{
+ await page.goto('/');await personal(page,100000);
+ const date=await page.evaluate(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;});
+ await page.evaluate(date=>{const s=window.JuntoApp.getState();s.incomes=[{id:'variable',name:'Salário',person:'a',amount:120000,rule:'business',nth:5,countSat:true,since:date,variable:true}];s.goals=[{id:'car',name:'Carro',target:1000000,saved:0,icon:'shield'}];s.settings.personalBudget={a:{fare:550,trips:2,debtPrincipal:90000,debtMinimum:30000,debtRate:7,debtSince:date}};window.JuntoApp.applyState(s);window.JuntoApp.openModal('Entrada',`<button data-action="income-arrived" data-id="variable" data-date="${date}">Confirmar salário</button>`);},date);
+ await page.getByRole('button',{name:'Confirmar salário'}).click();await expect(page.locator('#arrival-save')).toHaveValue('0,00');await page.getByRole('button',{name:'Confirmar entrada',exact:true}).click();
+ const result=await page.evaluate(()=>{const s=window.JuntoApp.getState();return {balance:s.users[0].balance,goal:s.goals[0].saved,saves:s.saves.length};});expect(result).toEqual({balance:220000,goal:0,saves:0});
+});
 test('mobile app renders, navigates and preserves the fixed bottom bar',async({page})=>{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/');await expect(page.locator('#app-content')).not.toBeEmpty();
  if(process.env.JUNTO_CHROME){try{execFileSync('node_modules/.bin/agent-browser',['--executable-path',process.env.JUNTO_CHROME,'--session','junto-smoke','open','http://127.0.0.1:5173'],{stdio:'pipe',timeout:20000});execFileSync('node_modules/.bin/agent-browser',['--session','junto-smoke','snapshot','-i'],{stdio:'pipe',timeout:10000});execFileSync('node_modules/.bin/agent-browser',['--session','junto-smoke','close'],{stdio:'pipe',timeout:10000});}catch{console.log('agent-browser unavailable; browser verification continues with Playwright.');}}

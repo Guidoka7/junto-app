@@ -269,11 +269,12 @@
   });}
   function recommendedKey(){const o=planOptions(),inc=o[0].inc;return (o.find(x=>x.monthly>=inc*.10)||o[2]).key;}
   function planShare(inc,date){
-    if(!state.plan)return Math.round(inc.amount*.10/1000)*1000;
+    const limit=inc.person===active&&state.settings.personalBudget?.[active]?personalBudgetReading().saveNow:Infinity;
+    if(!state.plan)return Math.min(limit,Math.round(inc.amount*.10/1000)*1000);
     const ym=date.slice(0,7),p=state.plan;let share;
     if(ym===dateISO().slice(0,7)){const occ=remainingMonthOcc(),tot=occ.reduce((s,x)=>s+x.inc.amount,0);share=tot?Math.max(0,p.monthly-savedInMonth(ym))*inc.amount/tot:0;}
     else{const d=pd(date),mi=monthIncome(d.getFullYear(),d.getMonth());share=mi?p.monthly*inc.amount/mi:0;}
-    return Math.min(inc.amount,Math.round(share/1000)*1000);
+    return Math.min(limit,inc.amount,Math.round(share/1000)*1000);
   }
   function etaText(remaining,perMonth){if(remaining<=0)return 'já chegou';if(perMonth<=0)return 'não chega nesse ritmo';const n=Math.ceil(remaining/perMonth);if(n>72)return 'mais de 6 anos';const d=new Date();return new Date(d.getFullYear(),d.getMonth()+n,1).toLocaleDateString('pt-BR',{month:'short',year:'numeric'}).replace('.','').replace(' de ','/');}
   const goalPace=(g)=>state.saves.filter(s=>s.goalId===g.id&&s.date>=dateISO(addDays(new Date(),-89))).reduce((a,s)=>a+s.amount,0)/3;
@@ -638,7 +639,7 @@
   function arrivalModal(incId,date){
     const inc=state.incomes.find(i=>i.id===incId);if(!inc||handled(incId,date))return;
     const share=planShare(inc,date),goals=state.goals;
-    openModal(`Caiu ${inc.name.toLowerCase()} de ${first(user(inc.person).name)}?`,`<p class="modal-sub">${dateLong(date)} · previsto ${money(inc.amount)}. Confirme quanto entrou de verdade.</p><form class="form" data-form="arrival" data-id="${incId}" data-date="${date}">${field('arrival-amount','Quanto entrou?','0,00',moneyNumber(inc.amount),true)}${goals.length?`<div class="save-first"><div class="save-first-head">${icon('coins')}<div><strong>Guardar primeiro</strong><p>${state.plan?`Pelo plano ${esc(state.plan.name)}, a parte desta entrada é ${money(share)}.`:'Sugestão: 10% desta entrada, antes de qualquer gasto.'}</p></div></div><div class="field-pair">${field('arrival-save','Separar agora','0,00',moneyNumber(share),true)}<div class="field"><label for="arrival-goal">Para qual plano?</label><select id="arrival-goal" name="arrival-goal">${goals.map(g=>`<option value="${g.id}" ${g.id===state.plan?.goalId?'selected':''}>${esc(g.name)}</option>`).join('')}</select></div></div></div>`:''}${formEnd('Confirmar entrada')}<button type="button" class="btn ghost wide" data-action="income-skip" data-id="${incId}" data-date="${date}">Não entrou desta vez</button></form>`,'arrival');
+    openModal(`Caiu ${inc.name.toLowerCase()} de ${first(user(inc.person).name)}?`,`<p class="modal-sub">${dateLong(date)} · previsto ${money(inc.amount)}. Confirme quanto entrou de verdade.</p><form class="form" data-form="arrival" data-id="${incId}" data-date="${date}">${field('arrival-amount','Quanto entrou?','0,00',moneyNumber(inc.amount),true)}${goals.length?`<div class="save-first"><div class="save-first-head">${icon('coins')}<div><strong>Guardar primeiro</strong><p>${state.plan?`Pelo plano ${esc(state.plan.name)}, a parte desta entrada é ${money(share)}.`:state.settings.personalBudget?.[active]?`Sugestão pelo seu orçamento: ${money(share)}. Contas, despesas e dívida vêm antes da meta.`:'Sugestão: 10% desta entrada, antes de qualquer gasto.'}</p></div></div><div class="field-pair">${field('arrival-save','Separar agora','0,00',moneyNumber(share),true)}<div class="field"><label for="arrival-goal">Para qual plano?</label><select id="arrival-goal" name="arrival-goal">${goals.map(g=>`<option value="${g.id}" ${g.id===state.plan?.goalId?'selected':''}>${esc(g.name)}</option>`).join('')}</select></div></div></div>`:''}${formEnd('Confirmar entrada')}<button type="button" class="btn ghost wide" data-action="income-skip" data-id="${incId}" data-date="${date}">Não entrou desta vez</button></form>`,'arrival');
   }
   let budgetProfileDraft=null;
   function personalBudgetReading(){return withFinanceView('personal',personalBudgetData);}

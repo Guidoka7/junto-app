@@ -811,3 +811,19 @@ test('two independent accounts invite, sync offline edits and keep their own pro
   await expect(a.page.locator('#cloud-email')).toBeVisible();await expect(a.page.locator('#app-content')).toBeEmpty();
  }finally{releaseRead?.();for(const c of contexts)await c.close();await chain;await db.close();}
 });
+
+
+test('Ajustes possui central de atualizações com versão atual e verificação manual',async({page})=>{
+  await page.goto('/');await personal(page);
+  await page.locator('.profile-photo-button:visible').click();
+  await expect(page.locator('#modal [data-action="update-center"]')).toBeVisible();
+  await expect(page.locator('#modal [data-update-summary]')).not.toBeEmpty();
+  await page.locator('#modal [data-action="update-center"]').click();
+  await expect(page.locator('#modal-title')).toContainText('Atualizações');
+  await expect(page.locator('.junto-update-versions')).toContainText('INSTALADA');
+  await expect(page.locator('#modal [data-action="update-check"]')).toBeVisible();
+  await page.locator('#modal [data-action="update-check"]').click();
+  await expect(page.locator('.junto-update-card')).toContainText('Tudo em dia');
+  await page.locator('#modal [data-action="update-later"]').click();
+  await expect(page.locator('#modal')).not.toBeVisible();
+});

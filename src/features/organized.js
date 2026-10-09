@@ -20,6 +20,7 @@ let ledgerTab = "history",
   ledgerMine = true,
   goalScope = "mine",
   homeEveryone = false,
+  incomeEveryone = false,
   homeScopePerson = null,
   ledgerPerson = null,
   ledgerLastRoute = null,
@@ -105,7 +106,7 @@ function normalizeRoute() {
   }
   if (!["goals", "plan", "challenges"].includes(planTab)) planTab = "goals";
   if (!["home", "ledger", "analysis", "goals", "couple", "incomes"].includes(route)) route = "home";
-  if (homeScopePerson !== active) { homeEveryone = false; goalScope = "mine"; homeScopePerson = active; }
+  if (homeScopePerson !== active) { homeEveryone = false; incomeEveryone = false; goalScope = "mine"; homeScopePerson = active; }
   if (ledgerPerson !== active || (route === "ledger" && ledgerLastRoute !== "ledger")) {
     ledgerMine = true;
     ledgerFilter = "all";
@@ -117,7 +118,7 @@ function viewFor() {
   return { home: homeV4, ledger: ledgerView, analysis: analysisV4, goals: personalGoalsView, couple: coupleView, incomes: () => `<div class="j-page">${incomesView()}</div>` }[route] || homeV4;
 }
 function viewMode() {
-  return route === "home" ? (homeEveryone ? "shared" : "personal") : route === "analysis" || route === "incomes" || route === "goals" ? "personal" : "shared";
+  return route === "home" ? (homeEveryone ? "shared" : "personal") : route === "incomes" ? (incomeEveryone ? "shared" : "personal") : route === "analysis" || route === "goals" ? "personal" : "shared";
 }
 
 // ---------- Peças de interface ----------
@@ -587,7 +588,6 @@ function homeV4() {
         : `<button class="j-card j-dream-empty" data-action="new-goal">${icon("heart")}<span><b>Tem um sonho aí?</b><small>Dá um nome pra ele e o Juntô calcula quando chega.</small></span><em>Criar</em></button>`
     }
     ${challengeStrip()}
-    ${!solo && !homeEveryone ? `<button class="j-card j-couple-link" data-action="home-scope"><span class="j-avs">${avatar("a")}${avatar("b")}</span><span><b>Nosso espaço a dois</b><small>Ver planejamento combinado e totais da dupla</small></span><span class="j-chev" aria-hidden="true">›</span></button>` : ""}
     ${
       !solo
         ? `<button class="j-card j-couple-link" data-action="route" data-route="couple"><span class="j-avs">${avatar("a")}${avatar("b")}</span><span><b>A dupla</b><small>${pending().length ? `${plural(pending().length, "pedido em conversa", "pedidos em conversa")}` : "Nenhum pedido em aberto"} · ${cashR(approvedTotal())} combinados</small></span><span class="j-chev" aria-hidden="true">›</span></button>`
@@ -1083,6 +1083,7 @@ document.addEventListener("click", (event) => {
     return;
   }
   if (action==='home-scope') { homeEveryone = !homeEveryone; render(); return; }
+  if (action==='income-scope') { incomeEveryone = !incomeEveryone; render(); return; }
   if (action==='goal-scope') { goalScope = el.dataset.value; planTab = 'goals'; render(); return; }
   if (action==='ledger-income') ledgerIncomeModal();
 });

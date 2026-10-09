@@ -997,9 +997,9 @@ function coupleView() {
 // ---------- Chat: o parça das finanças ----------
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 function chatWelcome() {
-  const me = first(user().name), h = new Date().getHours(), f = free(), cap = dailyCap();
+  const me = first(user().name), h = new Date().getHours(), f = personalFree(), cap = withFinanceView('personal',dailyCap);
   const hi = h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite";
-  if (!avgIncome())
+  if (!withFinanceView('personal',avgIncome))
     return `${hi}, ${me}! 👋 Sou o Juntô, seu parça das finanças.\nAinda não sei quanto entra por mês, então minhas contas ficam pela metade. Cadastra sua renda em **Análise › Renda** e eu passo a falar com os seus números de verdade.\nEnquanto isso, manda um “gastei pizza 45” que eu anoto.`;
   const mood = f < 0
     ? `O mês tá apertado: faltam **${cash(-f)}** depois das contas e dos planos. Bora achar de onde tirar? 💪`

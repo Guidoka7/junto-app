@@ -1804,6 +1804,7 @@ ${JSON.stringify(chatContext())}`;
     if(action==='toggle-theme'){applyTheme(themeIsDark()?'light':'dark');return;}
     if(action==='notifications')return notificationsModal();
     if(action==='settings')return settingsModal();
+    if(action==='update-center')return window.JuntoUpdates?.open?.();
     if(action==='about')return aboutModal();
     if(action==='peer'){if(cloudSlot)return openModal('Juntô sincronizado',`<div class="peer-live-card">${avatar(other(),'large')}<div><h3>${esc(first(user(other()).name))} responde na própria conta</h3><p>Os pedidos, respostas e compras sincronizam entre os dois perfis. Você não responde no lugar da outra pessoa.</p></div></div>`,'peer-info');openModal(`Celular de ${first(user(other()).name)}`,peerHTML()+'<p class="peer-caption">Responda como a outra pessoa.<br>As duas telas são simuladas neste navegador.</p>','peer');return;}
     if(action==='onboard'){onboardDraft={};onboard(0);return;}

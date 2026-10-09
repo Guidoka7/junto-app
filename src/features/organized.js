@@ -715,7 +715,8 @@ function dayLabel(iso) {
 }
 function ledgerView() {
   const solo = isSolo(),
-    nOpen = [...state.bills, ...state.transactions].filter((x) => x.contest && x.contest.status === "open" && visible(x)).length;
+    // Revisões são combinados da dupla: ambos precisam ver e responder, mesmo quando só um pagou.
+    nOpen = [...state.bills, ...state.transactions].filter((x) => x.contest && x.contest.status === "open").length;
   const head = pageHead(
     solo || (ledgerTab === "history" && ledgerMine) ? "Meu dinheiro" : "Nosso dinheiro",
     "Extrato",
@@ -800,8 +801,8 @@ function billsPanel() {
         ? state.bills.filter((b) => b.status === "paid" && visible(b)).sort((a, b) => b.due.localeCompare(a.due))
         : f === "fixed"
           ? templates().filter(visible).sort((a, b) => recurringDay(a) - recurringDay(b))
-          : state.bills.filter((b) => b.contest && visible(b));
-  const txs = f === "contested" ? state.transactions.filter((t) => t.contest && !t.billId && visible(t)) : [];
+          : state.bills.filter((b) => b.contest);
+  const txs = f === "contested" ? state.transactions.filter((t) => t.contest && !t.billId) : [];
   const shared = openMonth.filter((b) => ["half", "prop"].includes(b.payer)),
     parts = shared.reduce((acc, b) => (splitShares(b.amount, b.payer).forEach((x) => (acc[x.id] = (acc[x.id] || 0) + x.amount)), acc), { a: 0, b: 0 });
   const billRow = (b) => {

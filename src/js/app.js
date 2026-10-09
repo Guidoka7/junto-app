@@ -2042,6 +2042,26 @@ ${JSON.stringify(chatContext())}`;
       notify(other(),'Novo objetivo no Juntô 💚',`${first(user().name)} criou “${name}”, com meta de ${money(target)}.`);
       close();route='goals';planTab='goals';persist();window.scrollTo({top:0,behavior:'smooth'});toast('Objetivo criado.',`${name} · meta de ${money(target)}.`,'heart');return;
     }
+    if(type==='ledger-income'){
+      if(actor!==active||(cloudSlot&&actor!==cloudSlot)){error('Abra o registro de entrada novamente no seu perfil.');return;}
+      if(!id||state.received.some(r=>r.id===id))return;
+      const name=titleValue(d,'receipt-name'),amount=amountValue(d,'receipt-amount'),date=String(d.get('receipt-date')||''),incomeId=String(d.get('receipt-income')||'');
+      if(name==null||amount==null)return;
+      if(!Number.isSafeInteger(amount)||amount>99999999999){error('Confira o valor da entrada.');return;}
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||dateISO(pd(date))!==date||date>dateISO()){error('Informe a data em que esse dinheiro foi recebido, até hoje.');return;}
+      const inc=incomeId?state.incomes.find(i=>i.id===incomeId&&i.person===actor):null;
+      if(incomeId&&!inc){error('Selecione uma entrada do seu perfil.');return;}
+      const expectedDate=inc?String(d.get('receipt-expected-date')||''):date;
+      if(inc&&(!/^\d{4}-\d{2}-\d{2}$/.test(expectedDate)||dateISO(pd(expectedDate))!==expectedDate)){error('Confira a data do recebimento previsto.');return;}
+      if(inc&&handled(inc.id,expectedDate)){error('Esse recebimento previsto já foi registrado. Confira o histórico antes de lançar novamente.');return;}
+      const balanceDelta=d.get('receipt-adjust-balance')==='on'?amount:0;
+      if(!Number.isSafeInteger(user(actor).balance+balanceDelta)){error('Confira o valor da entrada.');return;}
+      user(actor).balance+=balanceDelta;
+      state.received.push({id,incomeId:inc?.id||null,person:actor,name,date:expectedDate,actualDate:date,amount,status:'received',at:Date.now(),balanceDelta});
+      log(actor,`registrou ${name.toLowerCase()}: entrada de ${money(amount)}.`);
+      close();ledgerTab='history';ledgerMine=true;ledgerFilter='all';ledgerMonth=(pd(date).getFullYear()-new Date().getFullYear())*12+pd(date).getMonth()-new Date().getMonth();persist();
+      toast('Entrada registrada.',balanceDelta?`${money(amount)} somados ao saldo de ${first(user(actor).name)}.`:'O recebimento entrou no histórico. Seu saldo permaneceu igual.','coins');return;
+    }
     if(type==='arrival'&&cloudSlot&&state.incomes.find(i=>i.id===id)?.person!==cloudSlot){error('Confirme apenas os seus recebimentos.');return;}
     if(type==='arrival'){
       const inc=state.incomes.find(i=>i.id===id),date=form.dataset.date;if(!inc||handled(id,date))return;const amount=amountValue(d,'arrival-amount');if(amount==null)return;

@@ -827,3 +827,36 @@ test('Ajustes possui central de atualizações com versão atual e verificação
   await page.locator('#modal [data-action="update-later"]').click();
   await expect(page.locator('#modal')).not.toBeVisible();
 });
+
+
+test('botão central Juntô aparece inteiro e abre o chat em larguras Android/iPhone',async({page})=>{
+  await page.goto('/');
+  await personal(page);
+  for (const theme of ['light','dark']) {
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;},theme);
+    for (const width of [320,360,390,430]) {
+      await page.setViewportSize({width,height:844});
+      const values=await page.locator('#mobile-nav').evaluate(nav=>{
+        const orb=nav.querySelector('.nav-ai-orb');
+        const button=nav.querySelector('button.nav-ai');
+        const n=nav.getBoundingClientRect(),o=orb.getBoundingClientRect();
+        const x=o.x+o.width/2,y=o.y+o.height/2;
+        return {navTop:n.top,orbTop:o.top,orbBottom:o.bottom,orbLeft:o.left,orbRight:o.right,
+          orbSize:o.width,contain:getComputedStyle(nav).contain,overflow:getComputedStyle(nav).overflow,
+          tappable:document.elementFromPoint(x,y)?.closest('button.nav-ai')===button};
+      });
+      expect(values.contain,theme+' '+width+'px: navegação não pode recortar o círculo').not.toContain('paint');
+      expect(values.overflow,theme+' '+width+'px: navegação deve permitir saliência').toBe('visible');
+      expect(values.orbTop,theme+' '+width+'px: círculo deve ficar elevado').toBeLessThan(values.navTop);
+      expect(values.orbTop).toBeGreaterThanOrEqual(0);
+      expect(values.orbLeft).toBeGreaterThanOrEqual(0);
+      expect(values.orbRight).toBeLessThanOrEqual(width);
+      expect(values.orbSize).toBeGreaterThanOrEqual(47);
+      expect(values.tappable,theme+' '+width+'px: centro do botão deve aceitar toque').toBe(true);
+      await page.locator('#mobile-nav button.nav-ai').click();
+      await expect(page.locator('#chat-panel')).toBeVisible();
+      await page.locator('#chat-panel [data-action="chat-close"]').click();
+      await expect(page.locator('#chat-panel')).not.toBeVisible();
+    }
+  }
+});

@@ -483,7 +483,7 @@ function setupSave() {
   }
   // Sonho.
   const target = M(d.dream.target);
-  if (d.dream.name && target && !next.goals.some((g) => norm(g.name) === norm(d.dream.name))) next.goals.push({ id: uid(), name: d.dream.name.slice(0, 40), target, saved: 0, icon: /reserva|emerg/i.test(d.dream.name) ? "shield" : /viag/i.test(d.dream.name) ? "plane" : "heart" });
+  if (d.dream.name && target && !next.goals.some((g) => norm(g.name) === norm(d.dream.name))) next.goals.push({ id: uid(), name: d.dream.name.slice(0, 40), target, saved: 0, owner: isSolo() ? 'a' : me, kind: 'dream', icon: /reserva|emerg/i.test(d.dream.name) ? "shield" : /viag/i.test(d.dream.name) ? "plane" : "heart" });
   next.settings.setup = next.settings.setup || {};
   // Respostas guardadas como texto: o validador trata qualquer chave "amount" como centavos.
   next.settings.setup[me] = { v: SETUP_VERSION, at: Date.now(), answers: JSON.stringify(d) };

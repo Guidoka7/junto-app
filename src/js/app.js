@@ -105,6 +105,9 @@
     if(!Number.isFinite(s.settings.profileZoom))s.settings.profileZoom=1.08;
     if(!Number.isFinite(s.settings.profileY))s.settings.profileY=50;
     if(!('plan' in s))s.plan=null;s.budgets=s.budgets&&typeof s.budgets==='object'?s.budgets:{};s.learned=s.learned&&typeof s.learned==='object'?s.learned:{};s.commitments=Array.isArray(s.commitments)?s.commitments:[];s.challenges=Array.isArray(s.challenges)?s.challenges:[];
+    // Conservar objetivos pré-existentes: no modo solo pertencem a quem os criou;
+    // metas legadas da dupla permanecem compartilhadas (sem atribuir a outra pessoa).
+    s.goals.forEach(g=>{if(!['a','b','both'].includes(g.owner))g.owner=s.users?.length===1?'a':'both';if(!['dream','investment'].includes(g.kind))g.kind='dream';});
     s.received.forEach(r=>{if(r.status!=='received')return;const inc=s.incomes.find(i=>i.id===r.incomeId);if(!r.person&&inc)r.person=inc.person;if(!Number.isSafeInteger(r.balanceDelta))r.balanceDelta=r.amount;});
     const legacySeries={};s.bills.filter(b=>b.recurring&&b.recurringKey).forEach(b=>{legacySeries[String(b.name||'').trim().toLocaleLowerCase('pt-BR')]=b.recurringKey;});
     s.bills.filter(b=>b.recurring&&!b.recurringKey).forEach(b=>{const k=String(b.name||'').trim().toLocaleLowerCase('pt-BR');b.recurringKey=legacySeries[k]||(legacySeries[k]=`legacy:${k||b.id}`);});
@@ -420,7 +423,7 @@
   let state;try{const s=JSON.parse(localStorage.getItem(KEY));state=migrate(validBackup(s)?s:freshPersonalState());}catch{state=freshPersonalState();}
   let active='a';try{active=sessionStorage.getItem(PROFILE)==='b'?'b':'a';}catch{}if(state.users.length<2)active='a';
   let route='home',billFilter='all',requestFilter='all',hidden=false,noticesEnabled=true;try{noticesEnabled=localStorage.getItem('junto-notices-v1')!=='off';}catch{}
-  let analysisTab='overview',analysisPerson='both',futureTab='forecast',incomeTab='overview',planTab='goals';
+  let analysisTab='overview',analysisPerson=null,futureTab='forecast',incomeTab='overview',planTab='goals';
   let onboardDraft={},onboardStep=1,channel=null;
   try{channel=new BroadcastChannel('junto-demo-sync');}catch{}
   const user=(id=active)=>state.users.find(u=>u.id===id)||{id:'b',name:'Seu amor',balance:0,tone:'pink'};
@@ -457,6 +460,21 @@
   const protectedTotal=()=>state.goals.reduce((a,g)=>a+g.saved,0);
   const approvedTotal=()=>state.requests.filter(r=>r.status==='approved').reduce((a,r)=>a+r.amount,0);
   const free=()=>total()-billsTotal()-protectedTotal()-approvedTotal();
+  const goalOwner=(g)=>['a','b'].includes(g?.owner)?g.owner:'both';
+  const goalEditable=(g,id=active)=>goalOwner(g)==='both'||goalOwner(g)===id;
+  function goalReserve(g,id=active){
+    if(goalOwner(g)===id)return g.saved;
+    if(goalOwner(g)!=='both')return 0;
+    const saved=state.saves.filter(s=>s.goalId===g.id),by=saved.reduce((o,s)=>(o[s.actor]=(o[s.actor]||0)+s.amount,o),{});
+    const recorded=(by.a||0)+(by.b||0),remaining=Math.max(0,g.saved-recorded);
+    return (by[id]||0)+(id==='a'?Math.ceil(remaining/2):Math.floor(remaining/2));
+  }
+  function personalFree(id=active){
+    const bills=state.bills.filter(b=>b.status==='open').reduce((sum,b)=>sum+shareOf(b,id),0);
+    const reserved=state.goals.reduce((sum,g)=>sum+goalReserve(g,id),0);
+    const requests=state.requests.filter(r=>r.status==='approved'&&r.author===id).reduce((sum,r)=>sum+r.amount,0);
+    return user(id).balance-bills-reserved-requests;
+  }
   const pending=()=>state.requests.filter(r=>r.status==='pending');
   const incoming=(id=active)=>pending().filter(r=>r.recipient===id);
   const unread=(id=active)=>state.notifications.filter(n=>n.to===id&&!n.read).length;
@@ -589,7 +607,8 @@
     const groups={};next.forEach(x=>(groups[x.date.slice(0,7)]=groups[x.date.slice(0,7)]||[]).push(x));
     const pendingHTML=rows=>rows.length?`<section class="income-v3-list"><div class="home-section-title"><h2>Confirmar recebimentos</h2>${pend.length>rows.length?'<button class="text-link" data-action="topic-tab" data-kind="income" data-value="calendar">Ver todos</button>':''}</div>${rows.map(x=>`<button class="income-v3-row" data-action="income-arrived" data-id="${x.inc.id}" data-date="${x.date}" aria-label="Confirmar ${esc(x.inc.name)} de ${esc(first(user(x.inc.person).name))}"><span class="income-v3-icon">${icon('coins')}</span><span><b>${esc(x.inc.name)}</b><small>${esc(first(user(x.inc.person).name))} · previsto ${dateText(x.date)}</small></span><strong class="num">${cashR(x.inc.amount)}</strong><em>›</em></button>`).join('')}</section>`:'';
     const tabs=segTabs('income',incomeTab,[['overview','Resumo'],['sources','Entradas'],['calendar','Calendário'],['base','Ajustes']]);
-    const head=`<button class="j-back" data-action="go" data-route="analysis" data-kind="analysis" data-value="summary">‹ Análise</button>`+pageHead(solo?'Minha renda':'Nossa renda','O que vai cair?','Quando e quanto o dinheiro entra. A análise inteira nasce daqui.')+tabs;
+    const head=`<button class="j-back" data-action="go" data-route="analysis" data-kind="analysis" data-value="summary">‹ Análise</button>`+pageHead(solo?'Minha renda':'Renda da dupla','O que vai cair?','Quando e quanto o dinheiro entra. A análise inteira nasce daqui.')+
+      (isSolo()?'':`<div class="j-ledger-scope"><div><b>${incomeEveryone?'Entradas dos dois':'Minhas entradas'}</b><small>${incomeEveryone?'Recebimentos organizados por titular':'Somente o que você configurou'}</small></div><button type="button" class="j-toggle" data-action="income-scope">${incomeEveryone?'Só meus dados':'Ver todos'}</button></div>`)+tabs;
     if(incomeTab==='overview'){
       return head+`<div class="income-v3-surface"><section class="income-v3-total"><div><span>PREVISTO NO MÊS</span><strong class="num">${cashR(expected)}</strong><p>${solo?'Entradas que você configurou.':'Entradas configuradas pela dupla.'}</p></div><span class="income-v3-month">${esc(monthName(n))} ${n.getFullYear()}⌄</span></section>${pendingHTML(pend.slice(0,3))}<section class="income-v3-list"><div class="home-section-title"><h2>Entradas configuradas</h2><button class="text-link" data-action="topic-tab" data-kind="income" data-value="sources">Gerenciar</button></div>${financeState().incomes.length?financeState().incomes.map(i=>{const nx=next.find(x=>x.inc.id===i.id);return `<button class="income-v3-row" data-action="${!cloudSlot||i.person===active?'income-edit':'income-detail'}" data-id="${i.id}"><span class="income-v3-icon ${i.person==='b'?'pink':''}">${icon('wallet')}</span><span><b>${esc(i.name)}</b><small>${esc(first(user(i.person).name))} · ${esc(ruleText(i))}${nx?`<br>Próximo: ${dateText(nx.date)}`:''}</small></span><strong class="num">${cashR(i.amount)}${i.rule==='weekly'?'<small>por semana</small>':''}</strong><em>›</em></button>`;}).join(''):`<div class="home-empty-row">${icon('wallet')}<span><b>Nenhuma entrada configurada.</b><small>Adicione salário, renda semanal, comissão ou outro recebimento.</small></span></div>`}<div class="income-v3-confirm">${icon('bell')}<span>${nextOne?`Próxima confirmação: ${esc(nextOne.inc.name)} · ${dateText(nextOne.date)}.`:'Você confirma quando cada valor cair.'}</span></div></section><section class="income-v3-insight">${icon('sparkle')}<div><b>${rest>0?`${cashR(rest)} ainda estão previstos para ${monthName(n)}.`:'As entradas previstas deste mês já foram confirmadas.'}</b><p>${M.coverage>=14?'A previsão já usa seu ritmo real de gastos para ajustar o que sobra.':'Continue registrando gastos: quanto mais histórico, mais precisa fica a previsão.'}</p></div></section><button class="income-v3-add" data-action="income-new">${icon('plus')}Adicionar entrada</button><button class="income-v3-link" data-action="topic-tab" data-kind="income" data-value="calendar">Ver recebimentos ›</button></div>`;
     }
@@ -1119,7 +1138,7 @@
   function fvChart(monthly,rate,w){const h=96,n=60,pts=[],plain=[];for(let i=0;i<=n;i++){pts.push(fvMonthly(monthly,i,rate));plain.push(monthly*i);}const mx=Math.max(pts[n],1),X=i=>4+(w-8)*i/n,Y=v=>h-6-(h-16)*v/mx,path=a=>a.map((v,i)=>`${i?'L':'M'}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(' ');
     return `<svg class="chart" viewBox="0 0 ${w} ${h+16}" aria-hidden="true"><path d="${path(pts)} L${X(n)} ${Y(0)} L${X(0)} ${Y(0)} Z" class="fv-area"/><path d="${path(plain)}" class="fv-plain"/><path d="${path(pts)}" class="fv-line"/>${[12,36,60].map(i=>`<line x1="${X(i)}" x2="${X(i)}" y1="${Y(0)}" y2="${Y(pts[i])}" class="fv-tick"/><text x="${X(i)}" y="${h+12}" text-anchor="${i===60?'end':'middle'}" class="fv-lbl">${i/12} ${i===12?'ano':'anos'}</text>`).join('')}</svg>`;}
   function cutResult(){
-    const {monthly,suggested,chosen}=cutTotals(),rate=Number(state.settings.yieldRate??10),who=cutPerson==='both'?'A dupla':first(user(cutPerson).name),g=state.goals[0],base=state.plan?state.plan.monthly:Math.max(0,(planOptions()[0]||{base:0}).base-CUSHION);
+    const {monthly,suggested,chosen}=cutTotals(),rate=Number(state.settings.yieldRate??10),who=cutPerson==='both'?'A dupla':first(user(cutPerson).name),g=state.goals.find(g=>goalOwner(g)===(cutPerson==='both'?'both':active)),base=state.plan?state.plan.monthly:Math.max(0,(planOptions()[0]||{base:0}).base-CUSHION);
     if(!monthly)return `<p class="cr-label">Escolha o que cortar ao lado.</p><p class="cr-big num">${cashR(0)}<small>/mês</small></p><p class="cr-hint">Seguindo só as sugestões do Juntô, ${esc(who.toLowerCase()==='a dupla'?'a dupla':who)} guardaria <b>${cashR(suggested)} por mês</b>: ${cashR(fvMonthly(suggested,12,rate))} em um ano.</p><button class="btn lime wide" data-action="cut-suggest">${icon('sparkle')}Aplicar sugestões</button>`;
     return `<p class="cr-label">${esc(who)} economiza</p><p class="cr-big num">${cashR(monthly)}<small>/mês</small></p><p class="cr-sub">Cortando ${chosen.map(o=>`${esc(o.item.toLowerCase())}${levelOf(o)==='half'?' (metade)':''}`).join(', ')}.</p>
       <div class="cr-grid"><div><span>6 meses</span><b class="num">${cashR(fvMonthly(monthly,6,rate))}</b></div><div><span>1 ano</span><b class="num">${cashR(fvMonthly(monthly,12,rate))}</b></div><div><span>5 anos</span><b class="num">${cashR(fvMonthly(monthly,60,rate))}</b></div></div>
@@ -1134,10 +1153,10 @@
       <div class="cut-seg" role="group" aria-label="${esc(o.item)}">${[['keep','Manter'],['half','−50%'],['cut','Cortar']].map(([v,l])=>`<button type="button" data-action="cut-level" data-key="${esc(o.key)}" data-level="${v}" aria-pressed="${lv===v}" class="${lv===v?'on':''}">${l}</button>`).join('')}</div>
       <span class="cut-save num">${saved?`+${cashR(saved)}`:''}</span></div>`;}
   function commitStatus(c){const start=c.since,days=Math.max(1,daysUntil(dateISO())-daysUntil(start)+1),spent=state.transactions.filter(t=>!t.billId&&t.date>=start&&itemOf(t).item===c.item).reduce((s,t)=>s+(c.person==='both'?t.amount:shareOf(t,c.person)),0),expected=c.baseline/30.4*days,target=expected*(1-CUT_FACTOR[c.level]);return {days,spent,expected,target,saved:Math.max(0,expected-spent),ok:spent<=target*1.1+500};}
-  function commitmentsPanel(){const list=(state.commitments||[]).filter(c=>c.active);if(!list.length)return '';
+  function commitmentsPanel(){const list=(state.commitments||[]).filter(c=>c.active&&(c.person===cutPerson||(cutPerson==='both'&&c.person==='both')));if(!list.length)return '';
     return `<div class="panel commit-panel"><div class="section-header"><div><h2>Compromissos de corte</h2><p class="small muted" style="margin-top:4px">O Juntô acompanha cada um e avisa no Radar quando passa do combinado.</p></div></div>${list.map(c=>{const s=commitStatus(c),it=recognize(c.item)||{icon:'cut'};return `<div class="commit-row ${s.ok?'ok':'off'}"><span class="item-tile">${icon(it.icon)}</span><div><b>${c.person==='both'?'Dupla':esc(first(user(c.person).name))} · ${esc(c.item)} · ${c.level==='cut'?'cortar':'pela metade'}</b><small>Desde ${dayMonth(c.since)}: ${cashR(s.spent)} gastos${c.level==='half'?` de ${cashR(s.target)} combinados`:''}. ${s.ok?`Já economizou <strong>${cashR(s.saved)}</strong>.`:`Passou do combinado, mas ainda economizou ${cashR(s.saved)}.`}</small></div><button class="btn ghost" data-action="commit-end" data-id="${c.id}">Encerrar</button></div>`;}).join('')}</div>`;}
   function investGuide(extra){
-    const M=model(),essential=fixedMonthly()+['Alimentação','Transporte','Saúde'].reduce((s,c)=>s+(M.fc[c]?.f||0),0),target=essential*3,res=state.goals.filter(g=>g.icon==='shield').reduce((s,g)=>s+g.saved,0),per=(state.plan?state.plan.monthly:0)+extra,missing=Math.max(0,target-res),dream=state.goals.find(g=>g.icon!=='shield');
+    const M=model(),essential=fixedMonthly()+['Alimentação','Transporte','Saúde'].reduce((s,c)=>s+(M.fc[c]?.f||0),0),target=essential*3,res=financeState().goals.filter(g=>g.icon==='shield').reduce((s,g)=>s+g.saved,0),per=(state.plan?state.plan.monthly:0)+extra,missing=Math.max(0,target-res),dream=financeState().goals.find(g=>g.icon!=='shield');
     return `<div class="panel invest"><div class="section-header"><div><h2>Onde colocar esse dinheiro</h2><p class="small muted" style="margin-top:4px">A ordem que mais protege a dupla, com os números de vocês.</p></div></div><ol class="steps">
       <li class="${missing?'now':'done'}"><b>Reserva de emergência</b><p>${missing?`Meta: 3 meses do essencial, ${cashR(target)}. Vocês têm ${cashR(res)}. ${per?`Com ${cashR(per)} por mês, fica pronta em ${etaText(missing,per)}.`:'Comecem por aqui.'}`:`Pronta: ${cashR(res)}, cobre 3 meses do essencial.`} Costuma ficar em aplicações de baixo risco com resgate no mesmo dia, como Tesouro Selic, CDB com liquidez diária de banco grande ou conta remunerada.</p></li>
       <li class="${missing?'':'now'}"><b>Sonhos com data</b><p>${dream?`${esc(dream.name)}: faltam ${cashR(Math.max(0,dream.target-dream.saved))}. `:''}Pra objetivo com prazo, vale comparar aplicações com vencimento perto da data do sonho, como CDB, LCI/LCA ou Tesouro prefixado.</p></li>
@@ -1145,7 +1164,7 @@
   }
   function cutBlock(){
     if(!cutPerson||isSolo())cutPerson=isSolo()?'a':active;const {list}=cutTotals(),opt=list.filter(o=>o.w>=.3),ess=list.filter(o=>o.w<.3),M=model(),days=Math.max(1,Math.min(90,M.age)),who=cutPerson==='both'?'da dupla':`de ${first(user(cutPerson).name)}`;
-    return `<section class="block" id="cortes"><div class="block-head with-link"><div><h2>Cortar o que não precisa</h2><p>O Juntô leu ${days} dias de gastos ${esc(who)}, item por item: quanto custa, quantas vezes e quanto pesa no mês. Escolha o que manter, reduzir ou cortar.</p></div><div class="seg-person" role="group" aria-label="De quem são os gastos">${[...state.users.map(u=>[u.id,first(u.name)]),['both','Os dois']].map(([v,l])=>`<button data-action="cut-person" data-value="${v}" aria-pressed="${cutPerson===v}" class="${cutPerson===v?'on':''}">${esc(l)}</button>`).join('')}</div></div>
+    return `<section class="block" id="cortes"><div class="block-head with-link"><div><h2>Cortar o que não precisa</h2><p>O Juntô leu ${days} dias de gastos ${esc(who)}, item por item: quanto custa, quantas vezes e quanto pesa no mês. Escolha o que manter, reduzir ou cortar.</p></div><div class="seg-person" role="group" aria-label="De quem são os gastos">${[[active,'Meus gastos'],...(isSolo()?[]:[['both','Ver todos']])].map(([v,l])=>`<button data-action="cut-person" data-value="${v}" aria-pressed="${cutPerson===v}" class="${cutPerson===v?'on':''}">${esc(l)}</button>`).join('')}</div></div>
       <div class="cut-layout"><div class="panel cut-list">${opt.length?opt.map(cutRow).join(''):`<p class="small muted">Sem gastos que dê pra cortar nos últimos ${days} dias.</p>`}${(()=>{const t=cutTotals();return t.monthly?`<div class="cut-sticky" aria-live="polite"><span>Economia</span><b class="num">${cashR(t.monthly)}/mês</b><span>1 ano: ${cashR(fvMonthly(t.monthly,12,Number(state.settings.yieldRate??10)))}</span><a href="#cut-result">Ver projeção</a></div>`:'';})()}${ess.length?`<details class="essentials"><summary>Essenciais (${ess.length}): mercado, transporte, saúde. O Juntô não sugere cortar, mas dá pra simular.</summary>${ess.map(cutRow).join('')}</details>`:''}</div><aside class="panel cut-result" id="cut-result">${cutResult()}</aside></div>
       ${commitmentsPanel()}${investGuide(cutTotals().monthly)}</section>`;
   }
@@ -1174,8 +1193,8 @@
     const M=model(),o=planOptions()[0]||{},eomISO=endOfMonthISO(),pts=simulate({days:daysUntil(eomISO)}),eom=pts[pts.length-1],minP=pts.reduce((a,p)=>p.free<a.free?p:a,pts[0]),n=new Date();
     const items=(id)=>itemStats(id).slice(0,10).map(x=>({item:x.item,categoria:x.category,por_mes:R(x.monthly),frequencia:x.freq,valor_medio:R(x.unit),parte_redutivel_por_mes:R(x.cuttableMonthly),sugestao:{keep:'manter',half:'reduzir pela metade',cut:'cortar'}[x.sug]}));
     return {
-      orcamento_pessoal:(()=>{const b=personalBudgetReading();return {unidade:"reais",vale_alimentacao:{recebido:R(b.food.received),gasto:R(b.food.spent),restante:R(b.food.remaining)},vale_transporte:{recebido:R(b.transport.received),gasto:R(b.transport.spent),restante:R(b.transport.remaining)},transporte_hoje:R(b.transportToday),referencia_onibus_por_dia:R(b.transportLimit),transporte_semana:{recebido:R(b.weekTransport.received),gasto:R(b.weekTransport.spent),reserva_deslocamentos:R(b.weekTransport.reserve),sobra_possivel:R(b.weekTransport.possibleSaving)},disponivel_conservador:R(b.available),divida:b.debt?{juros_estimados:R(b.debt.interest),pagamento_possivel:R(b.debt.payment),abatimento:R(b.debt.amortization),saldo_apos_estimativa:R(b.debt.remaining),regra:"juros simples por dias/30; confirmar com credor"}:null,meta_disponivel_agora:R(b.saveNow)};})(),metodo_previsao:{confianca:M.confidence,dias_observados:M.coverage,pagamentos_avulsos_nao_repetem:true,renda_variavel:"estimativa, exige confirmação",sugestoes_nao_sao_transferencias:true},hoje:dateISO(),dia_da_semana:WEEKDAYS[n.getDay()],quem_esta_falando:{id:active,nome:user().name},pessoas:state.users.map(u=>({id:u.id,nome:u.name,saldo:R(u.balance)})),
-      saldo_dupla:R(total()),livre_pra_curtir:R(free()),contas_a_pagar_abertas:R(billsTotal()),protegido_em_planos:R(protectedTotal()),pode_gastar_por_dia_ate_fim_do_mes:R(dailyCap()),
+      orcamento_pessoal:(()=>{const b=personalBudgetReading();return {unidade:"reais",vale_alimentacao:{recebido:R(b.food.received),gasto:R(b.food.spent),restante:R(b.food.remaining)},vale_transporte:{recebido:R(b.transport.received),gasto:R(b.transport.spent),restante:R(b.transport.remaining)},transporte_hoje:R(b.transportToday),referencia_onibus_por_dia:R(b.transportLimit),transporte_semana:{recebido:R(b.weekTransport.received),gasto:R(b.weekTransport.spent),reserva_deslocamentos:R(b.weekTransport.reserve),sobra_possivel:R(b.weekTransport.possibleSaving)},disponivel_conservador:R(b.available),divida:b.debt?{juros_estimados:R(b.debt.interest),pagamento_possivel:R(b.debt.payment),abatimento:R(b.debt.amortization),saldo_apos_estimativa:R(b.debt.remaining),regra:"juros simples por dias/30; confirmar com credor"}:null,meta_disponivel_agora:R(b.saveNow)};})(),metodo_previsao:{confianca:M.confidence,dias_observados:M.coverage,pagamentos_avulsos_nao_repetem:true,renda_variavel:"estimativa, exige confirmação",sugestoes_nao_sao_transferencias:true},hoje:dateISO(),dia_da_semana:WEEKDAYS[n.getDay()],quem_esta_falando:{id:active,nome:user().name},pessoas:[{id:active,nome:user().name,saldo:R(user().balance)}],
+      saldo_pessoal:R(user().balance),livre_pra_curtir:R(personalFree()),contas_a_pagar_abertas:R(financeState().bills.filter(b=>b.status==='open').reduce((n,b)=>n+b.amount,0)),protegido_em_planos:R(financeState().goals.reduce((n,g)=>n+g.saved,0)),pode_gastar_por_dia_ate_fim_do_mes:R(dailyCap()),
       mes:{renda_prevista:R(o.inc||0),contas_fixas:R(o.fixed||0),dia_a_dia_previsto:R(o.variable||0),sobra_no_ritmo_atual:R(o.base||0),ritmo_por_dia:R(M.daily),fim_do_mes_fora_dos_planos:R(eom.free),dia_mais_apertado:{data:minP.date,valor:R(minP.free)}},
       historico_mensal:monthLedger().map(m=>({mes:m.ym,tipo:m.kind==='past'?'fechado':m.kind==='current'?'atual (projetado)':'previsão',entrou:R(m.income),fixas:R(m.fixed),dia_a_dia:R(m.variable),resultado:R(m.result)})),
       entradas:{pendentes:pendingArrivals().map(p=>({data:p.date,nome:p.inc.name,pessoa:user(p.inc.person).name,valor:R(p.inc.amount)})),proximas:nextArrivals(35).slice(0,8).map(x=>({data:x.date,nome:x.inc.name,pessoa:user(x.inc.person).name,valor:R(x.inc.amount)}))},
@@ -1183,8 +1202,8 @@
       contas_abertas:financeState().bills.filter(b=>b.status==='open').map(b=>({nome:b.name,valor:R(b.amount),vence:b.due})),
       metas_por_categoria:budgets().map(b=>({categoria:b.c,previsto_mes:R(b.f),meta:R(b.budget),gasto_no_mes:R(b.mtd),cabe_ainda:R(b.remaining),status:{ok:'no ritmo',tight:'acima do ritmo',over:'estourada'}[b.status],economia_possivel:R(b.save)})),
       leitura_individual:financeState().users.filter(u=>!cloudSlot||u.id===active).map(u=>u.id).map(id=>{const r=personReading(id);return {pessoa:user(id).name,renda_mes:R(r.inc),dia_a_dia_mes:R(r.v),parte_nas_fixas:R(r.fixed),sobra_individual:R(r.net),fatia_da_renda:pct(r.incShare),fatia_do_gasto:pct(r.varShare)};}),
-      itens_que_mais_pesam:Object.fromEntries(financeState().users.filter(u=>!cloudSlot||u.id===active).map(u=>[u.name,items(u.id)])),modo:isSolo()?'individual':'dupla',
-      planos:state.goals.map(g=>({nome:g.name,guardado:R(g.saved),meta:R(g.target)})),plano_de_guardar:financeState().plan?{nome:financeState().plan.name,por_mes:R(financeState().plan.monthly),guardado_no_mes:R(savedInMonth(dateISO().slice(0,7)))}:null,
+      itens_que_mais_pesam:{[user().name]:items(active)},modo:isSolo()?'individual':'individual (dupla conectada)',
+      planos:financeState().goals.map(g=>({nome:g.name,guardado:R(g.saved),meta:R(g.target),tipo:g.kind||'dream',visao:goalOwner(g)==='both'?'participacao_a_dois':'pessoal'})),plano_de_guardar:financeState().plan?{nome:financeState().plan.name,por_mes:R(financeState().plan.monthly),guardado_no_mes:R(savedInMonth(dateISO().slice(0,7)))}:null,
       compromissos:(financeState().commitments||[]).filter(c=>c.active).map(c=>{const s=commitStatus(c);return {pessoa:c.person==='both'?'dupla':user(c.person).name,item:c.item,nivel:c.level==='cut'?'cortar':'metade',desde:c.since,economizado:R(s.saved),dentro_do_combinado:s.ok};}),
       contestacoes_abertas:[...financeState().bills,...financeState().transactions].filter(x=>x.contest&&x.contest.status==='open').map(x=>({gasto:x.name,valor:R(x.amount),por:user(x.contest.by).name,motivo:x.contest.reason,comentario:x.contest.note})),
       oportunidades_pessoais:savingsReading().opportunities.map(o=>({tipo:o.key,custo_registrado:R(o.total),economia_possivel_no_periodo:R(o.saving),referencia_onibus_por_dia:o.routine?R(o.routine):null,vale_configurado_por_dia:o.allowance?R(o.allowance):null,periodo:dateISO().slice(0,7)})),dicas:tips().map(t=>t.title),desafios_ativos:(financeState().challenges||[]).filter(c=>c.status==='active').map(c=>{const st=challengeStatus(c);return {desafio:c.title,quem:whoLabel(c.person),dia:st.elapsed,de:c.days,economizado:R(st.saved),situacao:st.phase};}),desafios_sugeridos:challengeSuggestions().slice(0,3).map(x=>({desafio:x.title,quem:whoLabel(x.person),vale:R(x.value)})),rendimento_estimado_ao_ano_pct:Number(financeState().settings.yieldRate??10)
@@ -1370,8 +1389,25 @@ ${JSON.stringify(chatContext())}`;
     }
     finally{msg.streaming=false;chatBusy=null;renderChat();saveChat();chatMode();}
   }
-  function openChat(){chatOpen=true;const p=$('#chat-panel');if(!p)return;p.hidden=false;document.body.classList.add('chat-on');chatMode();renderChat();setTimeout(()=>$('#chat-input')?.focus(),60);}
-  function closeChat(){chatOpen=false;const p=$('#chat-panel');if(p)p.hidden=true;document.body.classList.remove('chat-on');$('#chat-fab')?.focus();}
+  function openChat(){
+    let p=$('#chat-panel');
+    if(!p){document.body.insertAdjacentHTML('beforeend',chatShell());p=$('#chat-panel');}
+    if(!p)return toast('Chat indisponível.','Atualize o aplicativo e tente novamente.','info');
+    chatOpen=true;p.hidden=false;p.removeAttribute('inert');p.setAttribute('aria-hidden','false');
+    document.body.classList.add('chat-on');
+    document.querySelectorAll('[data-action="chat-open"]').forEach(b=>b.setAttribute('aria-expanded','true'));
+    const ctx=p.querySelector('.chat-context p');
+    if(ctx)ctx.textContent='Usando as entradas, gastos e metas do seu perfil. As informações da dupla ficam separadas.';
+    chatMode();renderChat();
+    window.requestAnimationFrame(()=>$('#chat-input')?.focus({preventScroll:true}));
+  }
+  function closeChat(){
+    chatOpen=false;const p=$('#chat-panel');if(p){p.hidden=true;p.setAttribute('aria-hidden','true');}
+    document.body.classList.remove('chat-on');
+    document.querySelectorAll('[data-action="chat-open"]').forEach(b=>b.setAttribute('aria-expanded','false'));
+    const target=window.matchMedia('(max-width: 760px)').matches?document.querySelector('#mobile-nav [data-action="chat-open"]'):$('#chat-fab');
+    target?.focus({preventScroll:true});
+  }
   function chatSuggestions(){
     const ym=dateISO().slice(0,7),sums={};
     state.transactions.filter(t=>!t.billId&&t.date.slice(0,7)===ym).forEach(t=>sums[t.category]=(sums[t.category]||0)+t.amount);
@@ -1601,21 +1637,32 @@ ${JSON.stringify(chatContext())}`;
     const u=user(id);
     openModal(`Quanto tu tem em conta, ${first(u.name)}?`,`<p class="modal-sub">Atualize o saldo atual. A soma da dupla se ajusta junto.</p><form class="form" data-form="balance" data-user="${id}">${field('balance-amount','Saldo atual da sua conta','0,00',moneyNumber(u.balance),true)}<div class="form-note">Informe o saldo de agora. Isso substitui o valor anterior; não conta como uma renda nova.</div>${formEnd('Atualizar nosso saldo')}</form>`,'balance');
   }
-  function newGoalModal(){
-    openModal('Dá um nome pro nosso sonho.',`<p class="modal-sub">Pode ser uma viagem. Pode ser paz pra dormir. O plano é de vocês.</p><form class="form" data-form="goal">${field('goal-title','Nome do plano','Ex.: nosso cantinho, viagem, reserva')}<div class="field-pair">${field('goal-target','Quanto queremos juntar?','0,00','',true)}<div class="field"><label for="goal-icon">Cara desse plano</label><select id="goal-icon" name="goal-icon"><option value="plane">Viagem</option><option value="house">Nosso cantinho</option><option value="shield">Reserva</option><option value="gift">Um sonho</option></select></div></div>${formEnd('Criar nosso plano')}</form>`,'goal');
+  function newGoalModal(defaultKind='dream'){
+    const opts=isSolo()?'':`<option value="both">A dois · meta compartilhada</option>`;
+    openModal(defaultKind==='investment'?'Registrar investimento':'Criar sonho ou meta',
+      `<p class="modal-sub">Defina a quem pertence. Suas metas e investimentos ficam separados das metas do casal.</p>
+      <form class="form" data-form="goal">
+      <div class="field"><label for="goal-owner">De quem é este objetivo?</label><select name="goal-owner" id="goal-owner"><option value="${active}">Só meu · ${esc(first(user().name))}</option>${opts}</select></div>
+      <div class="field"><label for="goal-kind">O que vamos acompanhar?</label><select name="goal-kind" id="goal-kind"><option value="dream" ${defaultKind==='dream'?'selected':''}>Sonho / reserva</option><option value="investment" ${defaultKind==='investment'?'selected':''}>Investimento (registro manual)</option></select></div>
+      ${field('goal-title','Nome','Ex.: minha viagem, CDB, reserva pessoal')}
+      <div class="field-pair">${field('goal-target','Valor objetivo','0,00','',true)}
+      <div class="field"><label for="goal-icon">Ícone</label><select id="goal-icon" name="goal-icon"><option value="plane">Viagem</option><option value="house">Casa</option><option value="shield" ${defaultKind==='investment'?'selected':''}>Reserva / investimento</option><option value="gift">Sonho</option></select></div></div>
+      <p class="form-note">Investimento é um acompanhamento manual, não movimenta uma conta bancária automaticamente.</p>
+      ${formEnd('Salvar objetivo')}</form>`,'goal');
   }
   function goalDetailModal(id){
     const g=state.goals.find(x=>x.id===id);if(!g)return;
     const p=Math.min(100,Math.round(g.saved/g.target*100)),remaining=Math.max(0,g.target-g.saved),entries=state.saves.filter(x=>x.goalId===g.id),by=entries.reduce((o,x)=>(o[x.actor]=(o[x.actor]||0)+x.amount,o),{});
-    openModal(g.name,`<div class="goal-detail-v3"><div class="goal-detail-hero"><span class="goal-detail-icon">${icon(g.icon||'heart')}</span><div><span>PLANO</span><strong class="num">${cash(g.saved)}</strong><p>${p}% de ${cash(g.target)} · ${remaining?'faltam '+cash(remaining):'meta alcançada'}</p></div></div><div class="plans-v3-progress" role="progressbar" aria-label="Progresso de ${esc(g.name)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p}"><span style="width:${p}%"></span></div><div class="ledger-detail-grid">${ledgerMeta('Meta',cash(g.target))}${ledgerMeta('Guardado',cash(g.saved))}${ledgerMeta(isSolo()?'Contribuições':'Você',cash(isSolo()?g.saved:(by[active]||0)))}${!isSolo()?ledgerMeta('Meu amor',cash(by[other()]||0)):''}</div><div class="ledger-actions"><button class="ledger-action primary" data-action="contribute" data-id="${g.id}">${icon('plus')}<span><b>Guardar um pouquinho</b><small>Protege mais dinheiro para este plano</small></span></button><button class="ledger-action" data-action="edit-goal" data-id="${g.id}">${icon('edit')}<span><b>Editar plano</b><small>Nome, meta e ícone</small></span></button><button class="ledger-action danger" data-action="release-goal" data-id="${g.id}">${icon('trash')}<span><b>Encerrar plano</b><small>Libera ${cash(g.saved)} de volta ao saldo livre</small></span></button></div></div>`,'goal-detail');
+    const canEdit=goalEditable(g),owner=goalOwner(g),scope=owner==='both'?'Meta a dois':owner===active?'Objetivo pessoal':`De ${first(user(owner).name)}`;
+    openModal(g.name,`<div class="goal-detail-v3"><p class="modal-sub">${esc(scope)} · ${g.kind==='investment'?'investimento registrado manualmente':'sonho / reserva'}</p><div class="goal-detail-hero"><span class="goal-detail-icon">${icon(g.icon||'heart')}</span><div><span>PLANO</span><strong class="num">${cash(g.saved)}</strong><p>${p}% de ${cash(g.target)} · ${remaining?'faltam '+cash(remaining):'meta alcançada'}</p></div></div><div class="plans-v3-progress" role="progressbar" aria-label="Progresso de ${esc(g.name)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p}"><span style="width:${p}%"></span></div><div class="ledger-detail-grid">${ledgerMeta('Meta',cash(g.target))}${ledgerMeta('Guardado',cash(g.saved))}${ledgerMeta(isSolo()?'Contribuições':'Você',cash(isSolo()?g.saved:(by[active]||0)))}${!isSolo()?ledgerMeta('Meu amor',cash(by[other()]||0)):''}</div><div class="ledger-actions">${canEdit?`<button class="ledger-action primary" data-action="contribute" data-id="${g.id}">${icon('plus')}<span><b>Guardar um pouquinho</b><small>Protege mais dinheiro para este plano</small></span></button><button class="ledger-action" data-action="edit-goal" data-id="${g.id}">${icon('edit')}<span><b>Editar plano</b><small>Nome, meta e ícone</small></span></button><button class="ledger-action danger" data-action="release-goal" data-id="${g.id}">${icon('trash')}<span><b>Encerrar plano</b><small>Libera ${cash(g.saved)} de volta ao saldo livre</small></span></button>`:'<p class="modal-sub">Somente o titular pode alterar ou registrar valores deste objetivo.</p>'}</div></div>`,'goal-detail');
   }
   function editGoalModal(id){
-    const g=state.goals.find(x=>x.id===id);if(!g)return;
+    const g=state.goals.find(x=>x.id===id);if(!g||!goalEditable(g))return;
     openModal('Editar plano',`<form class="form" data-form="edit-goal" data-id="${g.id}">${field('edit-goal-title','Nome do plano','',g.name)}<div class="field-pair">${field('edit-goal-target','Meta','0,00',moneyNumber(g.target),true)}<div class="field"><label for="edit-goal-icon">Ícone</label><select id="edit-goal-icon" name="edit-goal-icon">${[['plane','Viagem'],['house','Nosso cantinho'],['shield','Reserva'],['gift','Um sonho']].map(([v,n])=>`<option value="${v}" ${g.icon===v?'selected':''}>${n}</option>`).join('')}</select></div></div><div class="form-note">O valor já guardado (${cash(g.saved)}) não é alterado ao mudar a meta.</div>${formEnd('Salvar plano')}</form>`,'goal-edit');
   }
   function contributeModal(id){
-    const g=state.goals.find(g=>g.id===id);if(!g)return;
-    openModal('Um pouquinho mais perto.',`<p class="modal-sub">Separar dinheiro para <b>${esc(g.name)}</b> é dizer: a gente vai fazer acontecer.</p><form class="form" data-form="contribute" data-id="${id}">${field('contribute-amount','Quanto vamos separar?','0,00','',true)}<div class="form-note"><strong>Livre agora: ${cash(free())}</strong>O valor continua no saldo da dupla, mas fica protegido para este plano. Faltam ${cash(Math.max(0,g.target-g.saved))} para a meta.</div>${formEnd('Guardar pro nosso plano')}</form>`,'contribute');
+    const g=state.goals.find(g=>g.id===id);if(!g||!goalEditable(g))return;
+    openModal(g.kind==='investment'?'Registrar aporte':'Guardar para o objetivo',`<p class="modal-sub"><b>${esc(g.name)}</b> · ${goalOwner(g)==='both'?'meta a dois':'somente seu'}.</p><form class="form" data-form="contribute" data-id="${id}">${field('contribute-amount','Valor a reservar / aportar','0,00','',true)}<div class="form-note"><strong>Seu saldo livre: ${cash(personalFree())}</strong>Registro manual que reserva dinheiro no seu planejamento, sem transferência bancária. Faltam ${cash(Math.max(0,g.target-g.saved))} para a meta.</div>${formEnd('Confirmar valor')}</form>`,'contribute');
   }
   function declineModal(id,actor){
     const r=state.requests.find(r=>r.id===id);if(!r||r.status!=='pending'||r.recipient!==actor)return;
@@ -1721,8 +1768,8 @@ ${JSON.stringify(chatContext())}`;
     if(action==='topic-tab'){const kind=el.dataset.kind,v=el.dataset.value;if(kind==='analysis')analysisTab=v;if(kind==='future')futureTab=v;if(kind==='income')incomeTab=v;if(kind==='plan')planTab=v;if(kind==='ledger')ledgerTab=v;if(kind==='couple')coupleTab=v;render();window.scrollTo({top:0,behavior:'smooth'});return;}
     if(action==='analysis-person'){analysisPerson=el.dataset.person||'both';analysisTab='overview';render();return;}
     if(action==='analysis-cut'){analysisTab='cuts';route='analysis';render();window.scrollTo({top:0,behavior:'smooth'});return;}
-    if(action==='switch'){active=el.dataset.user;try{sessionStorage.setItem(PROFILE,active);}catch{}render();return;}
-    if(action==='profile-photo-switch'){active=other(active);try{sessionStorage.setItem(PROFILE,active);}catch{}close();render();return;}
+    if(action==='switch'){active=el.dataset.user;cutPerson=null;analysisPerson=null;try{sessionStorage.setItem(PROFILE,active);}catch{}render();return;}
+    if(action==='profile-photo-switch'){active=other(active);cutPerson=null;analysisPerson=null;try{sessionStorage.setItem(PROFILE,active);}catch{}close();render();return;}
     if(action==='pick-couple-photo'){document.getElementById('couple-photo-input')?.click();return;}
     if(action==='remove-couple-photo'){state.settings.couplePhoto='';state.settings.profileZoom=1.08;state.settings.profileY=50;persist();if($('#modal').open&&$('#modal').dataset.kind==='settings')settingsModal();toast('Foto removida.','','info');return;}
     if(action==='reset-couple-photo-frame'){state.settings.profileZoom=1.08;state.settings.profileY=50;if($('#profile-zoom'))$('#profile-zoom').value='1.08';if($('#profile-y'))$('#profile-y').value='50';updatePhotoFramePreview();persist();return;}
@@ -1736,6 +1783,7 @@ ${JSON.stringify(chatContext())}`;
     if(action==='expense-category-pick'){const sel=$('#expense-category');if(!sel)return;sel.value=el.dataset.category||'Outros';sel.dataset.touched='1';const wrap=$('#expense-cat-wrap');if(wrap)wrap.hidden=false;smartRead('expense');updateBudgetNote();return;}
     if(action==='balance')return balanceModal(el.dataset.user||active);
     if(action==='new-goal')return newGoalModal();
+    if(action==='new-investment')return newGoalModal('investment');
     if(action==='goal-detail')return goalDetailModal(id);
     if(action==='edit-goal')return editGoalModal(id);
     if(action==='contribute')return contributeModal(id);
@@ -1775,7 +1823,7 @@ ${JSON.stringify(chatContext())}`;
       return openModal('Essa conta não entra mais?',`<p class="modal-sub">Remover <b>${esc(b.name)}</b> libera ${cash(b.amount)} do planejamento. Isso não registra um pagamento.</p><form class="form" data-form="remove-bill" data-id="${id}">${formEnd('Remover esta conta')}</form>`,'remove');
     }
     if(action==='release-goal'){
-      const g=state.goals.find(g=>g.id===id);if(!g)return;
+      const g=state.goals.find(g=>g.id===id);if(!g||!goalEditable(g))return;
       return openModal('Mudar de plano também é planejar.',`<p class="modal-sub">Encerrar <b>${esc(g.name)}</b> devolve ${cash(g.saved)} ao saldo livre. O dinheiro continua na conta.</p><form class="form" data-form="release-goal" data-id="${id}">${formEnd('Encerrar plano e liberar saldo')}</form>`,'release');
     }
     if(action==='notice-request'){close();route='requests';requestFilter='all';render();setTimeout(()=>document.getElementById('request-'+id)?.scrollIntoView({behavior:'smooth',block:'center'}),50);return;}
@@ -1835,8 +1883,8 @@ ${JSON.stringify(chatContext())}`;
     if(action==='cut-person'){cutPerson=el.dataset.value;const y=window.scrollY;render();window.scrollTo(0,y);return;}
     if(action==='cut-level'){const k=cutPerson+'|'+el.dataset.key;if(el.dataset.level==='keep')delete cutSel[k];else cutSel[k]=el.dataset.level;const y=window.scrollY;render();window.scrollTo(0,y);return;}
     if(action==='cut-suggest'){cutPerson=cutPerson||active;itemStats(cutPerson).forEach(o=>{const k=cutPerson+'|'+o.key;if(o.sug==='keep')delete cutSel[k];else cutSel[k]=o.sug;});const y=window.scrollY;render();window.scrollTo(0,y);return;}
-    if(action==='cut-commit'){const {chosen}=cutTotals();if(!chosen.length)return;state.commitments=state.commitments||[];let n=0;chosen.forEach(o=>{if(state.commitments.some(c=>c.active&&c.person===cutPerson&&c.item===o.item))return;state.commitments.push({id:uid(),person:cutPerson,item:o.item,level:levelOf(o),baseline:Math.round(o.monthly),since:dateISO(),active:true});n++;});const who=cutPerson==='both'?'A dupla':first(user(cutPerson).name);log(active,`assumiu cortes: ${chosen.map(o=>o.item.toLowerCase()+(levelOf(o)==='half'?' pela metade':'')).join(', ')}.`);notify(other(),'Compromisso de corte 💪',`${who} vai ${chosen.map(o=>(levelOf(o)==='half'?'reduzir ':'cortar ')+o.item.toLowerCase()).join(', ')}.`);const y=window.scrollY;persist();window.scrollTo(0,y);toast(n?'Compromisso assumido.':'Esses cortes já estavam valendo.','O Juntô acompanha e avisa no Radar se passar do combinado.','cut');return;}
-    if(action==='cut-to-plan'){const {monthly}=cutTotals();if(!monthly)return;if(state.plan){const add=Math.round(monthly/1000)*1000;state.plan.monthly+=add;log(active,`somou ${money(add)} dos cortes ao plano de guardar.`);const y=window.scrollY;persist();window.scrollTo(0,y);toast('Plano maior.',`Agora são ${money(state.plan.monthly)} por mês.`,'coins');return;}return planModal('cortes');}
+    if(action==='cut-commit'){const {chosen}=cutTotals();if(!chosen.length)return;state.commitments=state.commitments||[];let n=0;chosen.forEach(o=>{if(state.commitments.some(c=>c.active&&c.person===cutPerson&&c.item===o.item))return;state.commitments.push({id:uid(),person:cutPerson,item:o.item,level:levelOf(o),baseline:Math.round(o.monthly),since:dateISO(),active:true});n++;});const who=cutPerson==='both'?'A dupla':first(user(cutPerson).name);log(active,`assumiu cortes: ${chosen.map(o=>o.item.toLowerCase()+(levelOf(o)==='half'?' pela metade':'')).join(', ')}.`);if(cutPerson==='both')notify(other(),'Compromisso de corte 💪',`${who} vai ${chosen.map(o=>(levelOf(o)==='half'?'reduzir ':'cortar ')+o.item.toLowerCase()).join(', ')}.`);const y=window.scrollY;persist();window.scrollTo(0,y);toast(n?'Compromisso assumido.':'Esses cortes já estavam valendo.','O Juntô acompanha e avisa no Radar se passar do combinado.','cut');return;}
+    if(action==='cut-to-plan'){const {monthly}=cutTotals();if(!monthly)return;if(state.plan&&state.goals.some(g=>g.id===state.plan.goalId&&goalOwner(g)==='both'&&cutPerson!=='both')){return toast('Meta compartilhada.','Para adicionar cortes individuais, registre o valor numa meta pessoal.','info');}if(state.plan){const add=Math.round(monthly/1000)*1000;state.plan.monthly+=add;log(active,`somou ${money(add)} dos cortes ao plano de guardar.`);const y=window.scrollY;persist();window.scrollTo(0,y);toast('Plano maior.',`Agora são ${money(state.plan.monthly)} por mês.`,'coins');return;}return planModal('cortes');}
     if(action==='commit-end'){const c=(state.commitments||[]).find(c=>c.id===id);if(!c)return;c.active=false;const st=commitStatus(c);log(active,`encerrou o compromisso com ${c.item.toLowerCase()}: ${money(st.saved)} economizados.`);const y=window.scrollY;persist();window.scrollTo(0,y);toast('Compromisso encerrado.',`${money(st.saved)} ficaram no bolso enquanto durou.`,'check');return;}
     if(action==='plan-from-budgets')return planModal('metas');
     if(action==='plan-auto'){if(!state.plan)return;state.plan.auto=state.plan.auto===false;log(active,`${state.plan.auto?'ligou':'desligou'} o piloto automático do plano.`);persist();toast(state.plan.auto?'Piloto automático ligado.':'Piloto automático desligado.',state.plan.auto?'Entradas automáticas já caem guardando a parte do plano.':'O Juntô pergunta antes de guardar.','coins');return;}
@@ -1979,14 +2027,14 @@ ${JSON.stringify(chatContext())}`;
     }
     if(type==='edit-goal'){
       const g=state.goals.find(x=>x.id===id),name=titleValue(d,'edit-goal-title',2,60),target=amountValue(d,'edit-goal-target'),iconName=String(d.get('edit-goal-icon')||'shield'),allowed=new Set(['plane','house','shield','gift']);
-      if(!g||name==null||target==null)return;
+      if(!g||!goalEditable(g)||name==null||target==null)return;
       g.name=name;g.target=target;g.icon=allowed.has(iconName)?iconName:'shield';
       log(active,`editou o plano ${name}: meta de ${money(target)}.`);close();persist();toast('Plano atualizado.',`${name} · meta de ${money(target)}.`,'heart');return;
     }
     if(type==='contribute'){
-      const amount=amountValue(d,'contribute-amount'),g=state.goals.find(g=>g.id===id);if(amount==null||!g)return;
-      if(amount>free()){error(`Vocês têm ${money(Math.max(0,free()))} livres. Escolha um valor que preserve as contas e os outros planos.`);return;}
-      g.saved+=amount;state.saves.push({id:uid(),goalId:g.id,amount,date:dateISO(),actor:active,source:'manual'});log(active,`separou ${money(amount)} para ${g.name}.`);notify(other(),'Nosso sonho andou mais um pouco. 💚',`${first(user().name)} separou ${money(amount)} para ${g.name}.`);close();persist();toast('O sonho tá mais perto.',`${money(amount)} protegidos para ${g.name}.`);return;
+      const amount=amountValue(d,'contribute-amount'),g=state.goals.find(g=>g.id===id);if(amount==null||!g||!goalEditable(g))return;
+      if(amount>personalFree()){error(`Seu perfil tem ${money(Math.max(0,personalFree()))} livres. Escolha um valor que preserve suas contas e outras metas.`);return;}
+      g.saved+=amount;state.saves.push({id:uid(),goalId:g.id,amount,date:dateISO(),actor:active,source:'manual'});log(active,`separou ${money(amount)} para ${g.name}.`);if(goalOwner(g)==='both')notify(other(),'Nosso sonho andou mais um pouco. 💚',`${first(user().name)} separou ${money(amount)} para ${g.name}.`);close();persist();toast('O sonho tá mais perto.',`${money(amount)} protegidos para ${g.name}.`);return;
     }
     if(type==='decline'){
       const r=state.requests.find(r=>r.id===id),note=String(d.get('decline-note')||'').trim();if(!r||r.status!=='pending'||r.recipient!==actor)return;
@@ -2010,7 +2058,7 @@ ${JSON.stringify(chatContext())}`;
       const b=state.bills.find(b=>b.id===id);if(!b||b.status!=='open')return;state.bills=state.bills.filter(q=>q.id!==id);log(active,`removeu ${b.name} das contas a pagar.`);close();persist();toast('Conta retirada do planejamento.');return;
     }
     if(type==='release-goal'){
-      const g=state.goals.find(g=>g.id===id);if(!g)return;const paused=state.plan?.goalId===g.id;if(paused)state.plan=null;state.goals=state.goals.filter(q=>q.id!==id);log(active,`encerrou o plano ${g.name} e liberou ${money(g.saved)}${paused?'; piloto automático pausado':''}.`);notify(other(),'A dupla mudou de plano.',`${first(user().name)} encerrou ${g.name}. O dinheiro separado voltou ao livre.`);close();persist();toast('Plano encerrado. Dinheiro liberado.',paused?'O piloto automático também foi pausado para não guardar em um plano inexistente.':'','heart');return;
+      const g=state.goals.find(g=>g.id===id);if(!g||!goalEditable(g))return;const paused=state.plan?.goalId===g.id;if(paused)state.plan=null;state.goals=state.goals.filter(q=>q.id!==id);log(active,`encerrou o plano ${g.name} e liberou ${money(g.saved)}${paused?'; piloto automático pausado':''}.`);if(goalOwner(g)==='both')notify(other(),'A dupla mudou de plano.',`${first(user().name)} encerrou ${g.name}. O dinheiro separado voltou ao livre.`);close();persist();toast('Plano encerrado. Dinheiro liberado.',paused?'O piloto automático também foi pausado para não guardar em um plano inexistente.':'','heart');return;
     }
     if(type==='rename'){
       const a=titleValue(d,'name-a',1,24),b=isSolo()?'':titleValue(d,'name-b',1,24);if(a==null||b==null)return;state.users[0].name=a;if(!isSolo())state.users[1].name=b;close();persist();toast('A dupla ganhou os nomes de vocês.');return;
@@ -2031,15 +2079,16 @@ ${JSON.stringify(chatContext())}`;
     if(type==='onboard-solo'){const name=titleValue(d,'solo-name',1,24),bal=amountValue(d,'solo-balance',true);if(name==null||bal==null)return;state=migrate(seedSolo());state.users=[{id:'a',name,balance:bal,tone:'blue'}];state.bills=[];state.goals=[];state.transactions=[];state.requests=[];state.activity=[];state.notifications=[];state.incomes=[];state.received=[];state.saves=[];state.plan=null;state.challenges=[];state.commitments=[];state.budgets={};state.learned={};state.settings={variableEstimate:0,yieldRate:10,couplePhoto:'',profileZoom:1.08,profileY:50};state.demo=false;active='a';cutPerson=null;try{sessionStorage.setItem(PROFILE,'a');}catch{}log('a','começou no modo individual. Primeiro passo: feito!');close();route='incomes';persist();toast('Pronto. Seu controle começa agora.','Próximo passo: contar quando o seu dinheiro entra. É daí que sai a previsão.');return;}
     if(type==='plan'){
       const o=planOptionByKey(form.dataset.key),monthly=amountValue(d,'plan-amount');if(!o||monthly==null)return;let goalId=d.get('plan-goal');
-      if(goalId==='__new'||!state.goals.find(g=>g.id===goalId)){const g={id:uid(),name:isSolo()?'Meu cofre':'Cofre da dupla',target:Math.max(monthly*12,100000),saved:0,icon:'shield'};state.goals.push(g);goalId=g.id;}
+      if(goalId==='__new'||!state.goals.find(g=>g.id===goalId)){const g={id:uid(),name:isSolo()?'Meu cofre':'Cofre da dupla',target:Math.max(monthly*12,100000),saved:0,icon:'shield',owner:isSolo()?'a':'both',kind:'dream'};state.goals.push(g);goalId=g.id;}
       state.plan={key:o.key,name:o.name,monthly,goalId,cut:o.pct,auto:d.get('plan-auto')==='on',startedAt:Date.now()};planPicker=false;log(active,`ativou o plano ${o.name}: guardar ${money(monthly)} por mês, primeiro.`);notify(other(),'Agora a gente guarda primeiro. 💚',`${first(user().name)} ativou o plano ${o.name}: ${money(monthly)} por mês, separados no dia em que o dinheiro cai.`);close();route='goals';planTab='plan';persist();window.scrollTo({top:0,behavior:'smooth'});toast('Plano ativo. Dinheiro entrou, parte sai pro cofre.',`${money(monthly)} por mês.`,'coins');return;
     }
     if(type==='goal'){
       const name=titleValue(d,'goal-title',2,60),target=amountValue(d,'goal-target');if(name==null||target==null)return;
       const requestedIcon=String(d.get('goal-icon')||'shield'),allowedIcons=new Set(['plane','house','shield','gift']),goalIcon=allowedIcons.has(requestedIcon)?requestedIcon:'shield';
-      const goal={id:uid(),name,target,saved:0,icon:goalIcon};state.goals.push(goal);
+      const wanted=String(d.get('goal-owner')||active),owner=isSolo()||wanted!== 'both'?active:'both',kind=d.get('goal-kind')==='investment'?'investment':'dream';
+      const goal={id:uid(),name,target,saved:0,icon:goalIcon,owner,kind};state.goals.push(goal);goalScope=owner==='both'?'couple':'mine';
       log(active,`criou o objetivo “${name}” com meta de ${money(target)}.`);
-      notify(other(),'Novo objetivo no Juntô 💚',`${first(user().name)} criou “${name}”, com meta de ${money(target)}.`);
+      if(owner==='both')notify(other(),'Novo objetivo a dois 💚',`${first(user().name)} criou “${name}”, com meta de ${money(target)}.`);
       close();route='goals';planTab='goals';persist();window.scrollTo({top:0,behavior:'smooth'});toast('Objetivo criado.',`${name} · meta de ${money(target)}.`,'heart');return;
     }
     if(type==='ledger-income'){

@@ -142,7 +142,7 @@ test('mobile app renders, navigates and preserves the fixed bottom bar',async({p
 test('new Home stays functional in solo and couple modes',async({page})=>{
  await page.goto('/');await personal(page,250000);
  await expect(page.locator('.j-home')).toBeVisible();
- await expect(page.locator('.j-hero')).toContainText('Livre pra curtir');
+ await expect(page.locator('.j-hero')).toContainText('Meu dinheiro livre');
  await expect(page.locator('.j-home .j-eyebrow').first()).toContainText('Modo individual');
  await expect(page.locator('#couple-cta .couple-top-cta')).toBeVisible();
  await expect(page.locator('.j-home .connect-card')).toHaveCount(0);
@@ -162,7 +162,8 @@ test('new Home stays functional in solo and couple modes',async({page})=>{
  await expect(page.locator('#expense-read')).toContainText('valor habitual');
  await page.locator('#modal [data-action="close"]').click();
  await page.evaluate(()=>{const s=window.JuntoApp.freshState('Guilherme');s.users[0].balance=250000;s.users.push({id:'b',name:'Bia',balance:150000,tone:'pink'});window.JuntoApp.applyState(s);});
- await expect(page.locator('.j-home .j-eyebrow').first()).toContainText('Juntô a dois');
+ await expect(page.locator('.j-home .j-eyebrow').first()).toContainText('Meu espaço pessoal');
+  await expect(page.locator('.j-hero [data-action="home-scope"]')).toContainText('Ver todos');
  await expect(page.locator('.j-actions [data-action="ask"]')).toContainText('Amor, posso gastar?');
  await expect(page.locator('#couple-cta .couple-top-cta')).toHaveCount(0);
  await page.evaluate(()=>{const s=window.JuntoApp.getState();s.notifications=[{id:'home-notice',to:'a',title:'Combinado aprovado',body:'Seu amor respondeu ao pedido.',kind:'info',read:false,createdAt:Date.now()}];window.JuntoApp.applyState(s);});
@@ -279,7 +280,8 @@ test('income goal and solo spending flows stay connected',async({page})=>{
  await page.locator('#goal-title').fill('Viagem');
  await page.locator('#goal-target').fill('1000');
  await page.locator('[data-form="goal"] [type="submit"]').click();
- await page.locator('[data-action="contribute"]').first().click();
+ await page.locator('.j-goal-card[data-action="goal-detail"]').first().click();
+ await page.locator('#modal [data-action="contribute"]').click();
  await page.locator('#contribute-amount').fill('100');
  await page.locator('[data-form="contribute"] [type="submit"]').click();
  state=await page.evaluate(()=>window.JuntoApp.getState());
@@ -661,7 +663,7 @@ test('chat uses current money, retries real failures and can stop a request',asy
  await expect(page.locator('#chat-log')).toContainText('Seu saldo é R$ 1.234,56.');
  expect(sent).toHaveLength(2);
  const context=JSON.parse(sent[1].systemInstruction.parts[0].text.split('Dados do app agora (JSON, valores em reais):\n')[1]);
- expect(context.saldo_dupla).toBe(1234.56);expect(context.pessoas[0].saldo).toBe(1234.56);expect(context.modo).toBe('individual');
+ expect(context.saldo_pessoal).toBe(1234.56);expect(context.pessoas[0].saldo).toBe(1234.56);expect(context.modo).toBe('individual');
  await page.locator('#chat-input').fill('quanto sobra no mês?');await page.locator('#chat-send').click();
  await expect(page.locator('#chat-send')).toHaveAttribute('aria-label','Parar resposta');
  await page.locator('#chat-send').click();await expect(page.locator('#chat-log')).toContainText('Parei aqui');
@@ -742,11 +744,15 @@ test('two independent accounts invite, sync offline edits and keep their own pro
   await a.page.evaluate(()=>window.JuntoCloud.synchronize());
   for(const [device,own,other] of[[a,'Salário só do Gui','Salário só da Bia'],[b,'Salário só da Bia','Salário só do Gui']]){
     await device.page.evaluate(()=>window.JuntoApp.closeModal());await device.page.locator('#mobile-nav [data-route="analysis"]').click();await device.page.locator('#app-content [data-route="incomes"]').first().click();
-    await expect(device.page.locator('#app-content')).toContainText(own);await expect(device.page.locator('#app-content')).toContainText(other);
+    await expect(device.page.locator('#app-content')).toContainText(own);
+    await expect(device.page.locator('#app-content')).not.toContainText(other);
+    await device.page.locator('#app-content [data-action="income-scope"]').click();
+    await expect(device.page.locator('#app-content')).toContainText(other);
+    await device.page.locator('#app-content [data-action="income-scope"]').click();
     await device.page.locator('.j-seg [data-value="sources"]').click();await device.page.locator('#app-content [data-action="income-edit"]').click();await expect(device.page.locator('#income-person option')).toHaveCount(1);await device.page.evaluate(()=>window.JuntoApp.closeModal());
     await device.page.locator('#app-content [data-kind="income"][data-value="base"]').click();await expect(device.page.locator('#estimate-amount')).toHaveValue(device===a?'50,00':'70,00');
     if(device===b){await device.page.locator('#estimate-amount').fill('80,00');await device.page.locator('[data-form="estimate"] [type="submit"]').click();await device.page.evaluate(()=>window.JuntoCloud.synchronize());}
-    await device.page.locator('#mobile-nav [data-route="analysis"]').click();await expect(device.page.locator('[data-action="analysis-person"]')).toHaveCount(3);
+    await device.page.locator('#mobile-nav [data-route="analysis"]').click();await expect(device.page.locator('[data-action="analysis-person"]')).toHaveCount(2);
     await device.page.locator('#mobile-nav [data-route="ledger"]').click();await device.page.getByRole('button',{name:'Ver tudo',exact:true}).click();await expect(device.page.locator('#ledger-days')).toContainText('Café solo');await expect(device.page.locator('#ledger-days')).toContainText('Conta individual Gui');
   }
   await a.page.evaluate(()=>window.JuntoCloud.synchronize());expect(await a.page.evaluate(()=>window.JuntoApp.getState().settings.personalEstimates)).toEqual({a:5000,b:8000});

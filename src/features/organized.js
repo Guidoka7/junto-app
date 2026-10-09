@@ -599,6 +599,35 @@ function homeV4() {
   </div>`;
 }
 
+// ---------- Sonhos e investimentos com titularidade explícita ----------
+function personalGoalsView() {
+  const solo=isSolo(), mine=state.goals.filter(g=>goalOwner(g)===active),
+    shared=state.goals.filter(g=>goalOwner(g)==='both'),
+    partner=state.goals.filter(g=>!['both',active].includes(goalOwner(g))),
+    tabs=segTabs('plan',planTab,[['goals','Sonhos'],['plan','Guardar'],['challenges','Desafios']]),
+    head=pageHead('Meu planejamento','Metas','Sonhos e investimentos de cada pessoa, com espaço para os planos a dois.')+tabs;
+  const goalRow=g=>{
+    const p=g.target>0?Math.min(100,Math.round(g.saved/g.target*100)):0, owner=goalOwner(g),
+      title=owner==='both'?'A dois':owner===active?'Só meu':first(user(owner).name),
+      type=g.kind==='investment'?'Investimento':'Sonho / reserva';
+    return `<button class="j-goal-card" type="button" data-action="goal-detail" data-id="${esc(g.id)}"><span class="j-ic gold">${icon(g.icon||'shield')}</span><span class="j-goal-copy"><b>${esc(g.name)}</b><small>${esc(type)} · ${esc(title)}</small><span class="j-progress"><span style="width:${p}%"></span></span><small>${cash(g.saved)} de ${cash(g.target)}</small></span><strong class="num">${p}%</strong></button>`;
+  };
+  const group=(label,items)=>items.length?`<section class="j-goal-group"><h3>${esc(label)}</h3><div class="j-list">${items.map(goalRow).join('')}</div></section>`:'';
+  if(planTab==='challenges')return `<div class="j-page j-goals-personal">${head}${challengesView()}</div>`;
+  if(planTab==='plan'){
+    const myPlan=state.plan&&state.goals.some(g=>g.id===state.plan.goalId&&goalOwner(g)===active)?state.plan:null,
+      mySaved=state.saves.filter(x=>x.actor===active&&x.date.slice(0,7)===dateISO().slice(0,7)).reduce((n,x)=>n+x.amount,0);
+    return `<div class="j-page j-goals-personal">${head}<section class="j-card"><span class="j-eyebrow">Guardado por ${esc(first(user().name))} neste mês</span><strong class="j-big num">${cash(mySaved)}</strong><p class="j-muted">Seus aportes individuais e sua participação nos objetivos a dois são contabilizados separadamente.</p>${myPlan?`<p class="j-muted">Plano automático individual: ${cash(myPlan.monthly)} por mês.</p>`:'<p class="j-muted">Crie um objetivo pessoal ou um investimento para começar a acompanhar seus aportes.</p>'}<div class="j-goal-actions"><button class="j-cta primary" data-action="new-goal">${icon('plus')} Criar sonho</button><button class="j-cta" data-action="new-investment">${icon('shield')} Investimento</button></div></section>${group('Meus objetivos',mine)}${group('Metas a dois',shared)}</div>`;
+  }
+  const options=solo?[['mine','Meus objetivos']]:[['mine','Só meus'],['couple','A dois'],['all','Ver todos']];
+  const scope=chips('goal-scope',goalScope,options);
+  const shown=goalScope==='all'
+    ?group('Meus sonhos e investimentos',mine)+group('Sonhos da dupla',shared)+group(`De ${first(user(other()).name)}`,partner)
+    :goalScope==='couple'?group('Sonhos da dupla',shared):group('Meus sonhos e investimentos',mine);
+  const empty=emptyBox('target',goalScope==='couple'?'Ainda não há uma meta a dois.':'Nenhum objetivo neste espaço.','Registre um sonho, uma reserva ou um investimento, sem misturar os valores da dupla.');
+  const actions=`<div class="j-goal-actions"><button class="j-cta primary" data-action="new-goal">${icon('plus')}<span>Criar sonho</span></button><button class="j-cta" data-action="new-investment">${icon('shield')}<span>Registrar investimento</span></button></div>`;
+  return `<div class="j-page j-goals-personal">${head}${scope}${actions}${shown||empty}${!solo&&goalScope==='mine'&&shared.length?`<button class="j-card j-couple-link" data-action="goal-scope" data-value="couple"><span class="j-ic gold">${icon('heart')}</span><span><b>Temos ${shared.length} ${shared.length===1?'meta compartilhada':'metas compartilhadas'}</b><small>Ver nossos sonhos a dois, separados dos seus</small></span><span class="j-chev">›</span></button>`:''}</div>`;
+}
 // ---------- Extrato ----------
 function ledgerYM(offset = ledgerMonth) {
   const T = new Date();

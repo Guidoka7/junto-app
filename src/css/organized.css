@@ -2113,3 +2113,26 @@ html[data-theme] .j-setup-redo {
 .j-setup-line .field input {
   background: var(--premium-surface);
 }
+
+/* Perfis e objetivos separados: leia sempre o proprietário de cada registro. */
+.j-scope-actions{display:flex;align-items:center;gap:7px}
+.j-scope-actions .j-toggle{min-width:0;white-space:nowrap;min-height:34px;padding:6px 10px}
+.j-goals-personal .j-goal-actions{display:flex;gap:10px;margin:12px 0 16px;flex-wrap:wrap}
+.j-goals-personal .j-goal-actions .j-cta{flex:1 1 130px;min-width:0;justify-content:center}
+.j-goal-group{margin:16px 0 24px}
+.j-goal-group>h3{margin:0 0 12px;font-size:15px;font-weight:750;color:var(--premium-ink,var(--ink))}
+.j-goal-group .j-list{display:grid;gap:10px}
+.j-goal-card{width:100%;display:flex;align-items:flex-start;text-align:left;gap:12px;padding:15px;border:1px solid var(--premium-hairline,#e5e7ed);border-radius:19px;background:var(--premium-raised,#fff);color:var(--premium-ink,#1b293b);font:inherit;cursor:pointer;box-shadow:0 3px 12px rgba(10,30,52,.035)}
+.j-goal-card:hover,.j-goal-card:focus-visible{border-color:var(--ios-gold,#ccac70);outline-offset:2px}
+.j-goal-card .j-ic{flex:0 0 40px}
+.j-goal-copy{flex:1;min-width:0;display:grid;gap:7px}
+.j-goal-copy>b{font-size:14px;font-weight:750;overflow-wrap:anywhere}
+.j-goal-copy>small{font-size:11px;color:var(--premium-subtle,#6d7684)}
+.j-goal-copy .j-progress{display:block;overflow:hidden;border-radius:999px;height:5px;background:var(--premium-soft,#e8ebf1)}
+.j-goal-copy .j-progress>span{display:block;height:100%;border-radius:inherit;background:var(--ios-gold,#cca96b)}
+.j-goal-card>strong{flex:0 0 auto;font-size:13px;align-self:center}
+#chat-panel[hidden]{display:none!important}
+#chat-panel:not([hidden]){z-index:1200!important;visibility:visible;pointer-events:auto}
+.mobile-nav [data-action="chat-open"]{position:relative;z-index:4;min-height:56px;touch-action:manipulation;cursor:pointer;pointer-events:auto}
+.mobile-nav .nav-ai-orb,.mobile-nav .nav-ai-orb *{pointer-events:none}
+@media(max-width:760px){#chat-panel:not([hidden]){position:fixed;inset:0;width:100%;height:100dvh;max-width:none;max-height:none;border-radius:0;transform:none}}

@@ -1401,6 +1401,9 @@ html[data-theme] .j-day > .j-list {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     align-items: end;
     padding: 6px 6px max(7px, env(safe-area-inset-bottom)) !important;
+    /* A peça central flutua sobre a borda superior da barra, sem recorte. */
+    contain: layout !important;
+    overflow: visible !important;
   }
   html[data-theme] .mobile-nav button {
     min-width: 0 !important;
@@ -1411,11 +1414,17 @@ html[data-theme] .j-day > .j-list {
     box-shadow: none !important;
     color: var(--premium-ink) !important;
     font-weight: 700 !important;
+    overflow: visible !important;
+    position: relative;
+    z-index: 2;
   }
   .nav-ai-orb {
     width: 48px;
     height: 48px;
+    flex: 0 0 48px;
     margin-top: -22px;
+    position: relative;
+    z-index: 3;
     border-radius: 50%;
     display: grid;
     place-items: center;

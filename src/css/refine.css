@@ -138,7 +138,8 @@ dialog .modal-head .icon-btn{min-width:44px;min-height:44px}
   .mobile-nav{
     max-width:560px;
     margin-inline:auto;
-    contain:layout paint;
+    /* The central Juntô orb rises above the bar: paint containment clips it. */
+    contain:layout;
   }
   .mobile-nav button{min-height:50px}
   dialog{

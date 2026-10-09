@@ -105,6 +105,9 @@
     if(!Number.isFinite(s.settings.profileZoom))s.settings.profileZoom=1.08;
     if(!Number.isFinite(s.settings.profileY))s.settings.profileY=50;
     if(!('plan' in s))s.plan=null;s.budgets=s.budgets&&typeof s.budgets==='object'?s.budgets:{};s.learned=s.learned&&typeof s.learned==='object'?s.learned:{};s.commitments=Array.isArray(s.commitments)?s.commitments:[];s.challenges=Array.isArray(s.challenges)?s.challenges:[];
+    // Conservar objetivos pré-existentes: no modo solo pertencem a quem os criou;
+    // metas legadas da dupla permanecem compartilhadas (sem atribuir a outra pessoa).
+    s.goals.forEach(g=>{if(!['a','b','both'].includes(g.owner))g.owner=s.users?.length===1?'a':'both';if(!['dream','investment'].includes(g.kind))g.kind='dream';});
     s.received.forEach(r=>{if(r.status!=='received')return;const inc=s.incomes.find(i=>i.id===r.incomeId);if(!r.person&&inc)r.person=inc.person;if(!Number.isSafeInteger(r.balanceDelta))r.balanceDelta=r.amount;});
     const legacySeries={};s.bills.filter(b=>b.recurring&&b.recurringKey).forEach(b=>{legacySeries[String(b.name||'').trim().toLocaleLowerCase('pt-BR')]=b.recurringKey;});
     s.bills.filter(b=>b.recurring&&!b.recurringKey).forEach(b=>{const k=String(b.name||'').trim().toLocaleLowerCase('pt-BR');b.recurringKey=legacySeries[k]||(legacySeries[k]=`legacy:${k||b.id}`);});
@@ -420,7 +423,7 @@
   let state;try{const s=JSON.parse(localStorage.getItem(KEY));state=migrate(validBackup(s)?s:freshPersonalState());}catch{state=freshPersonalState();}
   let active='a';try{active=sessionStorage.getItem(PROFILE)==='b'?'b':'a';}catch{}if(state.users.length<2)active='a';
   let route='home',billFilter='all',requestFilter='all',hidden=false,noticesEnabled=true;try{noticesEnabled=localStorage.getItem('junto-notices-v1')!=='off';}catch{}
-  let analysisTab='overview',analysisPerson='both',futureTab='forecast',incomeTab='overview',planTab='goals';
+  let analysisTab='overview',analysisPerson=null,futureTab='forecast',incomeTab='overview',planTab='goals';
   let onboardDraft={},onboardStep=1,channel=null;
   try{channel=new BroadcastChannel('junto-demo-sync');}catch{}
   const user=(id=active)=>state.users.find(u=>u.id===id)||{id:'b',name:'Seu amor',balance:0,tone:'pink'};
@@ -457,6 +460,21 @@
   const protectedTotal=()=>state.goals.reduce((a,g)=>a+g.saved,0);
   const approvedTotal=()=>state.requests.filter(r=>r.status==='approved').reduce((a,r)=>a+r.amount,0);
   const free=()=>total()-billsTotal()-protectedTotal()-approvedTotal();
+  const goalOwner=(g)=>['a','b'].includes(g?.owner)?g.owner:'both';
+  const goalEditable=(g,id=active)=>goalOwner(g)==='both'||goalOwner(g)===id;
+  function goalReserve(g,id=active){
+    if(goalOwner(g)===id)return g.saved;
+    if(goalOwner(g)!=='both')return 0;
+    const saved=state.saves.filter(s=>s.goalId===g.id),by=saved.reduce((o,s)=>(o[s.actor]=(o[s.actor]||0)+s.amount,o),{});
+    const recorded=(by.a||0)+(by.b||0),remaining=Math.max(0,g.saved-recorded);
+    return (by[id]||0)+(id==='a'?Math.ceil(remaining/2):Math.floor(remaining/2));
+  }
+  function personalFree(id=active){
+    const bills=state.bills.filter(b=>b.status==='open').reduce((sum,b)=>sum+shareOf(b,id),0);
+    const reserved=state.goals.reduce((sum,g)=>sum+goalReserve(g,id),0);
+    const requests=state.requests.filter(r=>r.status==='approved'&&r.author===id).reduce((sum,r)=>sum+r.amount,0);
+    return user(id).balance-bills-reserved-requests;
+  }
   const pending=()=>state.requests.filter(r=>r.status==='pending');
   const incoming=(id=active)=>pending().filter(r=>r.recipient===id);
   const unread=(id=active)=>state.notifications.filter(n=>n.to===id&&!n.read).length;
@@ -1370,8 +1388,25 @@ ${JSON.stringify(chatContext())}`;
     }
     finally{msg.streaming=false;chatBusy=null;renderChat();saveChat();chatMode();}
   }
-  function openChat(){chatOpen=true;const p=$('#chat-panel');if(!p)return;p.hidden=false;document.body.classList.add('chat-on');chatMode();renderChat();setTimeout(()=>$('#chat-input')?.focus(),60);}
-  function closeChat(){chatOpen=false;const p=$('#chat-panel');if(p)p.hidden=true;document.body.classList.remove('chat-on');$('#chat-fab')?.focus();}
+  function openChat(){
+    let p=$('#chat-panel');
+    if(!p){document.body.insertAdjacentHTML('beforeend',chatShell());p=$('#chat-panel');}
+    if(!p)return toast('Chat indisponível.','Atualize o aplicativo e tente novamente.','info');
+    chatOpen=true;p.hidden=false;p.removeAttribute('inert');p.setAttribute('aria-hidden','false');
+    document.body.classList.add('chat-on');
+    document.querySelectorAll('[data-action="chat-open"]').forEach(b=>b.setAttribute('aria-expanded','true'));
+    const ctx=p.querySelector('.chat-context p');
+    if(ctx)ctx.textContent='Usando as entradas, gastos e metas do seu perfil. As informações da dupla ficam separadas.';
+    chatMode();renderChat();
+    window.requestAnimationFrame(()=>$('#chat-input')?.focus({preventScroll:true}));
+  }
+  function closeChat(){
+    chatOpen=false;const p=$('#chat-panel');if(p){p.hidden=true;p.setAttribute('aria-hidden','true');}
+    document.body.classList.remove('chat-on');
+    document.querySelectorAll('[data-action="chat-open"]').forEach(b=>b.setAttribute('aria-expanded','false'));
+    const target=window.matchMedia('(max-width: 760px)').matches?document.querySelector('#mobile-nav [data-action="chat-open"]'):$('#chat-fab');
+    target?.focus({preventScroll:true});
+  }
   function chatSuggestions(){
     const ym=dateISO().slice(0,7),sums={};
     state.transactions.filter(t=>!t.billId&&t.date.slice(0,7)===ym).forEach(t=>sums[t.category]=(sums[t.category]||0)+t.amount);
@@ -1601,21 +1636,32 @@ ${JSON.stringify(chatContext())}`;
     const u=user(id);
     openModal(`Quanto tu tem em conta, ${first(u.name)}?`,`<p class="modal-sub">Atualize o saldo atual. A soma da dupla se ajusta junto.</p><form class="form" data-form="balance" data-user="${id}">${field('balance-amount','Saldo atual da sua conta','0,00',moneyNumber(u.balance),true)}<div class="form-note">Informe o saldo de agora. Isso substitui o valor anterior; não conta como uma renda nova.</div>${formEnd('Atualizar nosso saldo')}</form>`,'balance');
   }
-  function newGoalModal(){
-    openModal('Dá um nome pro nosso sonho.',`<p class="modal-sub">Pode ser uma viagem. Pode ser paz pra dormir. O plano é de vocês.</p><form class="form" data-form="goal">${field('goal-title','Nome do plano','Ex.: nosso cantinho, viagem, reserva')}<div class="field-pair">${field('goal-target','Quanto queremos juntar?','0,00','',true)}<div class="field"><label for="goal-icon">Cara desse plano</label><select id="goal-icon" name="goal-icon"><option value="plane">Viagem</option><option value="house">Nosso cantinho</option><option value="shield">Reserva</option><option value="gift">Um sonho</option></select></div></div>${formEnd('Criar nosso plano')}</form>`,'goal');
+  function newGoalModal(defaultKind='dream'){
+    const opts=isSolo()?'':`<option value="both">A dois · meta compartilhada</option>`;
+    openModal(defaultKind==='investment'?'Registrar investimento':'Criar sonho ou meta',
+      `<p class="modal-sub">Defina a quem pertence. Suas metas e investimentos ficam separados das metas do casal.</p>
+      <form class="form" data-form="goal">
+      <div class="field"><label for="goal-owner">De quem é este objetivo?</label><select name="goal-owner" id="goal-owner"><option value="${active}">Só meu · ${esc(first(user().name))}</option>${opts}</select></div>
+      <div class="field"><label for="goal-kind">O que vamos acompanhar?</label><select name="goal-kind" id="goal-kind"><option value="dream" ${defaultKind==='dream'?'selected':''}>Sonho / reserva</option><option value="investment" ${defaultKind==='investment'?'selected':''}>Investimento (registro manual)</option></select></div>
+      ${field('goal-title','Nome','Ex.: minha viagem, CDB, reserva pessoal')}
+      <div class="field-pair">${field('goal-target','Valor objetivo','0,00','',true)}
+      <div class="field"><label for="goal-icon">Ícone</label><select id="goal-icon" name="goal-icon"><option value="plane">Viagem</option><option value="house">Casa</option><option value="shield" ${defaultKind==='investment'?'selected':''}>Reserva / investimento</option><option value="gift">Sonho</option></select></div></div>
+      <p class="form-note">Investimento é um acompanhamento manual, não movimenta uma conta bancária automaticamente.</p>
+      ${formEnd('Salvar objetivo')}</form>`,'goal');
   }
   function goalDetailModal(id){
     const g=state.goals.find(x=>x.id===id);if(!g)return;
     const p=Math.min(100,Math.round(g.saved/g.target*100)),remaining=Math.max(0,g.target-g.saved),entries=state.saves.filter(x=>x.goalId===g.id),by=entries.reduce((o,x)=>(o[x.actor]=(o[x.actor]||0)+x.amount,o),{});
-    openModal(g.name,`<div class="goal-detail-v3"><div class="goal-detail-hero"><span class="goal-detail-icon">${icon(g.icon||'heart')}</span><div><span>PLANO</span><strong class="num">${cash(g.saved)}</strong><p>${p}% de ${cash(g.target)} · ${remaining?'faltam '+cash(remaining):'meta alcançada'}</p></div></div><div class="plans-v3-progress" role="progressbar" aria-label="Progresso de ${esc(g.name)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p}"><span style="width:${p}%"></span></div><div class="ledger-detail-grid">${ledgerMeta('Meta',cash(g.target))}${ledgerMeta('Guardado',cash(g.saved))}${ledgerMeta(isSolo()?'Contribuições':'Você',cash(isSolo()?g.saved:(by[active]||0)))}${!isSolo()?ledgerMeta('Meu amor',cash(by[other()]||0)):''}</div><div class="ledger-actions"><button class="ledger-action primary" data-action="contribute" data-id="${g.id}">${icon('plus')}<span><b>Guardar um pouquinho</b><small>Protege mais dinheiro para este plano</small></span></button><button class="ledger-action" data-action="edit-goal" data-id="${g.id}">${icon('edit')}<span><b>Editar plano</b><small>Nome, meta e ícone</small></span></button><button class="ledger-action danger" data-action="release-goal" data-id="${g.id}">${icon('trash')}<span><b>Encerrar plano</b><small>Libera ${cash(g.saved)} de volta ao saldo livre</small></span></button></div></div>`,'goal-detail');
+    const canEdit=goalEditable(g),owner=goalOwner(g),scope=owner==='both'?'Meta a dois':owner===active?'Objetivo pessoal':`De ${first(user(owner).name)}`;
+    openModal(g.name,`<div class="goal-detail-v3"><p class="modal-sub">${esc(scope)} · ${g.kind==='investment'?'investimento registrado manualmente':'sonho / reserva'}</p><div class="goal-detail-hero"><span class="goal-detail-icon">${icon(g.icon||'heart')}</span><div><span>PLANO</span><strong class="num">${cash(g.saved)}</strong><p>${p}% de ${cash(g.target)} · ${remaining?'faltam '+cash(remaining):'meta alcançada'}</p></div></div><div class="plans-v3-progress" role="progressbar" aria-label="Progresso de ${esc(g.name)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p}"><span style="width:${p}%"></span></div><div class="ledger-detail-grid">${ledgerMeta('Meta',cash(g.target))}${ledgerMeta('Guardado',cash(g.saved))}${ledgerMeta(isSolo()?'Contribuições':'Você',cash(isSolo()?g.saved:(by[active]||0)))}${!isSolo()?ledgerMeta('Meu amor',cash(by[other()]||0)):''}</div><div class="ledger-actions">${canEdit?`<button class="ledger-action primary" data-action="contribute" data-id="${g.id}">${icon('plus')}<span><b>Guardar um pouquinho</b><small>Protege mais dinheiro para este plano</small></span></button><button class="ledger-action" data-action="edit-goal" data-id="${g.id}">${icon('edit')}<span><b>Editar plano</b><small>Nome, meta e ícone</small></span></button><button class="ledger-action danger" data-action="release-goal" data-id="${g.id}">${icon('trash')}<span><b>Encerrar plano</b><small>Libera ${cash(g.saved)} de volta ao saldo livre</small></span></button>`:'<p class="modal-sub">Somente o titular pode alterar ou registrar valores deste objetivo.</p>'}</div></div>`,'goal-detail');
   }
   function editGoalModal(id){
-    const g=state.goals.find(x=>x.id===id);if(!g)return;
+    const g=state.goals.find(x=>x.id===id);if(!g||!goalEditable(g))return;
     openModal('Editar plano',`<form class="form" data-form="edit-goal" data-id="${g.id}">${field('edit-goal-title','Nome do plano','',g.name)}<div class="field-pair">${field('edit-goal-target','Meta','0,00',moneyNumber(g.target),true)}<div class="field"><label for="edit-goal-icon">Ícone</label><select id="edit-goal-icon" name="edit-goal-icon">${[['plane','Viagem'],['house','Nosso cantinho'],['shield','Reserva'],['gift','Um sonho']].map(([v,n])=>`<option value="${v}" ${g.icon===v?'selected':''}>${n}</option>`).join('')}</select></div></div><div class="form-note">O valor já guardado (${cash(g.saved)}) não é alterado ao mudar a meta.</div>${formEnd('Salvar plano')}</form>`,'goal-edit');
   }
   function contributeModal(id){
-    const g=state.goals.find(g=>g.id===id);if(!g)return;
-    openModal('Um pouquinho mais perto.',`<p class="modal-sub">Separar dinheiro para <b>${esc(g.name)}</b> é dizer: a gente vai fazer acontecer.</p><form class="form" data-form="contribute" data-id="${id}">${field('contribute-amount','Quanto vamos separar?','0,00','',true)}<div class="form-note"><strong>Livre agora: ${cash(free())}</strong>O valor continua no saldo da dupla, mas fica protegido para este plano. Faltam ${cash(Math.max(0,g.target-g.saved))} para a meta.</div>${formEnd('Guardar pro nosso plano')}</form>`,'contribute');
+    const g=state.goals.find(g=>g.id===id);if(!g||!goalEditable(g))return;
+    openModal(g.kind==='investment'?'Registrar aporte':'Guardar para o objetivo',`<p class="modal-sub"><b>${esc(g.name)}</b> · ${goalOwner(g)==='both'?'meta a dois':'somente seu'}.</p><form class="form" data-form="contribute" data-id="${id}">${field('contribute-amount','Valor a reservar / aportar','0,00','',true)}<div class="form-note"><strong>Seu saldo livre: ${cash(personalFree())}</strong>Registro manual que reserva dinheiro no seu planejamento, sem transferência bancária. Faltam ${cash(Math.max(0,g.target-g.saved))} para a meta.</div>${formEnd('Confirmar valor')}</form>`,'contribute');
   }
   function declineModal(id,actor){
     const r=state.requests.find(r=>r.id===id);if(!r||r.status!=='pending'||r.recipient!==actor)return;
@@ -1721,8 +1767,8 @@ ${JSON.stringify(chatContext())}`;
     if(action==='topic-tab'){const kind=el.dataset.kind,v=el.dataset.value;if(kind==='analysis')analysisTab=v;if(kind==='future')futureTab=v;if(kind==='income')incomeTab=v;if(kind==='plan')planTab=v;if(kind==='ledger')ledgerTab=v;if(kind==='couple')coupleTab=v;render();window.scrollTo({top:0,behavior:'smooth'});return;}
     if(action==='analysis-person'){analysisPerson=el.dataset.person||'both';analysisTab='overview';render();return;}
     if(action==='analysis-cut'){analysisTab='cuts';route='analysis';render();window.scrollTo({top:0,behavior:'smooth'});return;}
-    if(action==='switch'){active=el.dataset.user;try{sessionStorage.setItem(PROFILE,active);}catch{}render();return;}
-    if(action==='profile-photo-switch'){active=other(active);try{sessionStorage.setItem(PROFILE,active);}catch{}close();render();return;}
+    if(action==='switch'){active=el.dataset.user;analysisPerson=null;try{sessionStorage.setItem(PROFILE,active);}catch{}render();return;}
+    if(action==='profile-photo-switch'){active=other(active);analysisPerson=null;try{sessionStorage.setItem(PROFILE,active);}catch{}close();render();return;}
     if(action==='pick-couple-photo'){document.getElementById('couple-photo-input')?.click();return;}
     if(action==='remove-couple-photo'){state.settings.couplePhoto='';state.settings.profileZoom=1.08;state.settings.profileY=50;persist();if($('#modal').open&&$('#modal').dataset.kind==='settings')settingsModal();toast('Foto removida.','','info');return;}
     if(action==='reset-couple-photo-frame'){state.settings.profileZoom=1.08;state.settings.profileY=50;if($('#profile-zoom'))$('#profile-zoom').value='1.08';if($('#profile-y'))$('#profile-y').value='50';updatePhotoFramePreview();persist();return;}
@@ -1736,6 +1782,7 @@ ${JSON.stringify(chatContext())}`;
     if(action==='expense-category-pick'){const sel=$('#expense-category');if(!sel)return;sel.value=el.dataset.category||'Outros';sel.dataset.touched='1';const wrap=$('#expense-cat-wrap');if(wrap)wrap.hidden=false;smartRead('expense');updateBudgetNote();return;}
     if(action==='balance')return balanceModal(el.dataset.user||active);
     if(action==='new-goal')return newGoalModal();
+    if(action==='new-investment')return newGoalModal('investment');
     if(action==='goal-detail')return goalDetailModal(id);
     if(action==='edit-goal')return editGoalModal(id);
     if(action==='contribute')return contributeModal(id);
@@ -1775,7 +1822,7 @@ ${JSON.stringify(chatContext())}`;
       return openModal('Essa conta não entra mais?',`<p class="modal-sub">Remover <b>${esc(b.name)}</b> libera ${cash(b.amount)} do planejamento. Isso não registra um pagamento.</p><form class="form" data-form="remove-bill" data-id="${id}">${formEnd('Remover esta conta')}</form>`,'remove');
     }
     if(action==='release-goal'){
-      const g=state.goals.find(g=>g.id===id);if(!g)return;
+      const g=state.goals.find(g=>g.id===id);if(!g||!goalEditable(g))return;
       return openModal('Mudar de plano também é planejar.',`<p class="modal-sub">Encerrar <b>${esc(g.name)}</b> devolve ${cash(g.saved)} ao saldo livre. O dinheiro continua na conta.</p><form class="form" data-form="release-goal" data-id="${id}">${formEnd('Encerrar plano e liberar saldo')}</form>`,'release');
     }
     if(action==='notice-request'){close();route='requests';requestFilter='all';render();setTimeout(()=>document.getElementById('request-'+id)?.scrollIntoView({behavior:'smooth',block:'center'}),50);return;}
@@ -1979,14 +2026,14 @@ ${JSON.stringify(chatContext())}`;
     }
     if(type==='edit-goal'){
       const g=state.goals.find(x=>x.id===id),name=titleValue(d,'edit-goal-title',2,60),target=amountValue(d,'edit-goal-target'),iconName=String(d.get('edit-goal-icon')||'shield'),allowed=new Set(['plane','house','shield','gift']);
-      if(!g||name==null||target==null)return;
+      if(!g||!goalEditable(g)||name==null||target==null)return;
       g.name=name;g.target=target;g.icon=allowed.has(iconName)?iconName:'shield';
       log(active,`editou o plano ${name}: meta de ${money(target)}.`);close();persist();toast('Plano atualizado.',`${name} · meta de ${money(target)}.`,'heart');return;
     }
     if(type==='contribute'){
-      const amount=amountValue(d,'contribute-amount'),g=state.goals.find(g=>g.id===id);if(amount==null||!g)return;
-      if(amount>free()){error(`Vocês têm ${money(Math.max(0,free()))} livres. Escolha um valor que preserve as contas e os outros planos.`);return;}
-      g.saved+=amount;state.saves.push({id:uid(),goalId:g.id,amount,date:dateISO(),actor:active,source:'manual'});log(active,`separou ${money(amount)} para ${g.name}.`);notify(other(),'Nosso sonho andou mais um pouco. 💚',`${first(user().name)} separou ${money(amount)} para ${g.name}.`);close();persist();toast('O sonho tá mais perto.',`${money(amount)} protegidos para ${g.name}.`);return;
+      const amount=amountValue(d,'contribute-amount'),g=state.goals.find(g=>g.id===id);if(amount==null||!g||!goalEditable(g))return;
+      if(amount>personalFree()){error(`Seu perfil tem ${money(Math.max(0,personalFree()))} livres. Escolha um valor que preserve suas contas e outras metas.`);return;}
+      g.saved+=amount;state.saves.push({id:uid(),goalId:g.id,amount,date:dateISO(),actor:active,source:'manual'});log(active,`separou ${money(amount)} para ${g.name}.`);if(goalOwner(g)==='both')notify(other(),'Nosso sonho andou mais um pouco. 💚',`${first(user().name)} separou ${money(amount)} para ${g.name}.`);close();persist();toast('O sonho tá mais perto.',`${money(amount)} protegidos para ${g.name}.`);return;
     }
     if(type==='decline'){
       const r=state.requests.find(r=>r.id===id),note=String(d.get('decline-note')||'').trim();if(!r||r.status!=='pending'||r.recipient!==actor)return;
@@ -2010,7 +2057,7 @@ ${JSON.stringify(chatContext())}`;
       const b=state.bills.find(b=>b.id===id);if(!b||b.status!=='open')return;state.bills=state.bills.filter(q=>q.id!==id);log(active,`removeu ${b.name} das contas a pagar.`);close();persist();toast('Conta retirada do planejamento.');return;
     }
     if(type==='release-goal'){
-      const g=state.goals.find(g=>g.id===id);if(!g)return;const paused=state.plan?.goalId===g.id;if(paused)state.plan=null;state.goals=state.goals.filter(q=>q.id!==id);log(active,`encerrou o plano ${g.name} e liberou ${money(g.saved)}${paused?'; piloto automático pausado':''}.`);notify(other(),'A dupla mudou de plano.',`${first(user().name)} encerrou ${g.name}. O dinheiro separado voltou ao livre.`);close();persist();toast('Plano encerrado. Dinheiro liberado.',paused?'O piloto automático também foi pausado para não guardar em um plano inexistente.':'','heart');return;
+      const g=state.goals.find(g=>g.id===id);if(!g||!goalEditable(g))return;const paused=state.plan?.goalId===g.id;if(paused)state.plan=null;state.goals=state.goals.filter(q=>q.id!==id);log(active,`encerrou o plano ${g.name} e liberou ${money(g.saved)}${paused?'; piloto automático pausado':''}.`);if(goalOwner(g)==='both')notify(other(),'A dupla mudou de plano.',`${first(user().name)} encerrou ${g.name}. O dinheiro separado voltou ao livre.`);close();persist();toast('Plano encerrado. Dinheiro liberado.',paused?'O piloto automático também foi pausado para não guardar em um plano inexistente.':'','heart');return;
     }
     if(type==='rename'){
       const a=titleValue(d,'name-a',1,24),b=isSolo()?'':titleValue(d,'name-b',1,24);if(a==null||b==null)return;state.users[0].name=a;if(!isSolo())state.users[1].name=b;close();persist();toast('A dupla ganhou os nomes de vocês.');return;
@@ -2031,15 +2078,16 @@ ${JSON.stringify(chatContext())}`;
     if(type==='onboard-solo'){const name=titleValue(d,'solo-name',1,24),bal=amountValue(d,'solo-balance',true);if(name==null||bal==null)return;state=migrate(seedSolo());state.users=[{id:'a',name,balance:bal,tone:'blue'}];state.bills=[];state.goals=[];state.transactions=[];state.requests=[];state.activity=[];state.notifications=[];state.incomes=[];state.received=[];state.saves=[];state.plan=null;state.challenges=[];state.commitments=[];state.budgets={};state.learned={};state.settings={variableEstimate:0,yieldRate:10,couplePhoto:'',profileZoom:1.08,profileY:50};state.demo=false;active='a';cutPerson=null;try{sessionStorage.setItem(PROFILE,'a');}catch{}log('a','começou no modo individual. Primeiro passo: feito!');close();route='incomes';persist();toast('Pronto. Seu controle começa agora.','Próximo passo: contar quando o seu dinheiro entra. É daí que sai a previsão.');return;}
     if(type==='plan'){
       const o=planOptionByKey(form.dataset.key),monthly=amountValue(d,'plan-amount');if(!o||monthly==null)return;let goalId=d.get('plan-goal');
-      if(goalId==='__new'||!state.goals.find(g=>g.id===goalId)){const g={id:uid(),name:isSolo()?'Meu cofre':'Cofre da dupla',target:Math.max(monthly*12,100000),saved:0,icon:'shield'};state.goals.push(g);goalId=g.id;}
+      if(goalId==='__new'||!state.goals.find(g=>g.id===goalId)){const g={id:uid(),name:isSolo()?'Meu cofre':'Cofre da dupla',target:Math.max(monthly*12,100000),saved:0,icon:'shield',owner:isSolo()?'a':'both',kind:'dream'};state.goals.push(g);goalId=g.id;}
       state.plan={key:o.key,name:o.name,monthly,goalId,cut:o.pct,auto:d.get('plan-auto')==='on',startedAt:Date.now()};planPicker=false;log(active,`ativou o plano ${o.name}: guardar ${money(monthly)} por mês, primeiro.`);notify(other(),'Agora a gente guarda primeiro. 💚',`${first(user().name)} ativou o plano ${o.name}: ${money(monthly)} por mês, separados no dia em que o dinheiro cai.`);close();route='goals';planTab='plan';persist();window.scrollTo({top:0,behavior:'smooth'});toast('Plano ativo. Dinheiro entrou, parte sai pro cofre.',`${money(monthly)} por mês.`,'coins');return;
     }
     if(type==='goal'){
       const name=titleValue(d,'goal-title',2,60),target=amountValue(d,'goal-target');if(name==null||target==null)return;
       const requestedIcon=String(d.get('goal-icon')||'shield'),allowedIcons=new Set(['plane','house','shield','gift']),goalIcon=allowedIcons.has(requestedIcon)?requestedIcon:'shield';
-      const goal={id:uid(),name,target,saved:0,icon:goalIcon};state.goals.push(goal);
+      const wanted=String(d.get('goal-owner')||active),owner=isSolo()||wanted!== 'both'?active:'both',kind=d.get('goal-kind')==='investment'?'investment':'dream';
+      const goal={id:uid(),name,target,saved:0,icon:goalIcon,owner,kind};state.goals.push(goal);
       log(active,`criou o objetivo “${name}” com meta de ${money(target)}.`);
-      notify(other(),'Novo objetivo no Juntô 💚',`${first(user().name)} criou “${name}”, com meta de ${money(target)}.`);
+      if(owner==='both')notify(other(),'Novo objetivo a dois 💚',`${first(user().name)} criou “${name}”, com meta de ${money(target)}.`);
       close();route='goals';planTab='goals';persist();window.scrollTo({top:0,behavior:'smooth'});toast('Objetivo criado.',`${name} · meta de ${money(target)}.`,'heart');return;
     }
     if(type==='ledger-income'){

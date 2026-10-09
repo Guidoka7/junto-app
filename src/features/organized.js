@@ -682,7 +682,7 @@ function ledgerView() {
   const solo = isSolo(),
     nOpen = [...state.bills, ...state.transactions].filter((x) => x.contest && x.contest.status === "open").length;
   const head = pageHead(
-    solo || ledgerMine ? "Meu dinheiro" : "Nosso dinheiro",
+    solo || (ledgerTab === "history" && ledgerMine) ? "Meu dinheiro" : "Nosso dinheiro",
     "Extrato",
     ledgerTab === "history" ? "Entradas e gastos, organizados por dia." : "Acompanhe o que falta pagar.",
     `<button class="j-icon-btn" data-feature="bank-settings" aria-label="Movimentos do banco">${icon("wallet")}</button>`,

@@ -4,7 +4,7 @@ import {parseApkRelease,isNewerApk} from '../features/update-core.js';
   const native = Boolean(window.Capacitor?.isNativePlatform?.());
   const releaseUrl = 'https://api.github.com/repos/Guidoka7/junto-app/releases/tags/latest';
   const SNOOZE_KEY = 'junto-apk-update-dismissed-v1';
-  const INTERVAL = 4 * 60 * 60 * 1000;
+  const INTERVAL = 60 * 60 * 1000;
   const state = {current:null,latest:null,error:'',checking:false,lastCheck:0};
   let pending=null,offeredVersion='',promise=null;
   const $ = id => document.getElementById(id);
@@ -138,6 +138,7 @@ import {parseApkRelease,isNewerApk} from '../features/update-core.js';
   window.addEventListener('junto:native-resume',()=>{
     if (native && Date.now()-state.lastCheck > INTERVAL) check({offer:true});
   });
+  if (native) setInterval(()=>{if(hasAccess() && !document.hidden && Date.now()-state.lastCheck >= INTERVAL)check({offer:true});},INTERVAL);
   window.addEventListener('junto:pwa-status',()=>{
     if (!native) {
       emit();

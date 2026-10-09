@@ -19,7 +19,7 @@ export function personalFinance(state,person,ratio=.5){
   const settings={...state.settings,variableEstimate:state.settings.personalEstimates?.[person]??state.settings.variableEstimate??0,personalBudget:{[person]:state.settings.personalBudget?.[person]||{}}};
   return{...state,users:state.users.map(u=>u.id===person?u:{...u,balance:0}),transactions:expenses(state.transactions),bills:expenses(state.bills),
     incomes:state.incomes.filter(i=>i.person===person),received:state.received.filter(own),saves:savings,goals,
-    plan:state.plan&&goals.some(g=>g.id===state.plan.goalId)?{...state.plan,monthly:Math.round(state.plan.monthly*(state.users.length===1||state.goals.find(g=>g.id===state.plan.goalId)?.owner===person?1:person==='a'?ratio:1-ratio))}:null,
+    plan:state.plan&&(!state.plan.goalId||goals.some(g=>g.id===state.plan.goalId))?{...state.plan,monthly:Math.round(state.plan.monthly*(state.users.length===1||state.goals.find(g=>g.id===state.plan.goalId)?.owner===person?1:person==='a'?ratio:1-ratio))}:null,
     budgets:state.settings.personalBudgets?.[person]||state.budgets,settings,
     requests:state.requests.filter(r=>r.author===person),activity:state.activity.filter(r=>r.actor===person||r.scope==='shared'),
     notifications:state.notifications.filter(r=>r.to===person),commitments:state.commitments.filter(r=>r.person===person||r.person==='both'),

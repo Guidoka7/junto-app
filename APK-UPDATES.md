@@ -15,3 +15,11 @@ A central existente junto-updates.vercel.app tem seu código preservado em updat
 Publicação da central: implantar os arquivos de updates/ na raiz do projeto Vercel EXISTENTE junto-updates (prj_wpOzgNGZqS0RfFY5EPNDmRGLWnrV), equipe Junto app. Ela permanece separada do deploy web principal. Sua consulta dinâmica dispensa novos deploys da central a cada APK.
 
 Os artifacts do Actions expiram em 7 dias; somente o APK atual permanece na release rolling. Releases versionadas por tag não são removidas.
+
+## Atualizações dentro do próprio aplicativo
+
+O APK tem o painel **Ajustes → Atualizações** com o identificador do build instalado, checagem manual e botão de download quando a release rolling possui build mais recente. Na abertura, uma consulta à API pública da release `latest` compara o runNumber e a tentativa do APK com os metadados da última release. Quando há novidade e o usuário está logado, aparece um modal com **Baixar APK atualizado** e **Agora não**. A recusa vale para aquele build, e a notificação retorna apenas quando aparecer outro. O app também verifica ao voltar ao primeiro plano e, se permanecer aberto, no máximo a cada hora, sem consultas repetidas a cada render.
+
+O download é aberto por um plugin Android Capacitor registrado em `MainActivity`, que lança o navegador externo para `https://junto-updates.vercel.app/apk`. O navegador baixa o arquivo e o Android exige confirmação expressa do usuário para instalar. **Não existe instalação silenciosa, permissão de fontes desconhecidas permanente, execução de arquivo remoto como código ou mudança no estado financeiro.** A atualização por cima só é possível com assinatura compatível. Se o usuário estiver preenchendo outro formulário, o aviso aguarda o modal ser fechado.
+
+O site PWA continua usando o Service Worker para atualizações sem APK; o item **Atualizações** nas configurações também permite verificar a versão web. O verificador nativo usa o `dist/version.json` gerado no próprio build e os metadados assinados do fluxo de release. Para ativar esse recurso em um APK instalado anteriormente, é necessária **uma última instalação manual** do APK que contém o verificador; daí em diante as notificações passam a aparecer dentro do aplicativo.

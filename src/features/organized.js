@@ -617,7 +617,7 @@ function personalGoalsView() {
   if(planTab==='plan'){
     const myPlan=state.plan&&state.goals.some(g=>g.id===state.plan.goalId&&goalOwner(g)===active)?state.plan:null,
       mySaved=state.saves.filter(x=>x.actor===active&&x.date.slice(0,7)===dateISO().slice(0,7)).reduce((n,x)=>n+x.amount,0);
-    return `<div class="j-page j-goals-personal">${head}<section class="j-card"><span class="j-eyebrow">Guardado por ${esc(first(user().name))} neste mês</span><strong class="j-big num">${cash(mySaved)}</strong><p class="j-muted">Seus aportes individuais e sua participação nos objetivos a dois são contabilizados separadamente.</p>${myPlan?`<p class="j-muted">Plano automático individual: ${cash(myPlan.monthly)} por mês.</p>`:'<p class="j-muted">Crie um objetivo pessoal ou um investimento para começar a acompanhar seus aportes.</p>'}<div class="j-goal-actions"><button class="j-cta primary" data-action="new-goal">${icon('plus')} Criar sonho</button><button class="j-cta" data-action="new-investment">${icon('shield')} Investimento</button></div></section>${group('Meus objetivos',mine)}${group('Metas a dois',shared)}</div>`;
+    return `<div class="j-page j-goals-personal">${head}<section class="j-card"><span class="j-eyebrow">Guardado por ${esc(first(user().name))} neste mês</span><strong class="j-big num">${cash(mySaved)}</strong><p class="j-muted">Seus aportes individuais e sua participação nos objetivos a dois são contabilizados separadamente.</p>${myPlan?`<p class="j-muted">Plano automático individual: ${cash(myPlan.monthly)} por mês.</p>`:'<p class="j-muted">Crie um objetivo pessoal ou um investimento para começar a acompanhar seus aportes.</p>'}<div class="j-goal-actions"><button class="j-cta primary" data-action="new-goal">${icon('plus')} Criar sonho</button><button class="j-cta" data-action="new-investment">${icon('shield')} Investimento</button></div></section>${group('Meus objetivos',mine)}${!solo&&shared.length?`<button class="j-card j-couple-link" data-action="goal-scope" data-value="couple"><span class="j-ic gold">${icon('heart')}</span><span><b>Metas a dois</b><small>Acompanhar separadamente nossos objetivos compartilhados</small></span><span class="j-chev">›</span></button>`:''}</div>`;
   }
   const options=solo?[['mine','Meus objetivos']]:[['mine','Só meus'],['couple','A dois'],['all','Ver todos']];
   const scope=chips('goal-scope',goalScope,options);
@@ -715,7 +715,7 @@ function dayLabel(iso) {
 }
 function ledgerView() {
   const solo = isSolo(),
-    nOpen = [...state.bills, ...state.transactions].filter((x) => x.contest && x.contest.status === "open").length;
+    nOpen = [...state.bills, ...state.transactions].filter((x) => x.contest && x.contest.status === "open" && visible(x)).length;
   const head = pageHead(
     solo || (ledgerTab === "history" && ledgerMine) ? "Meu dinheiro" : "Nosso dinheiro",
     "Extrato",
@@ -787,7 +787,9 @@ function ledgerIncomeModal() {
 function billsPanel() {
   const solo = isSolo(),
     ym = dateISO().slice(0, 7),
-    open = state.bills.filter((b) => b.status === "open").sort((a, b) => a.due.localeCompare(b.due)),
+    visible = b => solo || !ledgerMine || shareOf(b,active)>0,
+    individual = !solo && ledgerMine,
+    open = state.bills.filter((b) => b.status === "open" && visible(b)).sort((a, b) => a.due.localeCompare(b.due)),
     openMonth = open.filter((b) => b.due.slice(0, 7) <= ym),
     nOpen = [...state.bills, ...state.transactions].filter((x) => x.contest && x.contest.status === "open").length;
   const f = ["open", "paid", "fixed", "contested"].includes(billFilter) ? billFilter : "open";
@@ -795,11 +797,11 @@ function billsPanel() {
     f === "open"
       ? open
       : f === "paid"
-        ? state.bills.filter((b) => b.status === "paid").sort((a, b) => b.due.localeCompare(a.due))
+        ? state.bills.filter((b) => b.status === "paid" && visible(b)).sort((a, b) => b.due.localeCompare(a.due))
         : f === "fixed"
-          ? templates().sort((a, b) => recurringDay(a) - recurringDay(b))
-          : state.bills.filter((b) => b.contest);
-  const txs = f === "contested" ? state.transactions.filter((t) => t.contest && !t.billId) : [];
+          ? templates().filter(visible).sort((a, b) => recurringDay(a) - recurringDay(b))
+          : state.bills.filter((b) => b.contest && visible(b));
+  const txs = f === "contested" ? state.transactions.filter((t) => t.contest && !t.billId && visible(t)) : [];
   const shared = openMonth.filter((b) => ["half", "prop"].includes(b.payer)),
     parts = shared.reduce((acc, b) => (splitShares(b.amount, b.payer).forEach((x) => (acc[x.id] = (acc[x.id] || 0) + x.amount)), acc), { a: 0, b: 0 });
   const billRow = (b) => {
@@ -817,19 +819,19 @@ function billsPanel() {
       tone: late ? "red" : categoryColor(b.category),
       title: b.name,
       sub: `${when} · ${esc(payerLabel(b.payer))}${b.recurring && f !== "fixed" ? " · mensal" : ""}`,
-      amount: cash(b.amount),
+      amount: cash(individual?shareOf(b,active):b.amount),
       action: "bill-detail",
       id: b.id,
     })}${b.contest ? `<div class="j-contest">${contestBlock(b.contest, "bill", b.id)}</div>` : ""}</div>`;
   };
   const txRow = (t) =>
-    `<div class="j-row-wrap">${row({ icon: itemOf(t).icon, tone: categoryColor(t.category), title: t.name, sub: `${dateText(t.date)} · ${esc(payerLabel(t.payer))}`, amount: `− ${cash(t.amount)}`, action: "tx-detail", id: t.id })}<div class="j-contest">${contestBlock(t.contest, "tx", t.id)}</div></div>`;
+    `<div class="j-row-wrap">${row({ icon: itemOf(t).icon, tone: categoryColor(t.category), title: t.name, sub: `${dateText(t.date)} · ${esc(payerLabel(t.payer))}`, amount: `− ${cash(individual?shareOf(t,active):t.amount)}`, action: "tx-detail", id: t.id })}<div class="j-contest">${contestBlock(t.contest, "tx", t.id)}</div></div>`;
   const next = openMonth[0];
-  return `<section class="j-card j-bills-sum"><div><small>A pagar este mês</small><strong class="num">${cash(openMonth.reduce((s, b) => s + b.amount, 0))}</strong><p>${openMonth.length ? `${plural(openMonth.length, "conta aberta", "contas abertas")}${next ? ` · próxima: ${esc(next.name)}, ${next.due < dateISO() ? "vencida" : dateText(next.due)}` : ""}` : "Tudo pago. Cabeça em paz. ✨"}</p></div>${shared.length && !solo ? `<div class="j-split">${icon("half")}<span><small>Sua parte</small><b class="num">${cash(parts[active] || 0)}</b></span><span><small>Parte de ${esc(first(user(other()).name))}</small><b class="num">${cash(parts[other()] || 0)}</b></span></div>` : ""}</section>
+  return `<div class="j-ledger-scope"><div><b>${individual?'Minhas contas':'Contas da dupla'}</b><small>${individual?'Suas contas e sua parte das despesas compartilhadas':'Contas e valores combinados dos dois perfis'}</small></div>${solo?'':`<button type="button" class="j-toggle" data-action="ledger-mine" aria-pressed="${!ledgerMine}">${ledgerMine?'Ver tudo':'Só minhas contas'}</button>`}</div><section class="j-card j-bills-sum"><div><small>A pagar este mês</small><strong class="num">${cash(openMonth.reduce((s, b) => s + (individual?shareOf(b,active):b.amount), 0))}</strong><p>${openMonth.length ? `${plural(openMonth.length, "conta aberta", "contas abertas")}${next ? ` · próxima: ${esc(next.name)}, ${next.due < dateISO() ? "vencida" : dateText(next.due)}` : ""}` : "Tudo pago. Cabeça em paz. ✨"}</p></div>${shared.length && !solo && !individual ? `<div class="j-split">${icon("half")}<span><small>Sua parte</small><b class="num">${cash(parts[active] || 0)}</b></span><span><small>Parte de ${esc(first(user(other()).name))}</small><b class="num">${cash(parts[other()] || 0)}</b></span></div>` : ""}</section>
     ${chips("bill-filter", f, [
       ["open", "A pagar", open.length],
       ["paid", "Pagas"],
-      ["fixed", "Fixas", templates().length],
+      ["fixed", "Fixas", templates().filter(visible).length],
       ...(solo ? [] : [["contested", "Revisões", nOpen]]),
     ])}
     <section class="j-card j-list">${list.map(billRow).join("") + txs.map(txRow).join("") || `<p class="j-muted">${f === "contested" ? "Nenhuma revisão em aberto. Paz na dupla. 💚" : f === "open" ? "Nenhuma conta a pagar." : "Nada por aqui."}</p>`}</section>

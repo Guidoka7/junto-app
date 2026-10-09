@@ -40,7 +40,7 @@ import {parseApkRelease,isNewerApk} from '../features/update-core.js';
     if (!native || !available() || !hasAccess() || !state.latest || offeredVersion===state.latest.version) return;
     if ($('modal')?.open) {pending=state.latest.version;return;}
     pending=null;
-    if (localStorage.getItem(SNOOZE_KEY)===state.latest.version) return;
+    try {if (localStorage.getItem(SNOOZE_KEY)===state.latest.version) return;} catch {}
     offeredVersion=state.latest.version;
     showModal(true);
   }
@@ -64,7 +64,7 @@ import {parseApkRelease,isNewerApk} from '../features/update-core.js';
       ${download?'<button class="btn primary wide" data-action="update-download">Baixar APK atualizado ↗</button>':''}
       ${!native && webUpdate?'<button class="btn primary wide" data-action="pwa-update">Atualizar agora</button>':''}
       <button class="btn secondary wide" data-action="update-check" ${state.checking?'disabled':''}>${state.checking?'Verificando…':'Verificar atualizações'}</button>
-      <button class="btn ghost wide" data-action="update-later">${automatic?'Agora não':'Voltar aos ajustes'}</button>
+      <button class="btn ghost wide" data-action="update-later">${automatic?'Agora não':'Fechar'}</button>
     </div><p class="junto-update-foot">O APK vem da central oficial do Juntô. A instalação depende de sua confirmação e de uma assinatura compatível com o APK anterior.</p>`;
     window.JuntoApp.openModal(title,body,'updates');
   }
@@ -93,7 +93,7 @@ import {parseApkRelease,isNewerApk} from '../features/update-core.js';
       } catch {state.error='Consulta indisponível';state.lastCheck=Date.now();}
       finally {clearTimeout(timeout);state.checking=false;emit();}
       if (manual) showModal();
-      else if (offer) showOffer();
+      else if (offer && !state.error) showOffer();
       return state.latest;
     })().finally(()=>{promise=null;});
     return promise;
@@ -144,5 +144,8 @@ import {parseApkRelease,isNewerApk} from '../features/update-core.js';
       if ($('modal')?.open && $('modal')?.dataset.kind==='updates') showModal();
     }
   });
+  const modal=$('modal');
+  if (modal) new MutationObserver(()=>{if(pending&&!modal.open)setTimeout(showOffer,100);}).observe(modal,{attributes:true,attributeFilter:['open']});
+  if (hasAccess()) setTimeout(()=>check({offer:true}),700);
   readInstalled();
 })();

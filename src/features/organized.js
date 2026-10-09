@@ -12,11 +12,14 @@ Object.assign(paths, {
   receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
   pie: '<path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M14.5 2.6A9 9 0 0 1 21.4 9.5H14.5z"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  users: '<circle cx="9" cy="8" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M17 15a5 5 0 0 1 4 4v2"/>',
 });
 let ledgerTab = "history",
   ledgerFilter = "all",
   ledgerMonth = 0,
-  ledgerMine = false,
+  ledgerMine = true,
+  ledgerPerson = null,
+  ledgerLastRoute = null,
   coupleTab = "requests";
 const ESSENTIAL_LIMIT = 0.15;
 const isEssentialCat = (c) => (CUT_WEIGHT[c] ?? 0.3) <= ESSENTIAL_LIMIT;
@@ -99,6 +102,12 @@ function normalizeRoute() {
   }
   if (!["goals", "plan", "challenges"].includes(planTab)) planTab = "goals";
   if (!["home", "ledger", "analysis", "goals", "couple", "incomes"].includes(route)) route = "home";
+  if (ledgerPerson !== active || (route === "ledger" && ledgerLastRoute !== "ledger")) {
+    ledgerMine = true;
+    ledgerFilter = "all";
+    ledgerPerson = active;
+  }
+  ledgerLastRoute = route;
 }
 function viewFor() {
   return { home: homeV4, ledger: ledgerView, analysis: analysisV4, goals: goalsView, couple: coupleView, incomes: () => `<div class="j-page">${incomesView()}</div>` }[route] || homeV4;
@@ -611,15 +620,16 @@ function ledgerEntries(ym, { all = false } = {}) {
     });
   });
   state.received.forEach((r) => {
-    if (r.status !== "received" || (!all && r.date.slice(0, 7) !== ym)) return;
+    const date = r.actualDate || r.date;
+    if (r.status !== "received" || (!all && date.slice(0, 7) !== ym)) return;
     const inc = state.incomes.find((i) => i.id === r.incomeId),
       person = r.person || inc?.person;
-    if (mine && person && person !== active) return;
+    if (mine && person !== active) return;
     out.push({
       kind: "income",
-      date: r.date,
-      at: r.at || pd(r.date).getTime(),
-      title: inc?.name || r.name || "Entrada",
+      date,
+      at: r.at || pd(date).getTime(),
+      title: r.name || inc?.name || "Entrada",
       sub: `Recebido${isSolo() || !person ? "" : ` · ${esc(first(user(person).name))}`}${r.bankSource ? ` · ${esc(r.bankSource.bank)}` : ""}`,
       amount: r.amount,
       icon: "coins",
@@ -631,7 +641,7 @@ function ledgerEntries(ym, { all = false } = {}) {
   });
   state.saves.forEach((s) => {
     if (!all && s.date.slice(0, 7) !== ym) return;
-    if (mine && s.actor && s.actor !== active) return;
+    if (mine && s.actor !== active) return;
     const goal = state.goals.find((g) => g.id === s.goalId);
     out.push({
       kind: "save",
@@ -672,16 +682,16 @@ function ledgerView() {
   const solo = isSolo(),
     nOpen = [...state.bills, ...state.transactions].filter((x) => x.contest && x.contest.status === "open").length;
   const head = pageHead(
-    solo ? "Meu dinheiro" : "Nosso dinheiro",
+    solo || (ledgerTab === "history" && ledgerMine) ? "Meu dinheiro" : "Nosso dinheiro",
     "Extrato",
-    "Tudo o que entrou, saiu e foi guardado — num lugar só.",
+    ledgerTab === "history" ? "Entradas e gastos, organizados por dia." : "Acompanhe o que falta pagar.",
     `<button class="j-icon-btn" data-feature="bank-settings" aria-label="Movimentos do banco">${icon("wallet")}</button>`,
   );
   const tabs = segTabs("ledger", ledgerTab, [
     ["history", "Histórico"],
     ["bills", nOpen ? `Contas · ${nOpen}` : "Contas"],
   ]);
-  return `<div class="j-page">${head}${tabs}${ledgerTab === "bills" ? billsPanel() : historyPanel()}</div>`;
+  return `<div class="j-page j-ledger">${head}${tabs}${ledgerTab === "bills" ? billsPanel() : historyPanel()}</div>`;
 }
 function historyPanel() {
   const solo = isSolo(),
@@ -707,23 +717,37 @@ function historyPanel() {
       return `<section class="j-day" data-day><header><span>${esc(dayLabel(iso))}</span><b class="num ${net > 0 ? "pos" : ""}">${net ? signed(net, cash) : ""}</b></header><div class="j-list">${rows.map(ledgerRow).join("")}</div></section>`;
     })
     .join("");
-  const counts = { spent: all.filter((e) => e.kind === "spent").length, bill: all.filter((e) => e.kind === "bill").length, income: all.filter((e) => e.kind === "income").length, save: all.filter((e) => e.kind === "save").length };
-  return `<section class="j-card j-month">
+  const counts = { out: all.filter((e) => e.amount < 0 && !e.save).length, income: all.filter((e) => e.kind === "income").length, save: all.filter((e) => e.kind === "save").length };
+  const mine = solo || ledgerMine;
+  return `<div class="j-ledger-scope"><div><b>${mine ? "Meu histórico" : "Histórico dos dois"}</b><small>${mine ? esc(first(user().name)) + " · suas entradas e gastos" : esc(state.users.map((u) => first(u.name)).join(" + "))}</small></div>${solo ? "" : `<button type="button" class="j-toggle" data-action="ledger-mine" aria-pressed="${!ledgerMine}" aria-controls="ledger-days">${icon(ledgerMine ? "users" : "user")}${ledgerMine ? "Ver tudo" : "Só meu histórico"}</button>`}</div>
+    <div class="j-ledger-actions" role="group" aria-label="Registrar movimento"><button type="button" class="j-cta primary" data-action="ledger-income">${icon("plus")}<span>Registrar entrada</span></button><button type="button" class="j-cta" data-action="expense">${icon("arrowUp")}<span>Registrar gasto</span></button></div>
+    <section class="j-card j-month">
       <div class="j-month-nav"><button class="icon-btn" data-action="ledger-month" data-delta="-1" aria-label="Mês anterior" ${ledgerMonth <= -12 ? "disabled" : ""}>${icon("chevL")}</button><h3>${cap(monthName(d))} ${d.getFullYear()}</h3><button class="icon-btn" data-action="ledger-month" data-delta="1" aria-label="Próximo mês" ${current ? "disabled" : ""}>${icon("chevR")}</button></div>
-      <div class="j-month-stats"><div><small>Entrou</small><b class="num pos">+ ${cashR(inT)}</b></div><div><small>Saiu</small><b class="num">− ${cashR(outT)}</b></div><div><small>Guardou</small><b class="num gold">${cashR(saveT)}</b></div></div>
-      <p class="j-month-note">${inT ? `Resultado do mês: <b class="${inT - outT < 0 ? "neg" : "pos"}">${signed(inT - outT)}</b>.` : "Sem entradas confirmadas neste mês."}${prevOut && Math.abs(diff) >= 0.05 ? ` Você gastou ${pct(Math.abs(diff))} ${diff > 0 ? "a mais" : "a menos"} que em ${monthName(pd(ledgerYM(ledgerMonth - 1) + "-01"))}${current ? " no mesmo período" : ""}.` : ""}</p>
+      <div class="j-month-stats"><div><small>Entrou</small><b class="num pos">${cash(inT)}</b></div><div><small>Saiu</small><b class="num">${cash(outT)}</b></div></div>
+      <div class="j-ledger-result"><span>Resultado do mês</span><b class="num ${inT - outT < 0 ? "neg" : "pos"}">${signed(inT - outT, cash)}</b></div>
+      <div class="j-ledger-saved"><span>Guardado em metas</span><b class="num gold">${cash(saveT)}</b></div>
+      ${prevOut && Math.abs(diff) >= 0.05 ? `<p class="j-month-note">${mine ? "Você gastou" : "Vocês gastaram"} ${pct(Math.abs(diff))} ${diff > 0 ? "a mais" : "a menos"} que em ${monthName(pd(ledgerYM(ledgerMonth - 1) + "-01"))}${current ? " no mesmo período" : ""}.</p>` : ""}
     </section>
-    <div class="j-tools"><label class="j-search">${icon("search")}<input id="ledger-search" type="search" placeholder="Buscar: mercado, uber, salário…" aria-label="Buscar no extrato" autocomplete="off"></label>${solo ? "" : `<button class="j-toggle ${ledgerMine ? "on" : ""}" data-action="ledger-mine" aria-pressed="${ledgerMine}">${icon("user")}Só meus</button>`}</div>
-    ${chips("ledger-filter", ledgerFilter, [
+    <div class="j-tools"><label class="j-search">${icon("search")}<input id="ledger-search" type="search" placeholder="Buscar no histórico" aria-label="Buscar no extrato" autocomplete="off"></label></div>
+    <div class="j-history-filters">${chips("ledger-filter", ledgerFilter, [
       ["all", "Tudo"],
-      ["spent", "Gastos", counts.spent],
-      ["bill", "Contas pagas", counts.bill],
+      ["out", "Gastos", counts.out],
       ["income", "Entradas", counts.income],
       ["save", "Guardado", counts.save],
-    ])}
+    ])}</div>
     <div class="j-days" id="ledger-days">${groups || emptyBox("receipt", "Nada por aqui.", ledgerFilter === "all" ? "Nenhum movimento neste mês ainda." : "Nenhum movimento desse tipo neste mês.")}</div>
-    <p class="j-muted j-search-empty" id="ledger-search-empty" hidden>Nada encontrado com essa busca neste mês.</p>
-    <button class="j-cta primary wide" data-action="expense">${icon("plus")}<span>Registrar gasto</span></button>`;
+    <p class="j-muted j-search-empty" id="ledger-search-empty" hidden>Nada encontrado com essa busca neste mês.</p>`;
+}
+function ledgerIncomeModal() {
+  const sources = state.incomes.filter((i) => i.person === active), date = dateISO();
+  openModal("Registrar entrada", `<p class="modal-sub">Dinheiro recebido por ${esc(first(user().name))}.</p><form class="form" data-form="ledger-income" data-id="${uid()}" data-actor="${active}">
+    ${sources.length ? `<div class="field"><label for="receipt-income">De onde veio?</label><select id="receipt-income" name="receipt-income"><option value="">Entrada avulsa</option>${sources.map((i) => `<option value="${esc(i.id)}">${esc(i.name)}</option>`).join("")}</select></div>` : ""}
+    ${field("receipt-name", "Descrição", "Ex.: salário, Pix recebido, freela")}
+    ${field("receipt-amount", "Quanto entrou?", "0,00", "", true)}
+    <div class="field"><label for="receipt-date">Quando recebeu?</label><input id="receipt-date" name="receipt-date" type="date" value="${date}" max="${date}" required></div>
+    <div class="field" id="receipt-expected-field" hidden><label for="receipt-expected-date">Qual recebimento previsto está confirmando?</label><input id="receipt-expected-date" name="receipt-expected-date" type="date" value="${date}"></div>
+    <label class="check-row"><input type="checkbox" name="receipt-adjust-balance" checked><span>Somar ao meu saldo<small>Desmarque se esse dinheiro já está no saldo informado.</small></span></label>
+    ${formEnd("Confirmar entrada")}</form>`, "ledger-income");
 }
 function billsPanel() {
   const solo = isSolo(),
@@ -1019,7 +1043,20 @@ document.addEventListener("click", (event) => {
     const y = window.scrollY;
     render();
     window.scrollTo(0, y);
+    return;
   }
+  if (action==='ledger-income') ledgerIncomeModal();
+});
+document.addEventListener("change", (event) => {
+  if (event.target.id !== "receipt-income") return;
+  const inc = state.incomes.find((i) => i.id === event.target.value && i.person === active);
+  const expected = document.getElementById("receipt-expected-field");
+  if (expected) expected.hidden = !inc;
+  if (!inc) return;
+  document.getElementById("receipt-name").value = inc.name;
+  document.getElementById("receipt-amount").value = moneyNumber(inc.amount);
+  const date = dateISO();
+  document.getElementById("receipt-expected-date").value = occurrences(inc, date.slice(0, 7) + "-01", date).filter((d) => !handled(inc.id, d)).at(-1) || date;
 });
 // Busca do extrato filtra na tela, sem perder o foco do campo.
 document.addEventListener("input", (event) => {

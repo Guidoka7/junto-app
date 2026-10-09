@@ -5,6 +5,7 @@ import {saveDownload} from '../features/download.js';
 window.JuntoDownload=saveDownload;
 if(Capacitor.isNativePlatform()){
   document.documentElement.classList.add('native-app');
+  window.JuntoNativeUpdater=Capacitor.registerPlugin('JuntoUpdater');
   const updateSystemBars=()=>SystemBars.setStyle({style:document.documentElement.dataset.theme==='dark'?SystemBarsStyle.Dark:SystemBarsStyle.Light}).catch(()=>{});
   window.addEventListener('junto-theme-change',updateSystemBars);
   updateSystemBars();
@@ -17,5 +18,5 @@ if(Capacitor.isNativePlatform()){
   });
   const passURL=url=>{if(!url?.startsWith('junto://auth-callback'))return;window.JuntoAuthURL=url;window.dispatchEvent(new CustomEvent('junto:auth-url',{detail:url}));};
   App.addListener('appUrlOpen',event=>passURL(event.url));App.getLaunchUrl().then(event=>passURL(event?.url));
-  App.addListener('appStateChange',event=>{if(event.isActive){window.JuntoBank?.refresh();window.JuntoCloud?.synchronize();}});
+  App.addListener('appStateChange',event=>{if(event.isActive){window.JuntoBank?.refresh();window.JuntoCloud?.synchronize();window.dispatchEvent(new Event('junto:native-resume'));}});
 }

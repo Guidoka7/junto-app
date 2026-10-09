@@ -528,7 +528,7 @@ function homeV4() {
   const visibleGoals = state.goals.filter(g => homeEveryone || goalOwner(g) === active);
   const g = visibleGoals.find((x) => x.saved < x.target) || visibleGoals[0],
     gp = g ? Math.min(100, Math.round((g.saved / g.target) * 100)) : 0,
-    gPace = g ? state.plan?.monthly || goalPace(g) : 0;
+    gPace = g ? (state.plan?.goalId===g.id?state.plan.monthly:goalPace(g)) : 0;
   const events = upcomingEvents(7).filter(e => homeEveryone || (e.kind === "in" ? e.who === active : shareOf({amount:e.amount,payer:e.payer},active)>0)).map(e => homeEveryone || e.kind === "in" ? e : {...e,amount:shareOf({amount:e.amount,payer:e.payer},active),payer:active}).slice(0, 4),
     latest = ledgerEntries(dateISO().slice(0, 7), { all: true, everyone: homeEveryone }).slice(0, 4),
     insights = Bn.insights.slice(0, 3);
@@ -617,7 +617,7 @@ function personalGoalsView() {
   if(planTab==='plan'){
     const myPlan=state.plan&&state.goals.some(g=>g.id===state.plan.goalId&&goalOwner(g)===active)?state.plan:null,
       mySaved=state.saves.filter(x=>x.actor===active&&x.date.slice(0,7)===dateISO().slice(0,7)).reduce((n,x)=>n+x.amount,0);
-    return `<div class="j-page j-goals-personal">${head}<section class="j-card"><span class="j-eyebrow">Guardado por ${esc(first(user().name))} neste mês</span><strong class="j-big num">${cash(mySaved)}</strong><p class="j-muted">Seus aportes individuais e sua participação nos objetivos a dois são contabilizados separadamente.</p>${myPlan?`<p class="j-muted">Plano automático individual: ${cash(myPlan.monthly)} por mês.</p>`:'<p class="j-muted">Crie um objetivo pessoal ou um investimento para começar a acompanhar seus aportes.</p>'}<div class="j-goal-actions"><button class="j-cta primary" data-action="new-goal">${icon('plus')} Criar sonho</button><button class="j-cta" data-action="new-investment">${icon('shield')} Investimento</button></div></section>${group('Meus objetivos',mine)}${!solo&&shared.length?`<button class="j-card j-couple-link" data-action="goal-scope" data-value="couple"><span class="j-ic gold">${icon('heart')}</span><span><b>Metas a dois</b><small>Acompanhar separadamente nossos objetivos compartilhados</small></span><span class="j-chev">›</span></button>`:''}</div>`;
+    return `<div class="j-page j-goals-personal">${head}<section class="j-card"><span class="j-eyebrow">Guardado por ${esc(first(user().name))} neste mês</span><strong class="j-big num">${cash(mySaved)}</strong><p class="j-muted">Seus aportes individuais e sua participação nos objetivos a dois são contabilizados separadamente.</p>${myPlan?`<p class="j-muted">Plano automático individual: ${cash(myPlan.monthly)} por mês.</p>`:'<p class="j-muted">Crie um objetivo pessoal ou um investimento para começar a acompanhar seus aportes.</p>'}<div class="j-goal-actions"><button class="j-cta primary" data-action="new-goal">${icon('plus')} Criar sonho</button><button class="j-cta" data-action="new-investment">${icon('shield')} Investimento</button></div></section>${group('Meus objetivos',mine)}${!solo&&shared.length?`<button class="j-card j-couple-link" data-action="goal-scope" data-value="couple"><span class="j-ic gold">${icon('heart')}</span><span><b>Metas a dois</b><small>Acompanhar separadamente nossos objetivos compartilhados</small></span><span class="j-chev">›</span></button>`:''}${state.plan||state.incomes.length? `<details class="j-more j-shared-plan"><summary>${state.plan?'Ver ou editar plano automático a dois':'Criar plano automático a dois'} (separado do pessoal)</summary><div class="j-shared-plan-content">${withFinanceView('shared',()=>state.plan?activePlanPanel():`<div class="plan-options">${planOptions().map(o=>planCard(o,o.key===recommendedKey())).join('')}</div>`)}</div></details>`:''}</div>`;
   }
   const options=solo?[['mine','Meus objetivos']]:[['mine','Só meus'],['couple','A dois'],['all','Ver todos']];
   const scope=chips('goal-scope',goalScope,options);
@@ -1083,7 +1083,7 @@ document.addEventListener("click", (event) => {
     return;
   }
   if (action==='home-scope') { homeEveryone = !homeEveryone; render(); return; }
-  if (action==='goal-scope') { goalScope = el.dataset.value; render(); return; }
+  if (action==='goal-scope') { goalScope = el.dataset.value; planTab = 'goals'; render(); return; }
   if (action==='ledger-income') ledgerIncomeModal();
 });
 document.addEventListener("change", (event) => {

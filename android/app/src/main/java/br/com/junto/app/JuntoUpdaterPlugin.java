@@ -126,7 +126,10 @@ public class JuntoUpdaterPlugin extends Plugin {
     public void downloadAndInstall(PluginCall call) {
         String url = call.getString("url");
         String expected = call.getString("sha256");
-        Long size = call.getLong("apkSize");
+        // org.json trata APKs menores que 2 GB como Integer; PluginCall.getLong retornaria null.
+        Object value = call.getData().opt("apkSize");
+        Long size = value instanceof Number && ((Number) value).doubleValue() == ((Number) value).longValue()
+            ? ((Number) value).longValue() : null;
         if (!approvedDownload(url) || !isSha(expected) || size == null ||
             size < 100000 || size > MAX_APK_BYTES) {
             call.reject("Metadados do APK inválidos. Atualize a consulta e tente de novo.");
@@ -205,7 +208,10 @@ public class JuntoUpdaterPlugin extends Plugin {
     @PluginMethod
     public void installDownloaded(PluginCall call) {
         String expected = call.getString("sha256");
-        Long size = call.getLong("apkSize");
+        // org.json trata APKs menores que 2 GB como Integer; PluginCall.getLong retornaria null.
+        Object value = call.getData().opt("apkSize");
+        Long size = value instanceof Number && ((Number) value).doubleValue() == ((Number) value).longValue()
+            ? ((Number) value).longValue() : null;
         if (!isSha(expected) || size == null || size < 100000 || size > MAX_APK_BYTES) {
             call.reject("Versão inválida. Consulte as atualizações novamente.");
             return;

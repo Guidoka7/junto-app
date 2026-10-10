@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const must = ['src/index.html', 'src/css/app.css', 'src/css/mobile-compact.css', 'src/css/refine.css', 'src/js/app.js', 'src/js/banking.js', 'src/js/cloud.js', 'src/features/app-api.js', 'src/features/organized.js', 'src/features/setup.js', 'src/features/sync-core.js', 'src/manifest.webmanifest', 'src/sw.js', 'src/icons/icon-512.png', 'capacitor.config.json'];
+const must = ['src/index.html', 'src/css/app.css', 'src/css/mobile-compact.css', 'src/css/refine.css', 'src/js/app.js', 'src/js/banking.js', 'src/js/cloud.js', 'src/features/app-api.js', 'src/features/organized.js', 'src/features/setup.js', 'src/features/sync-core.js', 'src/features/virada-core.js', 'src/js/virada.js', 'src/css/virada.css', 'src/manifest.webmanifest', 'src/sw.js', 'src/icons/icon-512.png', 'capacitor.config.json'];
 let ok = true;
 for (const f of must) {
   try { await access(join(root, f)); } catch { console.error(`✗ falta ${f}`); ok = false; }

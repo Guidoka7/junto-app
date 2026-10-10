@@ -1,5 +1,8 @@
 # Histórico de versões
 
+## Não lançado
+- A Virada: espaço privado de uma conta específica para cortar cigarro, bebida e apostas. Lê a parte da pessoa no extrato, separa vícios, impulsos e gastos necessários, compara com academia, faculdade e cursos, projeta os anos com rendimento e gera um card de story. Os dados ficam só no aparelho, na chave da conta, e nunca entram no espaço da dupla.
+
 ## 1.0.0
 - Modo individual: controle financeiro só seu, com "Posso gastar?" que dá o veredito antes da compra.
 - Conectar meu amor: vira dupla sem perder nada e divide as contas da casa meio a meio.

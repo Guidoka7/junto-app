@@ -156,6 +156,7 @@ A leitura de notificações deve ser explicada na política de privacidade e nas
 - O backup automático do Android está desativado nesta versão. Exporte seus dados ou use a sincronização.
 - No APK, **Exportar meus dados** abre o seletor de arquivos do Android para você escolher o destino do JSON. No navegador, baixa o arquivo. A exportação só informa sucesso depois da gravação; cancelar o seletor mantém seus dados no app.
 - Web e APK mantêm armazenamento local separado; só compartilham registros quando entram no mesmo espaço.
+- **A Virada** só aparece para as contas listadas por hash do e-mail em `src/features/virada-core.js` (`PRIVATE_ACCOUNTS`). Ela apenas lê a parte da pessoa no extrato; hábitos, cofre, recaídas e correções ficam no `localStorage` do aparelho, na chave `junto-virada-v1:<id da conta>`, e não são sincronizados.
 - A integração opcional com Gemini continua na base. Quando ativada com sua chave, envia o contexto financeiro das perguntas à API do Google. Essa chave fica no aparelho e não participa da sincronização.
 
 ## Estrutura e comandos

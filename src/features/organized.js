@@ -549,6 +549,7 @@ function homeV4() {
   return `<div class="j-page j-home">
     <header class="j-hello"><div><span class="j-eyebrow">${solo ? "Modo individual" : homeEveryone ? "Juntô a dois · visão combinada" : "Meu espaço pessoal"}</span><h2>${hello}, ${esc(me)}.</h2></div></header>
     ${banners ? `<div class="j-banners">${banners}</div>` : ""}
+    ${window.JuntoPrivate?.homeHTML?.({ hidden }) || ""}
     <section class="j-hero" aria-label="Resumo financeiro">
       <div class="j-hero-top"><span>${homeEveryone ? "Livre da dupla" : "Meu dinheiro livre"}</span><div class="j-scope-actions">${solo ? "" : `<button type="button" class="j-toggle" data-action="home-scope" aria-pressed="${homeEveryone}">${homeEveryone ? "Só meus dados" : "Ver todos"}</button>`}<button class="icon-btn" data-action="hide" aria-label="${hidden ? "Mostrar" : "Ocultar"} valores">${icon(hidden ? "eyeOff" : "eye")}</button></div></div>
       <strong class="j-hero-value num ${available < 0 ? "neg" : ""}" id="free-amount">${signed(available, cash)}</strong>

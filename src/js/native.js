@@ -11,6 +11,7 @@ if(Capacitor.isNativePlatform()){
   updateSystemBars();
   window.addEventListener('load',()=>SplashScreen.hide().catch(()=>{}));
   App.addListener('backButton',()=>{
+    if(window.JuntoPrivate?.closeTop?.())return;
     const modal=document.getElementById('modal');if(modal?.open){window.JuntoApp.closeModal();return;}
     const chat=document.getElementById('chat-panel');if(chat&&!chat.hidden){document.querySelector('[data-action="chat-close"]')?.click();return;}
     if(document.body.dataset.route!=='home'){document.querySelector('#mobile-nav [data-route="home"]')?.click();return;}

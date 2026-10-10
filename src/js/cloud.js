@@ -319,5 +319,5 @@ const handledURLs=new Set();async function authURL(url){if(!client||handledURLs.
 window.addEventListener('junto:auth-url',event=>authURL(event.detail).catch(e=>app.toast('Não foi possível entrar.',errorMessage(e))));
 window.addEventListener('online',()=>synchronize(true));document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncSoon();});setInterval(()=>{if(!document.hidden)syncSoon();},30000);
 async function getAccessToken(){if(!client)return null;const{data,error}=await client.auth.getSession();if(error||!data?.session)return null;return data.session.access_token||null;}
-window.JuntoCloud={open,synchronize:()=>synchronize(true),settingsHTML,getAccessToken};window.JuntoFeatures={settingsHTML:()=>settingsHTML()+(window.JuntoBank?.settingsHTML()||'')};
+window.JuntoCloud={open,synchronize:()=>synchronize(true),settingsHTML,getAccessToken,account:()=>user&&sessionReady?{id:user.id,email:user.email||''}:null};window.JuntoFeatures={settingsHTML:()=>settingsHTML()+(window.JuntoBank?.settingsHTML()||'')};
 updateStatus();startClient().then(()=>{if(window.JuntoAuthURL)authURL(window.JuntoAuthURL);}).catch(accessError);

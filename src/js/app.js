@@ -93,7 +93,8 @@
   }
   function ruleText(inc){if(inc.rule==='weekly'){const w=Number(inc.weekday);return `${w===0||w===6?'Todo':'Toda'} ${WEEKDAYS[w]}`;}if(inc.rule==='monthly')return `Todo dia ${inc.day}`;return `${inc.nth||5}º dia útil${inc.countSat!==false?' (sábado conta)':''}`;}
   function rng(n){let a=n>>>0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
-  const brl=(c)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0,minimumFractionDigits:0}).format(Math.round(c/100));
+  // Valores financeiros são armazenados em centavos inteiros; nenhuma tela pode ocultar centavos.
+  const brl=(c)=>money(c);
   const cashR=(c)=>hidden?'R$ •••':brl(c);
   const pct=(x)=>`${Math.round(x*100)}%`;
   const ratioText=(x)=>x.toFixed(1).replace('.',',');

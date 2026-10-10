@@ -12,6 +12,7 @@ let currentToken = null;
 let listenersReady = false;
 let registering = false;
 let pendingOpen = false;
+let lastSaved = { userId: null, token: null, at: 0 };
 let status = configured ? 'Desativadas neste aparelho' : 'Firebase ainda não configurado neste APK';
 const optedIn = () => localStorage.getItem(OPT_IN) === 'yes';
 
@@ -40,6 +41,10 @@ async function authInfo() {
 async function storeToken(token) {
   if (!configured || !optedIn() || !token || !userId) return;
   const { uid, accessToken } = await authInfo();
+  if (lastSaved.userId === uid && lastSaved.token === token && Date.now() - lastSaved.at < 86400000) {
+    setStatus('Ativas neste aparelho · conectado');
+    return;
+  }
   const url = window.JuntoCloudConfig.url + '/rest/v1/junto_push_devices?on_conflict=user_id,device_id';
   const response = await fetch(url, {
     method: 'POST',
@@ -57,7 +62,10 @@ async function storeToken(token) {
   if (!response.ok) throw new Error(response.status === 404 || response.status === 400
     ? 'Execute a configuração de dispositivos push no Supabase.'
     : 'O token não pôde ser salvo no Supabase (HTTP ' + response.status + ').');
-  if (userId === uid) setStatus('Ativas neste aparelho · conectado');
+  if (userId === uid) {
+    lastSaved = { userId: uid, token, at: Date.now() };
+    setStatus('Ativas neste aparelho · conectado');
+  }
 }
 
 async function saveRegisteredToken(token) {
@@ -104,16 +112,17 @@ async function register(interactive = false) {
       setStatus('Permissão de notificações desativada no Android');
       return;
     }
-    await PushNotifications.createChannel({
-      id: 'junto_avisos', name: 'Avisos do Juntô',
-      description: 'Pedidos, respostas e lembretes do Juntô',
-      importance: 4, visibility: 1, vibration: true
-    });
+    try {
+      await PushNotifications.createChannel({
+        id: 'junto_avisos', name: 'Avisos do Juntô',
+        description: 'Pedidos, respostas e lembretes do Juntô',
+        importance: 4, visibility: 1, vibration: true
+      });
+    } catch { /* Android anterior ao 8 usa o canal padrão. */ }
     if (interactive) localStorage.setItem(OPT_IN, 'yes');
     if (!optedIn()) return;
     setStatus('Aguardando token do Firebase…');
     await PushNotifications.register();
-    if (currentToken) await storeToken(currentToken);
   } finally { registering = false; }
 }
 
@@ -133,6 +142,7 @@ async function unlink() {
     // Invalida o token local mesmo se a remoção remota falhar, para evitar envio ao usuário anterior.
     try { await PushNotifications.unregister(); } catch { /* Sem token válido. */ }
     currentToken = null;
+    lastSaved = { userId: null, token: null, at: 0 };
   }
 }
 
@@ -156,7 +166,10 @@ function settingsHTML() {
 
 window.addEventListener('junto:auth-changed', event => {
   const next = event.detail?.userId || null;
-  if (next !== userId) currentToken = null;
+  if (next !== userId) {
+    currentToken = null;
+    lastSaved = { userId: null, token: null, at: 0 };
+  }
   userId = next;
   if (userId && optedIn()) void register(false).catch(() => setStatus('Não foi possível registrar este aparelho.'));
   void openFromPush();

@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {detectVice,classifyRow,readSpending,declaredMonthly,habitProgress,overview,futureValue,monthsToReach,timeline,emptyProfile,sanitizeProfile,catalogWithPrices,healthProgress,PRIVATE_ACCOUNTS} from '../src/features/virada-core.js';
+import {detectVice,classifyRow,readSpending,declaredMonthly,dailyBook,typicalPurchase,overview,futureValue,monthsToReach,timeline,emptyProfile,sanitizeProfile,catalogWithPrices,healthProgress,PRIVATE_ACCOUNTS} from '../src/features/virada-core.js';
 import {personalFinance} from '../src/features/personal-core.js';
 import {createHash} from 'node:crypto';
 
@@ -51,34 +51,72 @@ test('lê só a parte dele nos gastos da dupla e projeta a média por mês pela 
   assert.deepEqual(s,before);
 });
 
-test('hábito declarado vale mais que o extrato e a redução só credita a parte combinada',()=>{
-  const p=emptyProfile(today);
-  p.habits.cigarro={...p.habits.cigarro,on:true,packsPerDay:1,packPrice:1200,mode:'parar',start:'2026-10-01'};
-  p.habits.bebida={...p.habits.bebida,on:true,weekly:7000,mode:'reduzir',reducePct:.5,start:'2026-10-01'};
-  assert.equal(declaredMonthly('cigarro',p.habits.cigarro),Math.round(1200*30.44));
-  assert.equal(declaredMonthly('bebida',p.habits.bebida),Math.round(7000*52/12));
-  const reading=readSpending({transactions:[tx('b','Cerveja',2000,'2026-10-04','Lazer')]},{today});
-  const now=new Date('2026-10-10T12:00:00').getTime()+12*3600000;
-  const cig=habitProgress('cigarro',p,reading,{today,now});
-  assert.equal(cig.cleanDays,10);
-  assert.equal(cig.spent,0);
-  assert.ok(Math.abs(cig.saved-cig.daily*10)<2);
-  assert.equal(cig.unitsAvoided,200);
-  const beb=habitProgress('bebida',p,reading,{today,now});
-  assert.equal(beb.spent,2000);
-  assert.ok(beb.saved>0&&beb.saved<=beb.would/2+1);
-  const o=overview(p,reading,{today,now});
-  assert.equal(o.habits.length,2);
-  assert.equal(o.freed,Math.round(cig.monthly+beb.monthly*.5));
+const H=(id)=>({cigarro:{on:true,packsPerDay:1,packPrice:1200,mode:'parar',reducePct:.5},bebida:{on:true,weekly:7000,mode:'reduzir',reducePct:.5},apostas:{on:true,weekly:0,mode:'parar',reducePct:.5}})[id];
+const endOf=d=>new Date(`${d}T12:00:00`).getTime()+12*3600000;
+
+test('a base diária vem dos 60 dias antes da virada; o declarado só vale quando é maior que o extrato',()=>{
+  const p=emptyProfile(today);p.countImpulse=false;
+  p.habits.cigarro={...p.habits.cigarro,...H('cigarro'),start:'2026-10-01',packsPerDay:0.5};
+  // 20 dias antes da virada com R$ 15 de cigarro por dia (mais que meio maço declarado)
+  const tx=[];for(let i=1;i<=20;i++){const d=new Date('2026-10-01T12:00:00');d.setDate(d.getDate()-i);tx.push({id:'c'+i,name:'Cigarro',item:'Cigarro',amount:1500,payer:'a',date:d.toISOString().slice(0,10),category:'Hábitos'});}
+  const book=dailyBook({transactions:tx},p,{today,now:endOf(today)});
+  assert.equal(book.preDays,20);
+  assert.equal(Math.round(book.groups.cigarro.baseDaily),1500);
+  assert.equal(book.groups.cigarro.source,'extrato');
+  assert.equal(book.days.length,10);
+  assert.equal(book.groups.cigarro.saved,15000);
+  // sem histórico, vale o declarado
+  const empty=dailyBook({transactions:[]},p,{today,now:endOf(today)});
+  assert.equal(Math.round(empty.groups.cigarro.baseDaily),600);assert.equal(empty.groups.cigarro.source,'declarado');
+});
+
+test('leitura diária: cada dia compara a base com o gasto real e a projeção usa o ritmo desde a virada',()=>{
+  const p=emptyProfile(today);p.countImpulse=true;
+  p.habits.cigarro={...p.habits.cigarro,...H('cigarro'),start:'2026-10-01'};
+  const tx=[{id:'i0',name:'iFood',amount:3044,payer:'a',date:'2026-09-20',category:'Delivery'},{id:'i1',name:'iFood',amount:4000,payer:'a',date:'2026-10-09',category:'Delivery'},{id:'c1',name:'Cigarro',item:'Cigarro',amount:1200,payer:'a',date:'2026-10-09',category:'Hábitos'}];
+  const book=dailyBook({transactions:tx},p,{today,now:endOf(today)});
+  assert.equal(book.yesterday.total,5200);
+  assert.equal(book.today.total,0);
+  assert.equal(book.series.length,30);
+  assert.ok(book.series.find(d=>d.date==='2026-09-20').after===false);
+  const day9=book.days.find(d=>d.date==='2026-10-09');
+  assert.equal(day9.actual,5200);
+  assert.ok(day9.saved<0,'dia com recaída fica negativo na leitura');
+  assert.ok(book.paceDaily>0&&book.paceDaily<book.baseDaily);
+  const o=overview(p,{transactions:tx},{today,now:endOf(today)});
+  assert.equal(o.groups.map(g=>g.id).join(),'cigarro,impulso');
+  assert.ok(o.paceSaving>0);
+  assert.equal(o.freed,Math.round((book.groups.cigarro.baseDaily+book.groups.impulso.baseDaily*.5)*30.44));
+});
+
+test('reduzir credita só a redução combinada no período, mesmo com compra concentrada num dia',()=>{
+  const p=emptyProfile(today);p.countImpulse=false;
+  p.habits.bebida={...p.habits.bebida,...H('bebida'),start:'2026-10-04'};
+  const base=7000*52/12/30.44;
+  const tx=[{id:'b',name:'Cerveja',amount:Math.round(base*7/2),payer:'a',date:'2026-10-06',category:'Lazer'}];
+  const o=overview(p,{transactions:tx},{today,now:endOf(today)});
+  const beb=o.habits.find(h=>h.id==='bebida');
+  assert.ok(Math.abs(beb.saved-Math.round(base*7/2))<=2,'gastou metade em 7 dias: economiza metade');
+  assert.equal(beb.last,'2026-10-06');
 });
 
 test('recaída registrada zera a sequência e desconta da economia',()=>{
-  const p=emptyProfile(today);
-  p.habits.cigarro={...p.habits.cigarro,on:true,packsPerDay:1,packPrice:1200,start:'2026-10-01'};
+  const p=emptyProfile(today);p.countImpulse=false;
+  p.habits.cigarro={...p.habits.cigarro,...H('cigarro'),start:'2026-10-01'};
   p.logs=[{habit:'cigarro',date:'2026-10-08',amount:1200}];
   const now=new Date('2026-10-10T20:00:00').getTime();
-  const h=habitProgress('cigarro',p,readSpending({transactions:[]},{today}),{today,now});
+  const h=overview(p,{transactions:[]},{today,now}).habits[0];
   assert.equal(h.spent,1200);assert.equal(h.cleanDays,1);assert.equal(h.last,'2026-10-08');
+  assert.ok(h.unitsAvoided>150&&h.unitsAvoided<200);
+});
+
+test('desistências entram no cofre e o valor típico vem da mediana do extrato',()=>{
+  const p=sanitizeProfile({v:1,vault:[{date:today,amount:1200,kind:'desistencia',habit:'cigarro'},{date:today,amount:5000},{date:today,amount:900,kind:'desistencia',habit:'xx'}]},today);
+  assert.deepEqual(p.vault.map(v=>v.kind),['desistencia','deposito','deposito']);
+  const o=overview(p,{transactions:[]},{today,now:endOf(today)});
+  assert.equal(o.vault,7100);assert.equal(o.desists,1);assert.equal(o.desisted,1200);
+  assert.equal(typicalPurchase('bebida',p,[{group:'bebida',amount:900},{group:'bebida',amount:1500},{group:'bebida',amount:3000}]),1500);
+  assert.equal(typicalPurchase('cigarro',p,[]),1200);
 });
 
 test('juros compostos mensais pelo CDI e prazo para cada sonho',()=>{
@@ -109,12 +147,11 @@ test('a lista de contas privadas guarda só o hash do e-mail',()=>{
 });
 
 test('começando hoje, a economia parte do momento da decisão e não da meia-noite',()=>{
-  const p=emptyProfile(today),decided=new Date('2026-10-10T21:00:00').getTime();
-  p.habits.cigarro={...p.habits.cigarro,on:true,packsPerDay:1,packPrice:1200,start:today,startAt:decided};
-  const r=readSpending({transactions:[]},{today});
-  assert.equal(habitProgress('cigarro',p,r,{today,now:decided}).saved,0);
-  const hour=habitProgress('cigarro',p,r,{today,now:decided+3600000});
-  assert.ok(hour.saved>40&&hour.saved<60);
+  const p=emptyProfile(today),decided=new Date('2026-10-10T21:00:00').getTime();p.countImpulse=false;
+  p.habits.cigarro={...p.habits.cigarro,...H('cigarro'),start:today,startAt:decided};
+  assert.equal(overview(p,{transactions:[]},{today,now:decided}).saved,0);
+  const hour=overview(p,{transactions:[]},{today,now:decided+3600000}).saved;
+  assert.ok(hour>40&&hour<60);
   p.habits.cigarro.startAt=new Date('2026-10-09T21:00:00').getTime();
-  assert.ok(habitProgress('cigarro',p,r,{today,now:decided}).saved>1000,'startAt de outro dia é ignorado e conta desde o início do dia escolhido');
+  assert.ok(overview(p,{transactions:[]},{today,now:decided}).saved>1000,'startAt de outro dia é ignorado e conta desde o início do dia escolhido');
 });

@@ -69,7 +69,11 @@ test('conta autorizada: ponto de partida, abertura, leitura privada e story',asy
   await page.locator('[data-vr="reclass-set"][data-value="need"]').click();
   await expect(rows.filter({hasText:'iFood'})).toHaveCount(0);
 
-  for(const [sel,name] of [['#vr-cost-title','cost'],['#vr-pays-title','pays'],['#vr-time-title','time'],['#vr-read-title','read'],['#vr-health-title','health'],['#vr-story-title','story']]){
+  // Leitura diária: base pelos dias antes da virada e o dia de hoje.
+  await expect(page.locator('#vr-daily-title')).toContainText('Hoje');
+  await expect(page.locator('.vr-chart .vr-day')).toHaveCount(30);
+  await expect(page.locator('.vr-lede').filter({hasText:'Sua base é'})).toContainText('dias antes da virada');
+  for(const [sel,name] of [['#vr-daily-title','daily'],['#vr-cost-title','cost'],['#vr-pays-title','pays'],['#vr-time-title','time'],['#vr-read-title','read'],['#vr-health-title','health'],['#vr-story-title','story']]){
     await page.locator(sel).scrollIntoViewIfNeeded();
     await page.waitForTimeout(250);
     await page.screenshot({path:`test-results/virada-${name}.png`});
@@ -84,6 +88,16 @@ test('conta autorizada: ponto de partida, abertura, leitura privada e story',asy
   await page.screenshot({path:'test-results/virada-sos.png'});
   await page.locator('[data-vr="sos-win"]').click();
   await expect(page.locator('.vr-stats')).toContainText('fissura vencida');
+  // Venceu a fissura → converte o maço em guardado.
+  await expect(page.locator('#vr-sheet-title')).toHaveText('Venceu a fissura');
+  await expect(page.locator('[data-vr-form="desist"] input[name="amount"]')).toHaveValue('12,00');
+  await page.locator('[data-vr-form="desist"] input[value="bebida"]').check({force:true});
+  await expect(page.locator('[data-vr-form="desist"] input[name="amount"]')).toHaveValue('9,00');
+  await page.screenshot({path:'test-results/virada-desist.png'});
+  await page.locator('[data-vr-form="desist"] button[type="submit"]').click();
+  await expect(page.locator('.vr-vault-head')).toContainText('R$ 9,00');
+  await expect(page.locator('.vr-vault')).toContainText('1 desistência convertida');
+  await page.screenshot({path:'test-results/virada-hero-after.png'});
 
   const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('junto-virada-v1:33333333-3333-4333-8333-333333333333')));
   expect(stored.setup).toBe(true);
@@ -92,6 +106,7 @@ test('conta autorizada: ponto de partida, abertura, leitura privada e story',asy
   expect(stored.habits.bebida.mode).toBe('reduzir');
   expect(stored.overrides.i1).toBe('need');
   expect(stored.cravings).toBe(1);
+  expect(stored.vault).toEqual([expect.objectContaining({kind:'desistencia',habit:'bebida',amount:900})]);
   const shared=await page.evaluate(()=>JSON.stringify(window.JuntoApp.getState()));
   expect(shared).not.toContain('virada');
   expect(shared).not.toContain('cravings');

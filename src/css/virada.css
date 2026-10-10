@@ -38,6 +38,16 @@
 .vr-home-cta { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; font-weight: 750; color: var(--vr-gold); }
 .vr-home-cta .vr-i { width: 16px; height: 16px; }
 
+/* Leitura do dia no cartão */
+.vr-home-daily { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.vr-verdict { display: inline-grid; grid-template-columns: auto auto; align-items: baseline; gap: 0 6px; padding: 7px 10px; border-radius: 12px; background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .08); font-family: var(--vr-font, inherit); }
+.vr-verdict small { grid-column: 1 / -1; font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: rgba(245, 243, 239, .5); }
+.vr-verdict b { font-size: 15px; font-weight: 800; color: #f5f3ef; }
+.vr-verdict em { font-style: normal; font-size: 11.5px; font-weight: 650; color: rgba(245, 243, 239, .62); }
+.vr-verdict.is-zero b, .vr-verdict.is-zero em { color: #3ddc97; }
+.vr-verdict.is-over { border-color: rgba(255, 107, 107, .35); }
+.vr-verdict.is-over em { color: #ff8b8b; }
+
 /* ---------- Camada ---------- */
 html.vr-open, html.vr-open body { overflow: hidden !important; }
 .vr-root { position: fixed; inset: 0; z-index: 1300; display: flex; flex-direction: column; background: var(--vr-bg); color: var(--vr-text); font-family: var(--vr-font);
@@ -333,3 +343,54 @@ html.vr-open, html.vr-open body { overflow: hidden !important; }
   .vr-root, .vr-root *, .vr-home, .vr-home * { animation: none !important; transition: none !important; }
   .vr-intro-line { opacity: 1; }
 }
+
+/* Leitura diária */
+.vr-lede b { color: var(--vr-text); }
+.vr-verdicts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.vr-verdicts .vr-verdict { padding: 10px 12px; border-radius: 14px; }
+.vr-verdicts .vr-verdict b { font-size: 20px; }
+.vr-chart { padding: 14px 12px 12px; border-radius: 20px; background: var(--vr-panel); border: 1px solid var(--vr-line); }
+.vr-chart-bars { position: relative; display: flex; align-items: flex-end; gap: 3px; height: 150px; }
+.vr-day { position: relative; flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column-reverse; border-radius: 4px 4px 2px 2px; background: rgba(255, 255, 255, .035); overflow: hidden; }
+.vr-day i { display: block; width: 100%; flex-shrink: 0; }
+.vr-day.is-before i { opacity: .35; filter: grayscale(.6); }
+.vr-day.is-start { box-shadow: inset 2px 0 0 var(--vr-green); }
+.vr-day.is-today { background: rgba(61, 220, 151, .12); }
+.vr-day-cigarro { background: var(--vr-ember); }
+.vr-day-bebida { background: var(--vr-gold); }
+.vr-day-apostas { background: #c48cff; }
+.vr-day-impulso { background: #6fb6ff; }
+.vr-chart-base { position: absolute; left: 0; right: 0; height: 0; border-top: 1.5px dashed rgba(255, 255, 255, .55); pointer-events: none; }
+.vr-chart-base em { position: absolute; left: 0; bottom: 3px; font-style: normal; font-size: 10.5px; font-weight: 750; color: var(--vr-text); background: rgba(18, 18, 22, .85); padding: 1px 6px; border-radius: 6px; }
+.vr-chart-axis { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--vr-faint); }
+.vr-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 10px; font-size: 11.5px; color: var(--vr-muted); }
+.vr-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.vr-legend i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+.vr-legend .vr-legend-before { background: rgba(255, 255, 255, .25); }
+.vr-proj { margin-top: 12px; padding: 14px 16px; border-radius: 20px; background: radial-gradient(120% 140% at 100% 0%, rgba(61, 220, 151, .14), transparent 60%), var(--vr-panel); border: 1px solid rgba(61, 220, 151, .25); }
+.vr-proj > small { display: block; margin-bottom: 6px; font-size: 11.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--vr-faint); }
+.vr-proj p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--vr-muted); }
+.vr-proj-row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-top: 1px solid var(--vr-line); font-size: 14px; color: var(--vr-muted); }
+.vr-proj-row:first-of-type { border-top: 0; }
+.vr-proj-row b { color: var(--vr-text); font-weight: 800; }
+.vr-root .neg { color: var(--vr-red) !important; }
+.vr-gold { color: var(--vr-gold) !important; }
+.vr-bar-row > b small { font-size: 11px; font-weight: 650; color: var(--vr-faint); margin-left: 2px; }
+
+/* Desistência → cofre */
+.vr-btn-keep { background: linear-gradient(120deg, rgba(61, 220, 151, .22), rgba(61, 220, 151, .06)) !important; border-color: rgba(61, 220, 151, .45) !important; }
+.vr-btn-keep > .vr-i { color: var(--vr-green); }
+.vr-btn-keep-go { background: linear-gradient(120deg, #2fcf8a, #7be3b4) !important; color: #052216; box-shadow: 0 14px 30px -14px rgba(61, 220, 151, .9); }
+.vr-btn-keep-go > .vr-i { color: #052216; }
+.vr-sheet-keep .vr-seg input:checked + span { background: rgba(61, 220, 151, .16); border-color: var(--vr-green); }
+.vr-vault-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
+.vr-vault-head span { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
+.vr-vault-head span .vr-i { color: var(--vr-green); width: 18px; height: 18px; }
+.vr-vault-head > b { font-size: 18px; font-weight: 800; color: var(--vr-green); }
+.vr-mini li span { display: inline-flex; align-items: center; gap: 8px; }
+.vr-mini li .vr-i { width: 16px; height: 16px; }
+.vr-burst { position: absolute; inset: 0; z-index: 30; pointer-events: none; overflow: hidden; }
+.vr-burst i { position: absolute; left: 50%; bottom: 18%; display: grid; place-items: center; width: 26px; height: 26px; margin-left: -13px; border-radius: 50%; font-style: normal; font-size: 9px; font-weight: 900; color: #3a2a05;
+  background: radial-gradient(circle at 35% 30%, #fff3c4, var(--vr-gold) 55%, #c9902e); box-shadow: 0 0 14px rgba(245, 196, 107, .7);
+  animation: vr-coin 1.4s cubic-bezier(.2, .7, .3, 1) var(--d) both; }
+@keyframes vr-coin { 0% { transform: translate(0, 0) scale(.4) rotate(0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translate(var(--x), -60vh) scale(1) rotate(var(--r)); opacity: 0; } }

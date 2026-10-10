@@ -83,54 +83,129 @@ export function declaredMonthly(id, cfg = {}) {
   if (id === 'cigarro') return Math.round((Number(cfg.packsPerDay) || 0) * cents(cfg.packPrice) * MONTH_DAYS);
   return Math.round(cents(cfg.weekly) * WEEKS_PER_MONTH);
 }
-// O que ele declarou pesa mais que o extrato (compra em dinheiro não aparece no app).
-export function baselineMonthly(id, cfg, reading) {
-  const declared = declaredMonthly(id, cfg), detected = reading?.groups?.[id]?.monthly || 0;
-  return {monthly: declared || detected, declared, detected, source: declared ? 'declarado' : detected ? 'extrato' : 'nenhum'};
-}
-
 export function habitIds(profile) { return Object.keys(VICES).filter(id => profile?.habits?.[id]?.on); }
-
-// Progresso desde o início da virada: o que gastaria − o que gastou de fato.
-export function habitProgress(id, profile, reading, {today, now = Date.now()} = {}) {
-  const cfg = profile.habits[id], base = baselineMonthly(id, cfg, reading), start = cfg.start || profile.startedAt || today;
-  const days = Math.max(0, daysBetween(start, today));
-  const daily = base.monthly / MONTH_DAYS;
-  const ledger = (reading?.rows || []).filter(r => r.group === id && r.date >= start);
-  const logs = (profile.logs || []).filter(l => l.habit === id && l.date >= start && l.date <= today);
-  const spent = ledger.reduce((s, r) => s + r.amount, 0) + logs.reduce((s, l) => s + cents(l.amount), 0);
-  // Começo do dia escolhido; se a decisão foi tomada hoje, conta a partir do momento exato.
-  const startMs = Number.isFinite(cfg.startAt) && iso(new Date(cfg.startAt)) === start ? cfg.startAt : at(start).getTime() - 12 * 3600000;
-  const elapsedDays = Math.max(0, (now - startMs) / DAY);
-  const would = Math.round(daily * elapsedDays);
-  const target = cfg.mode === 'reduzir' ? Math.round(would * (1 - clampPct(cfg.reducePct))) : 0;
-  const last = [...ledger.map(r => r.date), ...logs.map(l => l.date)].sort().pop() || null;
-  const cleanSince = last && last >= start ? last : start;
-  const lastMs = last && last >= start ? at(last).getTime() + 12 * 3600000 - 1 : startMs;
-  const cleanDays = Math.max(0, Math.floor((now - lastMs) / DAY));
-  let unitsAvoided = 0;
-  if (id === 'cigarro' && cents(cfg.packPrice)) {
-    const perDay = (Number(cfg.packsPerDay) || base.monthly / MONTH_DAYS / cfg.packPrice) * 20;
-    unitsAvoided = Math.max(0, Math.floor(perDay * elapsedDays - spent / cfg.packPrice * 20));
-  }
-  // Reduzir: só conta a redução combinada; passar do limite desconta. Parar: tudo o que deixou de gastar.
-  const share = cfg.mode === 'reduzir' ? clampPct(cfg.reducePct) : 1;
-  return {id, label: VICES[id].label, mode: cfg.mode === 'reduzir' ? 'reduzir' : 'parar', share, start, days, elapsedDays, daily, monthly: base.monthly, base, spent, would, target,
-    saved: would - Math.max(spent, target), onTrack: spent <= target, cleanSince, cleanDays, cleanMs: Math.max(0, now - lastMs), last, unitsAvoided,
-    perSecond: daily * share / 86400};
-}
 const clampPct = v => Math.max(0.1, Math.min(0.9, Number(v) || 0.5));
+export const TRACKED = ['cigarro', 'bebida', 'apostas', 'impulso'];
+export const BASE_WINDOW = 60; // dias antes da virada usados para a base diária
+export const IMPULSE_SHARE = 0.5; // impulsos: a meta é cortar metade, sem proibir
+const dayStart = date => at(date).getTime() - 12 * 3600000;
 
-export function overview(profile, reading, opts) {
-  const ids = habitIds(profile), habits = ids.map(id => habitProgress(id, profile, reading, opts));
-  const monthly = habits.reduce((s, h) => s + h.monthly, 0) + (profile.countImpulse ? reading.groups.impulso.monthly : 0);
-  // Quanto o plano libera por mês (parar = tudo; reduzir = a parte combinada).
-  const freed = Math.round(habits.reduce((s, h) => s + h.monthly * h.share, 0) + (profile.countImpulse ? reading.groups.impulso.monthly * 0.5 : 0));
-  const saved = habits.reduce((s, h) => s + h.saved, 0);
-  const perSecond = habits.reduce((s, h) => s + h.perSecond, 0);
+// Início da virada (o mais antigo entre os hábitos ativos).
+export function viradaStart(profile, today) {
+  const dates = habitIds(profile).map(id => profile.habits[id].start).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d || ''));
+  return [profile.startedAt, ...dates].filter(Boolean).sort()[0] || today;
+}
+function startMsOf(cfg, start) {
+  return Number.isFinite(cfg?.startAt) && iso(new Date(cfg.startAt)) === start ? cfg.startAt : dayStart(start);
+}
+
+// Livro diário: base por dia (antes da virada) × o que saiu de verdade em cada dia desde então.
+// A base de cada grupo é a média diária do extrato nos 60 dias anteriores; para vícios,
+// vale o maior entre o extrato e o que ele declarou (compra em dinheiro não aparece no app).
+export function dailyBook(finance, profile, {today, now = Date.now(), overrides = {}, chartDays = 30} = {}) {
+  const start = viradaStart(profile, today), baseFrom = addDays(start, -BASE_WINDOW);
+  const from = [baseFrom, addDays(today, -(chartDays - 1))].sort()[0];
+  const rows = (finance?.transactions || [])
+    .filter(t => cents(t.amount) && /^\d{4}-\d{2}-\d{2}$/.test(t.date || '') && t.date >= from && t.date <= today && !t.billId)
+    .map(t => ({id: t.id, name: t.name || t.item || 'Gasto', date: t.date, amount: t.amount, ...classifyRow(t, overrides[t.id])}))
+    .filter(r => TRACKED.includes(r.group));
+  const logs = (profile.logs || []).filter(l => TRACKED.includes(l.habit) && l.date >= from && l.date <= today);
+  const spentOn = (g, d) => rows.filter(r => r.group === g && r.date === d).reduce((s, r) => s + r.amount, 0) + logs.filter(l => l.habit === g && l.date === d).reduce((s, l) => s + l.amount, 0);
+
+  const pre = rows.filter(r => r.date < start && r.date >= baseFrom);
+  const preFirst = pre.reduce((m, r) => (r.date < m ? r.date : m), start);
+  const preDays = pre.length ? Math.max(1, daysBetween(preFirst, start)) : 0;
+  const groups = {};
+  for (const g of TRACKED) {
+    const vice = VICES[g], cfg = profile.habits?.[g];
+    const active = vice ? Boolean(cfg?.on) : Boolean(profile.countImpulse);
+    const ledgerDaily = preDays ? pre.filter(r => r.group === g).reduce((s, r) => s + r.amount, 0) / preDays : 0;
+    const declaredDaily = vice ? declaredMonthly(g, cfg) / MONTH_DAYS : 0;
+    const baseDaily = active ? Math.max(ledgerDaily, declaredDaily) : 0;
+    const share = !active ? 0 : vice ? (cfg.mode === 'reduzir' ? clampPct(cfg.reducePct) : 1) : IMPULSE_SHARE;
+    const gStart = vice && cfg?.start && cfg.start >= start ? cfg.start : start;
+    groups[g] = {id: g, label: GROUPS[g].label, active, vice: Boolean(vice), mode: vice ? (cfg?.mode === 'reduzir' ? 'reduzir' : 'parar') : 'reduzir',
+      share, start: gStart, startMs: startMsOf(cfg, gStart), ledgerDaily, declaredDaily, baseDaily,
+      source: !active ? 'nenhum' : declaredDaily > 0 && declaredDaily >= ledgerDaily ? 'declarado' : ledgerDaily > 0 ? 'extrato' : 'nenhum',
+      monthly: Math.round(baseDaily * MONTH_DAYS), spent: 0, would: 0, saved: 0, last: null};
+  }
+
+  // Cada dia desde o início: base proporcional ao tempo decorrido e gasto real.
+  const days = [];
+  for (let d = start; d <= today; d = addDays(d, 1)) {
+    const row = {date: d, base: 0, actual: 0, saved: 0, by: {}};
+    for (const g of TRACKED) {
+      const G = groups[g], begin = Math.max(dayStart(d), G.startMs), end = Math.min(dayStart(d) + DAY, now);
+      const frac = d < G.start ? 0 : Math.max(0, Math.min(1, (end - begin) / DAY));
+      const actual = d >= G.start ? spentOn(g, d) : 0;
+      row.by[g] = actual; row.actual += actual;
+      if (!G.active) continue;
+      const base = G.baseDaily * frac;
+      G.would += base; G.spent += actual; if (actual) G.last = d;
+      row.base += base; row.saved += base - actual;
+    }
+    days.push(row);
+  }
+  // Economia por grupo no período inteiro: parar = tudo que deixou de gastar;
+  // reduzir = só a redução combinada (gastar menos que o limite não infla a conta; passar dele desconta).
+  for (const G of Object.values(groups)) {
+    const target = G.would * (1 - G.share);
+    G.saved = Math.round(G.would - Math.max(G.spent, target));
+    G.would = Math.round(G.would);
+  }
+
+  // Série dos últimos dias (inclui antes da virada) para a leitura diária.
+  const series = [];
+  for (let d = addDays(today, -(chartDays - 1)); d <= today; d = addDays(d, 1)) {
+    const by = Object.fromEntries(TRACKED.map(g => [g, spentOn(g, d)]));
+    series.push({date: d, by, total: Object.values(by).reduce((a, b) => a + b, 0), after: d >= start});
+  }
+  const baseDaily = TRACKED.reduce((s, g) => s + groups[g].baseDaily, 0);
+  const elapsed = Math.max(0, (now - Math.min(...TRACKED.map(g => groups[g].startMs))) / DAY);
+  const spentSince = TRACKED.reduce((s, g) => s + (groups[g].active ? groups[g].spent : 0), 0);
+  const paceDaily = elapsed >= 1 ? spentSince / elapsed : null;
+  const day = d => series.find(x => x.date === d) || {date: d, by: {}, total: 0};
+  return {start, baseFrom, preDays, reliable: preDays >= 14, groups, days, series, baseDaily, paceDaily, elapsed,
+    today: day(today), yesterday: day(addDays(today, -1)), rows};
+}
+
+// Visão geral usada pela tela: projeções a partir da base diária.
+export function overview(profile, finance, {today, now = Date.now(), overrides = {}} = {}) {
+  const book = dailyBook(finance, profile, {today, now, overrides});
+  const ids = habitIds(profile);
+  const habits = ids.map(id => {
+    const G = book.groups[id], cfg = profile.habits[id];
+    const lastMs = G.last ? dayStart(G.last) + DAY - 1 : G.startMs;
+    const cleanMs = Math.max(0, now - Math.max(lastMs, G.startMs));
+    let unitsAvoided = 0;
+    if (id === 'cigarro' && cents(cfg.packPrice)) {
+      const perDay = G.baseDaily / cfg.packPrice * 20, elapsed = Math.max(0, (now - G.startMs) / DAY);
+      unitsAvoided = Math.max(0, Math.floor(perDay * elapsed - G.spent / cfg.packPrice * 20));
+    }
+    return {...G, cleanDays: Math.floor(cleanMs / DAY), cleanMs, unitsAvoided,
+      base: {declared: Math.round(G.declaredDaily * MONTH_DAYS), detected: Math.round(G.ledgerDaily * MONTH_DAYS), source: G.source}};
+  });
+  const active = TRACKED.map(g => book.groups[g]).filter(G => G.active);
+  const monthly = Math.round(book.baseDaily * MONTH_DAYS);
+  const freed = Math.round(active.reduce((s, G) => s + G.baseDaily * G.share, 0) * MONTH_DAYS);
+  const saved = active.reduce((s, G) => s + G.saved, 0);
+  const perSecond = active.reduce((s, G) => s + G.baseDaily * G.share, 0) / 86400;
   const vault = (profile.vault || []).reduce((s, v) => s + cents(v.amount), 0);
-  const startedAt = profile.startedAt || ids.map(id => profile.habits[id].start).sort()[0] || opts.today;
-  return {habits, monthly, freed, yearly: monthly * 12, saved, perSecond, vault, day: Math.max(1, daysBetween(startedAt, opts.today) + 1), startedAt};
+  const desists = (profile.vault || []).filter(v => v.kind === 'desistencia');
+  const startedAt = book.start;
+  const paceSaving = book.paceDaily == null ? null : Math.round((book.baseDaily - book.paceDaily) * MONTH_DAYS);
+  return {habits, groups: active, book, monthly, freed, yearly: monthly * 12, saved, perSecond, vault, desists: desists.length,
+    desisted: desists.reduce((s, v) => s + v.amount, 0), paceSaving, day: Math.max(1, daysBetween(startedAt, today) + 1), startedAt};
+}
+
+// Valor típico de uma compra do hábito (mediana do extrato), para registrar uma desistência rápido.
+export function typicalPurchase(id, profile, rows = []) {
+  const amounts = rows.filter(r => r.group === id).map(r => r.amount).sort((a, b) => a - b);
+  if (amounts.length) return amounts[Math.floor(amounts.length / 2)];
+  if (id === 'cigarro') return cents(profile?.habits?.cigarro?.packPrice) || DEFAULT_PACK_PRICE;
+  if (id === 'bebida') return Math.min(cents(profile?.habits?.bebida?.weekly) || 1500, 3000);
+  if (id === 'apostas') return Math.min(cents(profile?.habits?.apostas?.weekly) || 2000, 5000);
+  return 3000;
 }
 
 // ---------- Projeções ----------
@@ -198,7 +273,7 @@ export function healthProgress(cleanMs) {
 
 // ---------- Perfil privado ----------
 export function emptyProfile(today) {
-  return {v: 1, startedAt: null, setup: false, introSeen: false, countImpulse: false,
+  return {v: 1, rev: 2, startedAt: null, setup: false, introSeen: false, countImpulse: true,
     habits: {cigarro: {on: false, packsPerDay: 1, packPrice: DEFAULT_PACK_PRICE, mode: 'parar', reducePct: 0.5, start: today},
       bebida: {on: false, weekly: 0, mode: 'reduzir', reducePct: 0.5, start: today},
       apostas: {on: false, weekly: 0, mode: 'parar', reducePct: 0.5, start: today}},
@@ -208,11 +283,15 @@ export function sanitizeProfile(raw, today) {
   const base = emptyProfile(today);
   if (!raw || typeof raw !== 'object' || raw.v !== 1) return base;
   const out = {...base, ...raw, habits: {...base.habits}};
+  // Revisão 2: impulsos passam a entrar na base diária por padrão.
+  if ((raw.rev || 1) < 2) out.countImpulse = true;
+  out.rev = 2;
   for (const id of Object.keys(base.habits)) out.habits[id] = {...base.habits[id], ...(raw.habits?.[id] || {})};
   for (const key of ['logs', 'vault', 'picks', 'dreams']) if (!Array.isArray(out[key])) out[key] = base[key];
   for (const key of ['overrides', 'prices']) if (!out[key] || typeof out[key] !== 'object' || Array.isArray(out[key])) out[key] = {};
   out.logs = out.logs.filter(l => VICES[l?.habit] && /^\d{4}-\d{2}-\d{2}$/.test(l.date) && Number.isSafeInteger(l.amount) && l.amount >= 0).slice(-500);
-  out.vault = out.vault.filter(v => /^\d{4}-\d{2}-\d{2}$/.test(v?.date) && Number.isSafeInteger(v.amount) && v.amount > 0).slice(-500);
+  out.vault = out.vault.filter(v => /^\d{4}-\d{2}-\d{2}$/.test(v?.date) && Number.isSafeInteger(v.amount) && v.amount > 0)
+    .map(v => ({...v, kind: v.kind === 'desistencia' && TRACKED.includes(v.habit) ? 'desistencia' : 'deposito'})).slice(-1000);
   out.dreams = out.dreams.filter(d => d && typeof d.name === 'string' && Number.isSafeInteger(d.target) && d.target >= 0).slice(0, 8);
   out.cravings = Number.isSafeInteger(out.cravings) && out.cravings >= 0 ? out.cravings : 0;
   return out;

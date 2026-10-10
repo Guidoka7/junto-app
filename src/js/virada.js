@@ -57,7 +57,7 @@ const myName = () => {
 function snapshot() {
   const state = app.getState(), finance = personalFinance(state, person());
   const reading = V.readSpending(finance, {today: today(), overrides: profile.overrides});
-  const o = V.overview(profile, reading, {today: today(), now: Date.now()});
+  const o = V.overview(profile, finance, {today: today(), now: Date.now(), overrides: profile.overrides});
   const debt = state.settings?.personalBudget?.[person()]?.debtPrincipal;
   const dreams = [...profile.dreams];
   if (Number.isSafeInteger(debt) && debt > 0 && !dreams.some(d => d.id === 'divida')) dreams.unshift({id: 'divida', name: 'Quitar a dívida', target: debt, icon: 'shield', fromBudget: true});
@@ -121,7 +121,14 @@ function homeHTML({hidden = false} = {}) {
     <span class="vr-home-tag">${icon('flame')} A Virada · dia ${o.day}</span>
     <b class="vr-home-value num" ${hidden ? '' : 'data-vr-live'}>${hidden ? 'R$ •••••' : money(o.saved)}</b>
     <span class="vr-home-copy">que não viraram fumaça${profile.habits.bebida.on ? ' nem ressaca' : ''}. ${hidden ? '' : covered >= 1 ? `Já paga ${n1(covered)} ${covered < 2 ? 'mês' : 'meses'} de ${esc(gym.name)}.` : `${Math.round(covered * 100)}% de um mês de ${esc(gym.name)}.`}</span>
+    ${hidden ? '' : `<span class="vr-home-daily">${dayVerdict('Hoje', o.book.today.total, o.book.baseDaily, true)}${o.book.yesterday.date >= o.book.start ? dayVerdict('Ontem', o.book.yesterday.total, o.book.baseDaily) : ''}</span>`}
     <span class="vr-home-cta">Abrir minha virada ${icon('arrow')}</span></button>`;
+}
+
+// Selo curto da leitura de um dia: dentro ou acima da base diária.
+function dayVerdict(label, spent, base, partial = false) {
+  const ok = spent === 0 || spent <= base;
+  return `<span class="vr-verdict ${spent === 0 ? 'is-zero' : ok ? 'is-ok' : 'is-over'}"><small>${label}</small><b class="num">${money0(spent)}</b><em>${spent === 0 ? (partial ? 'até agora, zero' : 'zero em hábito') : ok ? 'dentro da base' : `+${money0(spent - base)} da base`}</em></span>`;
 }
 
 // ---------- Overlay ----------
@@ -176,7 +183,7 @@ function renderMain() {
   const scroll = root.querySelector('#vr-scroll'), top = scroll.scrollTop;
   const snap = snapshot(), {o} = snap;
   setLive(o);
-  scroll.innerHTML = profile.setup ? [heroScene(snap), costScene(snap), paysScene(snap), timelineScene(snap), readScene(snap), healthScene(snap), storyScene(snap), footerScene()].join('') : `<section class="vr-scene vr-hero"><p class="vr-kicker">Preparando sua virada…</p></section>`;
+  scroll.innerHTML = profile.setup ? [heroScene(snap), dailyScene(snap), costScene(snap), paysScene(snap), timelineScene(snap), readScene(snap), healthScene(snap), storyScene(snap), footerScene()].join('') : `<section class="vr-scene vr-hero"><p class="vr-kicker">Preparando sua virada…</p></section>`;
   scroll.scrollTop = top;
   if (profile.setup) drawStory();
 }
@@ -199,28 +206,59 @@ function heroScene({o}) {
     <div class="vr-stats">${stats.map(([v, l]) => `<div><b class="num">${v}</b><span>${esc(l)}</span></div>`).join('')}</div>
     <div class="vr-hero-actions">
       <button type="button" class="vr-btn vr-btn-sos" data-vr="sos">${icon('sos')}<span><b>Bateu a vontade?</b><small>3 minutos comigo</small></span></button>
-      <button type="button" class="vr-btn" data-vr="vault">${icon('piggy')}<span><b>Guardei de verdade</b><small>${money0(o.vault)} no cofre</small></span></button>
+      <button type="button" class="vr-btn vr-btn-keep" data-vr="desist">${icon('piggy')}<span><b>Desisti de comprar</b><small>Converte o cigarro ou a bebida em guardado</small></span></button>
       <button type="button" class="vr-btn vr-btn-quiet" data-vr="relapse">${icon('undo')}<span><b>Tive uma recaída</b><small>Sem julgamento</small></span></button>
     </div>
-    ${o.saved > 0 ? `<div class="vr-vault"><div class="vr-vault-bar"><i style="width:${vaultPct}%"></i></div><small>${vaultPct}% do que você economizou já está guardado de verdade. Economia no papel só vira futuro quando sai da conta.</small></div>` : ''}
+    <div class="vr-vault"><div class="vr-vault-head"><span>${icon('piggy')}<b>Cofre da Virada</b></span><b class="num">${money(o.vault)}</b></div>
+      ${o.saved > 0 ? `<div class="vr-vault-bar"><i style="width:${vaultPct}%"></i></div>` : ''}
+      <small>${o.desists ? `${plural(o.desists, 'desistência convertida', 'desistências convertidas')} em guardado (${money0(o.desisted)}). ` : 'Cada vez que você desistir de comprar, o valor vem pra cá. '}${o.saved > 0 ? `${vaultPct}% do que você economizou já está guardado de verdade.` : ''}</small></div>
     <span class="vr-scroll-hint" aria-hidden="true">role pra ver o que isso vira</span>
   </section>`;
 }
 
-function costScene({o, reading}) {
-  const rows = o.habits.map(h => ({id: h.id, label: h.label, monthly: h.monthly, source: h.base.source, detected: h.base.detected}));
-  if (profile.countImpulse && reading.groups.impulso.monthly) rows.push({id: 'impulso', label: 'Delivery e impulsos', monthly: reading.groups.impulso.monthly, source: 'extrato', detected: reading.groups.impulso.monthly});
+function dailyScene({o}) {
+  const b = o.book, max = Math.max(1, b.baseDaily * 1.6, ...b.series.map(d => d.total)), basePct = Math.min(100, b.baseDaily / max * 100);
+  const todayTxt = b.today.total === 0 ? `Hoje, <em>nada</em> em hábito.` : `Hoje: <em class="num">${money0(b.today.total)}</em> em hábito e impulso.`;
+  const tops = ['cigarro', 'bebida', 'apostas', 'impulso'];
+  const bars = b.series.map(d => {
+    const label = `${dm(d.date)}: ${money(d.total)}${d.total ? ' — ' + tops.filter(g => d.by[g]).map(g => `${V.GROUPS[g].label.split(',')[0]} ${money(d.by[g])}`).join(', ') : ''}`;
+    return `<span class="vr-day ${d.after ? '' : 'is-before'} ${d.date === b.start ? 'is-start' : ''} ${d.date === b.today.date ? 'is-today' : ''}" title="${esc(label)}">${tops.filter(g => d.by[g]).map(g => `<i class="vr-day-${g}" style="height:${d.by[g] / max * 100}%"></i>`).join('')}</span>`;
+  }).join('');
+  const sinceDays = b.days.filter(d => d.date < b.today.date);
+  const within = sinceDays.filter(d => d.actual <= d.base + 1).length;
+  return `<section class="vr-scene" aria-labelledby="vr-daily-title">
+    <p class="vr-kicker">Leitura diária · ${dm(b.today.date)}</p>
+    <h2 id="vr-daily-title" class="vr-h">${todayTxt}</h2>
+    <p class="vr-lede">Sua base é <b class="num">${money(b.baseDaily)}</b> por dia em hábitos e impulsos — ${b.preDays ? `a média dos ${b.preDays} dias antes da virada${b.reliable ? '' : ' (ainda pouco histórico)'}` : 'pelo que você contou no ponto de partida'}. Todo dia o Juntô lê o que saiu e compara.</p>
+    <div class="vr-verdicts">${dayVerdict('Hoje', b.today.total, b.baseDaily, true)}${dayVerdict('Ontem', b.yesterday.total, b.baseDaily)}${sinceDays.length ? `<span class="vr-verdict is-ok"><small>Desde a virada</small><b class="num">${within}/${sinceDays.length}</b><em>dias dentro da base</em></span>` : ''}</div>
+    <div class="vr-chart" role="img" aria-label="Gasto diário em hábitos e impulsos nos últimos ${b.series.length} dias, com a base diária de ${money(b.baseDaily)}">
+      <div class="vr-chart-bars">${bars}<span class="vr-chart-base" style="bottom:${basePct}%"><em>base ${money0(b.baseDaily)}/dia</em></span></div>
+      <div class="vr-chart-axis"><span>${dm(b.series[0].date)}</span><span>hoje</span></div>
+      <div class="vr-legend">${tops.map(g => `<span><i class="vr-day-${g}"></i>${esc(V.GROUPS[g].label.split(',')[0])}</span>`).join('')}<span><i class="vr-legend-before"></i>antes da virada</span></div>
+    </div>
+    <div class="vr-proj">${b.paceDaily == null
+      ? `<p>A projeção pelo seu ritmo real aparece depois do primeiro dia completo. Por enquanto, a conta usa o plano: <b class="num">${money0(o.freed)}</b> por mês.</p>`
+      : `<small>Projeção no seu ritmo desde a virada</small>
+        <div class="vr-proj-row"><span>Gasto em hábito</span><b class="num">${money(b.paceDaily)}/dia</b></div>
+        <div class="vr-proj-row"><span>Economia por mês</span><b class="num ${o.paceSaving < 0 ? 'neg' : ''}">${money0(o.paceSaving)}</b></div>
+        <div class="vr-proj-row"><span>Em 1 ano, investido</span><b class="num">${money0(V.futureValue(Math.max(0, o.paceSaving), 12))}</b></div>
+        <div class="vr-proj-row"><span>Em 10 anos, investido</span><b class="num vr-gold">${money0(V.futureValue(Math.max(0, o.paceSaving), 120))}</b></div>`}</div>
+  </section>`;
+}
+
+function costScene({o}) {
+  const rows = o.groups.map(G => ({id: G.id, label: G.label, monthly: G.monthly, daily: G.baseDaily, source: G.source, detected: Math.round(G.ledgerDaily * 30.44)}));
   const max = Math.max(1, ...rows.map(r => r.monthly)), ten = V.futureValue(o.monthly, 120);
   return `<section class="vr-scene" aria-labelledby="vr-cost-title">
     <p class="vr-kicker">Capítulo 1 · o preço real</p>
-    <h2 id="vr-cost-title" class="vr-h">Todo mês, <em class="num">${money0(o.monthly)}</em> vão embora.</h2>
-    <div class="vr-bars">${rows.map(r => `<div class="vr-bar-row"><span class="vr-bar-label">${icon(HABIT_ICON[r.id])}${esc(r.label)}</span><span class="vr-bar"><i style="width:${Math.max(4, r.monthly / max * 100)}%"></i></span><b class="num">${money0(r.monthly)}</b><small>${r.source === 'declarado' ? `pelo que você contou${r.detected ? ` · ${money0(r.detected)} no extrato` : ''}` : r.source === 'extrato' ? 'lido no seu extrato' : 'sem registro ainda'}</small></div>`).join('')}</div>
+    <h2 id="vr-cost-title" class="vr-h">No ritmo de antes, <em class="num">${money(o.book.baseDaily)}</em> por dia iam embora.</h2>
+    <div class="vr-bars">${rows.map(r => `<div class="vr-bar-row"><span class="vr-bar-label">${icon(HABIT_ICON[r.id])}${esc(r.label)}</span><span class="vr-bar"><i style="width:${Math.max(4, r.monthly / max * 100)}%"></i></span><b class="num">${money0(r.monthly)}<small>/mês</small></b><small>${money(r.daily)} por dia · ${r.source === 'declarado' ? `pelo que você contou${r.detected ? ` (${money0(r.detected)}/mês no extrato)` : ''}` : r.source === 'extrato' ? 'média do seu extrato antes da virada' : 'sem registro ainda'}</small></div>`).join('')}</div>
     <div class="vr-trio">
       <div><small>por mês</small><b class="num">${money0(o.monthly)}</b></div>
       <div><small>por ano</small><b class="num">${money0(o.yearly)}</b></div>
       <div class="vr-hot"><small>em 10 anos, investido</small><b class="num">${money0(ten)}</b></div>
     </div>
-    <p class="vr-note">Projeção com ${esc(V.YIELD.label)} (${esc(V.YIELD.source)}), antes do imposto. A taxa muda com o tempo; o hábito é o que você controla.</p>
+    <p class="vr-note">A projeção multiplica a base diária pelos dias do mês e rende a ${esc(V.YIELD.label)} (${esc(V.YIELD.source)}), antes do imposto. A taxa muda com o tempo; o hábito é o que você controla.</p>
   </section>`;
 }
 
@@ -348,7 +386,8 @@ async function drawStory() {
     ctx.fillStyle = 'rgba(255,255,255,.78)'; ctx.font = font(600, 50); ctx.fillText(o.day === 1 ? 'dia de virada.' : 'dias de virada.', 96, y + 90); y += 250;
   }
   const cig = o.habits.find(h => h.id === 'cigarro');
-  if (opts.days && cig?.unitsAvoided) { ctx.fillStyle = '#3ddc97'; ctx.font = font(800, 64); ctx.fillText(`${int(cig.unitsAvoided)} cigarros não fumados`, 96, y); y += 120; }
+  if (opts.days && cig?.unitsAvoided) { ctx.fillStyle = '#3ddc97'; ctx.font = font(800, 64); ctx.fillText(`${int(cig.unitsAvoided)} cigarros não fumados`, 96, y); y += 100; }
+  if (opts.money && o.desists) { ctx.fillStyle = '#f5c46b'; ctx.font = font(750, 48); ctx.fillText(fit(ctx, `${plural(o.desists, 'desistência', 'desistências')} → ${money0(o.desisted)} guardados`, W - 192), 96, y); y += 110; }
   if (opts.pays) {
     ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.font = font(700, 34); ctx.fillText('ISSO VIRA, POR MÊS:', 96, y + 40); y += 160;
     const items = catalog.filter(c => profile.picks.includes(c.id)).slice(0, 3);
@@ -412,14 +451,20 @@ function relapseSheet() {
       <p class="vr-note">Se essa compra já está no extrato do Juntô, deixe o valor em zero: a Virada já leu.</p>
     </form>`);
 }
-function vaultSheet() {
-  const {o} = snapshot(), suggestion = Math.max(0, o.saved - o.vault);
-  openSheet('Guardei de verdade', `<p class="vr-sheet-lede">Transferiu pra poupança, caixinha ou investimento? Registra aqui. Economia que fica parada na conta corrente costuma virar outra compra.</p>
-    <form class="vr-form" data-vr-form="vault">
-      <label class="vr-field"><span>Quanto você separou?</span><input name="amount" inputmode="decimal" value="${moneyField(Math.round(suggestion / 100) * 100)}" autocomplete="off" required></label>
+// Desistência: ia comprar, não comprou, e o valor vira guardado no cofre da Virada.
+const KEEP_LABEL = {cigarro: 'Maço de cigarro', bebida: 'Bebida', apostas: 'Aposta', impulso: 'Delivery ou lanche', outro: 'Outro valor'};
+function desistSheet(pre = null, won = false) {
+  const {o} = snapshot(), opts = [...o.groups.map(G => G.id), 'outro'], habit = opts.includes(pre) ? pre : opts[0];
+  const typical = id => id === 'outro' ? 0 : V.typicalPurchase(id, profile, o.book.rows);
+  const recent = profile.vault.slice(-6).reverse();
+  openSheet(won ? 'Venceu a fissura' : 'Desisti de comprar', `<p class="vr-sheet-lede">${won ? 'Essa vontade passou. Agora transforma o que ia virar fumaça em dinheiro guardado:' : 'Ia comprar e desistiu? Converte esse valor em guardado — transfere pra poupança ou caixinha e registra aqui.'}</p>
+    <form class="vr-form" data-vr-form="desist">
+      <fieldset class="vr-seg"><legend>O que você ia comprar?</legend>${opts.map(id => `<label><input type="radio" name="habit" value="${id}" data-typical="${moneyField(typical(id))}" ${id === habit ? 'checked' : ''}><span>${icon(id === 'outro' ? 'piggy' : HABIT_ICON[id])}${esc(KEEP_LABEL[id])}</span></label>`).join('')}</fieldset>
+      <label class="vr-field"><span>Valor que ficou com você</span><input name="amount" inputmode="decimal" value="${moneyField(typical(habit))}" autocomplete="off" required><small>Sugestão pelo valor típico das suas compras. Ajuste se quiser.</small></label>
       <p class="vr-error" role="alert"></p>
-      <button class="vr-btn vr-btn-primary" type="submit"><span><b>Pôr no cofre</b></span></button>
-    </form>${profile.vault.length ? `<ul class="vr-mini">${profile.vault.slice(-5).reverse().map(v => `<li><span>${dm(v.date)}</span><b class="num">${money(v.amount)}</b></li>`).join('')}</ul>` : ''}`);
+      <button class="vr-btn vr-btn-primary vr-btn-keep-go" type="submit">${icon('piggy')}<span><b>Guardar em vez de gastar</b></span></button>
+    </form>
+    ${recent.length ? `<h3>No cofre</h3><ul class="vr-mini">${recent.map(v => `<li><span>${icon(v.kind === 'desistencia' ? HABIT_ICON[v.habit] : 'piggy')}${dm(v.date)} · ${v.kind === 'desistencia' ? `desistiu: ${esc(KEEP_LABEL[v.habit].toLowerCase())}` : 'guardado'}</span><b class="num">${money(v.amount)}</b></li>`).join('')}</ul><p class="vr-note">Total no cofre: ${money(o.vault)}.</p>` : ''}`, 'vr-sheet-keep');
 }
 function reclassSheet(id) {
   const row = snapshot().reading.rows.find(r => r.id === id); if (!row) return;
@@ -433,7 +478,7 @@ function settingsSheet() {
   const catalog = V.catalogWithPrices(profile);
   openSheet('Ajustes da Virada', `<div class="vr-form">
     <button type="button" class="vr-btn" data-vr="wizard">${icon('flame')}<span><b>Refazer meu ponto de partida</b><small>Hábitos, valores e se é pra parar ou reduzir</small></span></button>
-    <label class="vr-switch"><input type="checkbox" data-vr-toggle="countImpulse" ${profile.countImpulse ? 'checked' : ''}><span><b>Contar delivery e impulsos</b><small>Inclui metade do que vai em delivery e lanches no que a virada libera</small></span></label>
+    <label class="vr-switch"><input type="checkbox" data-vr-toggle="countImpulse" ${profile.countImpulse ? 'checked' : ''}><span><b>Delivery e impulsos na base diária</b><small>Entram na leitura de cada dia; a meta é cortar metade</small></span></label>
     </div>
     <form class="vr-form" data-vr-form="prices"><h3>Preços de referência</h3>${catalog.map(c => `<label class="vr-field vr-field-row"><span>${esc(c.name)}<small>${esc(c.plan)}</small></span><input name="${c.id}" inputmode="decimal" value="${moneyField(c.price)}"></label>`).join('')}
       <h3>Sonhos (valor total)</h3>${profile.dreams.map((d, i) => `<div class="vr-field-row vr-dream-row"><input name="dream-name-${i}" value="${esc(d.name)}" maxlength="40" aria-label="Nome do sonho"><input name="dream-target-${i}" inputmode="decimal" value="${moneyField(d.target)}" aria-label="Valor de ${esc(d.name)}"></div>`).join('')}
@@ -496,7 +541,7 @@ function renderWizard() {
   const steps = [];
   steps.push(`<div data-vr-step="1"><p class="vr-kicker">Passo 1</p><h3 class="vr-wh">O que você quer cortar, ${esc(myName())}?</h3>
     <div class="vr-choice vr-choice-big">${['cigarro', 'bebida', 'apostas'].map(id => `<button type="button" class="${w.on[id] ? 'on' : ''}" data-vr="wz-toggle" data-id="${id}" aria-pressed="${w.on[id]}">${icon(HABIT_ICON[id])}${esc(V.VICES[id].label)}${det(id) ? `<small>${money0(det(id))}/mês no extrato</small>` : ''}</button>`).join('')}</div>
-    <p class="vr-note">Delivery e lanches a Virada lê sozinha; você decide nos ajustes se entram na conta.</p></div>`);
+    <p class="vr-note">Delivery, lanches e outros impulsos entram sozinhos na leitura diária (dá pra tirar nos ajustes).</p></div>`);
   steps.push(`<div data-vr-step="2"><p class="vr-kicker">Passo 2 · seja honesto, ninguém vê</p><h3 class="vr-wh">Quanto vai nisso hoje?</h3><form class="vr-form" data-vr-form="wz-amounts">
     ${w.on.cigarro ? `<div class="vr-field"><span>Maços por dia</span><div class="vr-stepper"><button type="button" data-vr="wz-packs" data-value="-0.25" aria-label="Menos">−</button><output class="num" id="vr-packs">${n1(w.packsPerDay)}</output><button type="button" data-vr="wz-packs" data-value="0.25" aria-label="Mais">+</button></div><small id="vr-packs-cig">${int(w.packsPerDay * 20)} cigarros por dia</small></div>
       <label class="vr-field"><span>Preço do maço que você compra</span><input name="packPrice" inputmode="decimal" value="${moneyField(w.packPrice)}"></label>` : ''}
@@ -602,6 +647,14 @@ function startEmbers() {
   embers = {turn() { target = 1; }, stop() { alive = false; cancelAnimationFrame(raf); window.removeEventListener('resize', size); }};
 }
 
+// Moedas subindo quando um hábito vira guardado.
+function celebrate() {
+  if (!root || reduced()) return;
+  const layer = document.createElement('div'); layer.className = 'vr-burst'; layer.setAttribute('aria-hidden', 'true');
+  layer.innerHTML = Array.from({length: 18}, (_, i) => `<i style="--x:${Math.round((Math.random() - .5) * 260)}px;--d:${(.15 + Math.random() * .5).toFixed(2)}s;--r:${Math.round(Math.random() * 360)}deg">${i % 3 ? '' : 'R$'}</i>`).join('');
+  root.append(layer); embers?.turn(); setTimeout(() => layer.remove(), 1800);
+}
+
 // ---------- Avisos dentro da Virada ----------
 function toast(title, body = '') {
   const zone = root?.querySelector('#vr-toasts');
@@ -622,9 +675,9 @@ document.addEventListener('click', event => {
   if (action === 'sheet-close') return closeSheet();
   if (action === 'intro-skip') return finishIntro();
   if (action === 'sos') return sosSheet();
-  if (action === 'sos-win') { profile.cravings++; save(); closeSheet(); renderMain(); return toast('Fissura vencida.', `${plural(profile.cravings, 'vez', 'vezes')} que você ganhou da vontade.`); }
+  if (action === 'sos-win') { profile.cravings++; save(); stopSOS(); renderMain(); const first = V.habitIds(profile)[0] || null; return desistSheet(first, true); }
   if (action === 'relapse') return relapseSheet();
-  if (action === 'vault') return vaultSheet();
+  if (action === 'desist') return desistSheet();
   if (action === 'share') return shareStory();
   if (action === 'pick') {
     const set = new Set(profile.picks); set.has(id) ? set.delete(id) : set.size < 3 ? set.add(id) : toast('Até 3 objetivos.', 'Tire um para escolher outro.');
@@ -658,6 +711,7 @@ document.addEventListener('input', event => {
   }
   if (range?.dataset.vrRange === 'pct' && wizard) { wizard.pct[range.dataset.id] = Number(range.value) / 100; const btn = range.parentElement.querySelector('[data-value="reduzir"]'); if (btn) btn.textContent = `Reduzir ${range.value}%`; return; }
   if (event.target.matches('[data-vr-start]') && wizard) { wizard.start = event.target.value; return; }
+  if (event.target.matches('[data-vr-form="desist"] input[name="habit"]')) { const amount = event.target.form.querySelector('input[name="amount"]'); if (amount && event.target.dataset.typical !== '0,00') amount.value = event.target.dataset.typical; return; }
   if (event.target.matches('[data-vr-story]')) { profile.story = {...(profile.story || {}), [event.target.dataset.vrStory]: event.target.checked}; save(); drawStory(); return; }
   if (event.target.matches('[data-vr-toggle]')) { profile[event.target.dataset.vrToggle] = event.target.checked; save(); renderMain(); }
 });
@@ -671,11 +725,14 @@ document.addEventListener('submit', event => {
     profile.logs.push({habit, date, amount, at: Date.now()}); save(); closeSheet(); renderMain();
     return toast('Registrado. Recomeça agora.', 'Uma recaída não desfaz os dias que você já venceu.');
   }
-  if (type === 'vault') {
-    const amount = centsInput(data.get('amount'));
-    if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 10000000) { err.textContent = 'Informe quanto você separou.'; return; }
-    profile.vault.push({date: today(), amount}); save(); closeSheet(); renderMain();
-    return toast('No cofre.', `${money(amount)} guardados de verdade.`);
+  if (type === 'desist') {
+    const habit = String(data.get('habit')), amount = centsInput(data.get('amount'));
+    if (!KEEP_LABEL[habit]) { err.textContent = 'Escolha o que você ia comprar.'; return; }
+    if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 10000000) { err.textContent = 'Informe o valor que ficou com você.'; return; }
+    profile.vault.push(habit === 'outro' ? {date: today(), amount, kind: 'deposito', at: Date.now()} : {date: today(), amount, kind: 'desistencia', habit, at: Date.now()});
+    save(); closeSheet(); renderMain(); celebrate();
+    const {o} = snapshot();
+    return toast(habit === 'outro' ? 'No cofre.' : 'Convertido em guardado.', `${money(amount)} ${habit === 'outro' ? 'guardados' : 'que iam pro hábito agora são seus'}. Cofre: ${money(o.vault)}.`);
   }
   if (type === 'prices') {
     const prices = {}, dreams = [];

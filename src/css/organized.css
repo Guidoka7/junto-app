@@ -2280,3 +2280,77 @@ html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-error{color:#f
 @media(prefers-reduced-motion:reduce){
   html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-actions .btn{transition:none}
 }
+
+
+/* Juntô — notificações no dark mode.
+   Os avisos reais usam .notice-item (não .notification-card); o legado
+   fixa #eef0f6 no card mesmo quando o texto fica branco no modo escuro.
+   Escopo apenas do modal de notificações; tema claro não é alterado. */
+html[data-theme="dark"] dialog[data-kind="notifications"] .modal-sub{
+  color:#b3becd!important;
+  line-height:1.55;
+}
+html[data-theme="dark"] dialog[data-kind="notifications"] .notice-list{
+  display:flex;
+  flex-direction:column;
+  gap:11px;
+  min-width:0;
+}
+html[data-theme="dark"] dialog[data-kind="notifications"] .notice-item{
+  position:relative;
+  min-width:0;
+  border:1px solid rgba(200,215,235,.16)!important;
+  border-radius:19px;
+  padding:17px 18px;
+  background:linear-gradient(148deg,#252e3d 0%,#1d2633 55%,#1b222e 100%)!important;
+  color:#f4f6fb!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.055),
+             0 7px 18px rgba(0,0,0,.12)!important;
+  overflow-wrap:anywhere;
+}
+html[data-theme="dark"] dialog[data-kind="notifications"] .notice-item strong{
+  display:block;
+  margin:0 0 6px;
+  font-size:14px;
+  line-height:1.4;
+  font-weight:730;
+  letter-spacing:-.015em;
+  color:#f6f8fc!important;
+}
+html[data-theme="dark"] dialog[data-kind="notifications"] .notice-item p{
+  color:#c5cfdd!important;
+  font-size:13px;
+  line-height:1.5;
+  margin:0;
+}
+html[data-theme="dark"] dialog[data-kind="notifications"] .notice-item time{
+  display:block;
+  margin-top:9px;
+  color:#aeb9c9!important;
+  font-size:11.5px;
+  line-height:1.35;
+  font-variant-numeric:tabular-nums;
+}
+html[data-theme="dark"] dialog[data-kind="notifications"] .notice-item [data-action="notice-request"]{
+  background:rgba(218,180,111,.12)!important;
+  border:1px solid rgba(232,193,126,.36)!important;
+  color:#f2cd90!important;
+  border-radius:12px;
+  font-weight:700;
+}
+html[data-theme="dark"] dialog[data-kind="notifications"] .notice-item [data-action="notice-request"]:focus-visible{
+  outline:2px solid #ebc482;
+  outline-offset:3px;
+}
+@media(hover:hover){
+  html[data-theme="dark"] dialog[data-kind="notifications"] .notice-item:hover{
+    background:linear-gradient(148deg,#2c3748 0%,#243043 55%,#212c3c 100%)!important;
+    border-color:rgba(222,205,166,.28)!important;
+  }
+}
+@media(max-width:380px){
+  html[data-theme="dark"] dialog[data-kind="notifications"] .notice-item{
+    padding:15px 14px;
+    border-radius:17px;
+  }
+}

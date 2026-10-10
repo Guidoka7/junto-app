@@ -19,3 +19,6 @@ Thumbs.db
 !.env.example
 playwright-report/
 test-results/
+
+# Arquivo Firebase do APK: injetado somente no build Android
+android/app/google-services.json

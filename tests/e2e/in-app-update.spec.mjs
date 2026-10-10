@@ -13,9 +13,15 @@ test('modal Android baixa APK dentro do app, exibe progresso e continua no insta
   await mockCloud(page,{authenticated:true});
   await page.route('**/version.json',route=>route.fulfill({json:{version:'1.1.1-old.3.1',packageVersion:'1.1.1',runNumber:3,commitSha:'d'.repeat(40)}}));
   await page.route('https://api.github.com/repos/Guidoka7/junto-app/releases/tags/latest',route=>route.fulfill({json:release}));
-  await page.addInitScript(()=>{
+  let browserOpened=0;
+  page.on('popup',()=>browserOpened++);
+  await page.goto('/');
+  await expect(page.locator('#authenticated-app')).toBeVisible();
+  // O navegador de testes não tem bridge Java: injetamos apenas o mock do plugin
+  // e carregamos novamente o controlador, que passa a enxergar a plataforma Android.
+  await page.evaluate(async()=>{
     window.__nativeUpdate={progress:null,downloads:[],installs:[],canceled:0};
-    const updater={
+    window.JuntoNativeUpdater={
       addListener:async(name,callback)=>{if(name==='downloadProgress')window.__nativeUpdate.progress=callback;return{remove(){}};},
       downloadAndInstall:async options=>{
         window.__nativeUpdate.downloads.push(options);
@@ -27,23 +33,15 @@ test('modal Android baixa APK dentro do app, exibe progresso e continua no insta
       installDownloaded:async options=>{window.__nativeUpdate.installs.push(options);return{status:'installerOpened'};},
       cancelDownload:async()=>{window.__nativeUpdate.canceled++;return{canceled:true};}
     };
-    const plugins={
-      JuntoUpdater:updater,
-      SystemBars:{setStyle:async()=>{}},
-      SplashScreen:{hide:async()=>{}},
-      App:{addListener:async()=>({remove(){}}),getLaunchUrl:async()=>({}),exitApp:async()=>{}},
-      BankNotifications:{addListener:async()=>({remove(){}}),getPending:async()=>({events:[]})}
-    };
-    window.Capacitor={
-      isNativePlatform:()=>true,getPlatform:()=> 'android',
-      registerPlugin:name=>plugins[name]||{addListener:async()=>({remove(){}})}
-    };
+    window.Capacitor={isNativePlatform:()=>true};
+    await new Promise((resolve,reject)=>{
+      const script=document.createElement('script');
+      script.src='/js/updates.js?test-native-updates=1';
+      script.onload=resolve;script.onerror=reject;
+      document.body.append(script);
+    });
   });
-  let browserOpened=0;
-  page.on('popup',()=>browserOpened++);
-  await page.goto('/');
-  await expect(page.locator('#authenticated-app')).toBeVisible();
-  await page.waitForFunction(()=>window.JuntoUpdates?.getStatus()?.latest?.runNumber===9000);
+  await page.evaluate(()=>window.JuntoUpdates.check({manual:true}));
   await page.evaluate(()=>window.JuntoUpdates.open());
   await expect(page.locator('#modal [data-action="update-download"]')).toBeVisible();
   await page.locator('#modal [data-action="update-download"]').click();

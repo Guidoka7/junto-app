@@ -5,7 +5,8 @@ import {parseApkRelease,isNewerApk} from '../src/features/update-core.js';
 const make=()=>({
   tag_name:'latest',draft:false,body:'APK validado\n<!-- junto-apk\n'+JSON.stringify({
     channel:'main',platform:'android',testBuild:true,signing:'debug',version:'1.1.1-abcdef0.39.1',
-    packageVersion:'1.1.1',commitSha:'a'.repeat(40),runNumber:39,runAttempt:1,apkSize:5500000,
+    packageVersion:'1.1.1',commitSha:'a'.repeat(40),sha256:'b'.repeat(64),
+    certificateSha256:'c'.repeat(64),runNumber:39,runAttempt:1,apkSize:5500000,
     assetName:'Junto-1.1.1-abcdef0.39.1-teste.apk',builtAt:'2026-10-09T12:00:00Z'
   })+'\n-->',
   assets:[{name:'Junto-1.1.1-abcdef0.39.1-teste.apk',size:5500000,state:'uploaded',
@@ -14,9 +15,12 @@ const make=()=>({
 test('valida APK rolling sem aceitar URL externa ou dados incompletos',()=>{
   const release=make(),parsed=parseApkRelease(release);
   assert.equal(parsed.version,'1.1.1-abcdef0.39.1');
-  assert.equal(parsed.downloadUrl,'https://junto-updates.vercel.app/apk');
+  assert.equal(parsed.downloadUrl,release.assets[0].browser_download_url);
+  assert.equal(parsed.sha256,'b'.repeat(64));
+  assert.equal(parsed.certificateSha256,'c'.repeat(64));
   assert.equal(parseApkRelease({...release,tag_name:'v1.1.1'}),null);
   assert.equal(parseApkRelease({...release,body:release.body.replace('"debug"','"release"')}),null);
+  assert.equal(parseApkRelease({...release,body:release.body.replace('"'+ 'b'.repeat(64) +'"','"invalid"')}),null);
   assert.equal(parseApkRelease({...release,assets:[{...release.assets[0],browser_download_url:'https://evil.example/test.apk'}]}),null);
   assert.equal(parseApkRelease({...release,assets:[{...release.assets[0],size:2}]}),null);
   assert.equal(parseApkRelease({...release,body:'broken'}),null);

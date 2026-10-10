@@ -2165,3 +2165,10 @@ html[data-theme] .j-setup-redo {
 .junto-update-actions .btn{min-height:46px}
 .junto-update-foot{margin:16px 4px 0;font-size:11px;line-height:1.55;color:var(--muted,#687386)}
 @media(max-width:380px){.junto-update-card{padding:17px}.junto-update-versions{grid-template-columns:1fr}}
+
+/* Download do APK fica no modal: progressão acessível nos dois temas. */
+.junto-update-progress{display:grid;gap:9px;margin-top:18px}
+.junto-update-progress-track{height:9px;width:100%;background:var(--line,#d8dfe8);border-radius:999px;overflow:hidden}
+#junto-update-progress-bar{height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,#8cba98,#4da984);transition:width .2s ease}
+#junto-update-progress-text{color:var(--muted,#687386);font-variant-numeric:tabular-nums;font-size:12px}
+.junto-update-error{margin-top:13px!important;color:var(--danger,#d65b58)!important;font-weight:600;overflow-wrap:anywhere}

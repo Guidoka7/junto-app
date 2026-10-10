@@ -2172,3 +2172,111 @@ html[data-theme] .j-setup-redo {
 #junto-update-progress-bar{height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,#8cba98,#4da984);transition:width .2s ease}
 #junto-update-progress-text{color:var(--muted,#687386);font-variant-numeric:tabular-nums;font-size:12px}
 .junto-update-error{margin-top:13px!important;color:var(--danger,#d65b58)!important;font-weight:600;overflow-wrap:anywhere}
+
+
+/* Dark-only: modal Atualizações. Elimina --card branco herdado do tema claro.
+   Não altera os dados, os outros modais ou a instalação do APK. */
+html[data-theme="dark"] dialog[data-kind="updates"]{
+  background:#151a24!important;color:#f5f5f7!important;
+  border-color:rgba(193,208,233,.17)!important;
+  box-shadow:0 26px 74px rgba(0,0,0,.52),inset 0 1px 0 rgba(255,255,255,.045)!important;
+}
+html[data-theme="dark"] dialog[data-kind="updates"] .modal-wrap{
+  background:radial-gradient(95% 44% at 105% -5%,rgba(64,88,136,.16),transparent 79%),
+             linear-gradient(165deg,#1b202b 0%,#141a24 58%,#141922 100%)!important;
+  color:#f5f5f7!important;
+}
+html[data-theme="dark"] dialog[data-kind="updates"] .modal-head h2{
+  color:#f7f7f9!important;letter-spacing:-.035em;
+}
+html[data-theme="dark"] dialog[data-kind="updates"] .modal-head .icon-btn{color:#e8ebf2!important}
+html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-card{
+  color:#f3f5fa!important;
+  background:radial-gradient(95% 70% at 100% 0%,rgba(203,156,76,.125),transparent 71%),
+             linear-gradient(150deg,#232832 0%,#171d29 58%,#1c222d 100%)!important;
+  border:1px solid rgba(211,218,230,.24)!important;border-radius:24px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.065),0 15px 32px rgba(0,0,0,.2)!important;
+}
+html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-card:before{
+  inset:-50px -65px auto auto;width:185px;height:185px;
+  background:radial-gradient(circle,rgba(228,186,113,.07),transparent 72%)!important;
+}
+html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-card.is-new:before{
+  background:radial-gradient(circle,rgba(107,204,172,.13),transparent 70%)!important;
+}
+html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-icon{
+  background:linear-gradient(145deg,rgba(149,105,46,.33),rgba(100,72,37,.27))!important;
+  color:#edc37d!important;border:1px solid rgba(239,193,115,.29);
+  box-shadow:inset 0 1px 0 rgba(255,222,163,.12);
+}
+html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-kicker{
+  color:#e3bd7a!important;letter-spacing:.16em;
+}
+html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-card h3{
+  color:#f4f6fb!important;font-size:clamp(20px,4.8vw,23px);line-height:1.25;
+  font-weight:760;letter-spacing:-.035em;
+}
+html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-card > p:not(.junto-update-error){
+  color:#b7bfcd!important;line-height:1.55;
+}
+html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-versions{
+  gap:10px;margin-top:21px;
+}
+html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-versions span{
+  background:linear-gradient(145deg,rgba(44,52,66,.9),rgba(27,33,45,.95))!important;
+  border:1px solid rgba(206,217,234,.23)!important;
+  border-radius:15px;padding:12px 11px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035)!important;
+}
+html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-versions small{
+  color:#bbc3d0!important;font-size:10px;letter-spacing:.07em;
+}
+html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-versions strong{
+  display:block;color:#f5f7fc!important;
+  font-size:clamp(10px,2.9vw,12px);line-height:1.48;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums;overflow-wrap:anywhere;
+}
+html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-actions{
+  gap:10px;margin-top:17px;
+}
+html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-actions .btn{
+  min-height:49px;border-radius:15px!important;font-weight:700!important;
+  transition:background .18s ease,border-color .18s ease,transform .18s ease;
+}
+html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-actions :is(.btn.primary,.btn[data-action="update-download"]){
+  background:linear-gradient(155deg,#e8c78d 0%,#d9af6d 100%)!important;
+  border:1px solid rgba(244,207,145,.56)!important;color:#181d27!important;
+  box-shadow:inset 0 1px 0 rgba(255,248,222,.38),0 5px 18px rgba(197,145,68,.15)!important;
+}
+html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-actions :is(.btn.secondary,.btn.ghost){
+  background:linear-gradient(150deg,#252b35,#202630)!important;
+  border:1px solid rgba(203,215,235,.21)!important;color:#f1f3f7!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035)!important;
+}
+html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-actions.is-current [data-action="update-check"]{
+  background:linear-gradient(155deg,#e8c78d 0%,#d9af6d 100%)!important;
+  border:1px solid rgba(244,207,145,.56)!important;color:#181d27!important;
+  box-shadow:inset 0 1px 0 rgba(255,248,222,.38),0 5px 18px rgba(197,145,68,.15)!important;
+}
+html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-actions .btn:disabled{
+  opacity:.62;box-shadow:none!important;cursor:wait;
+}
+html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-actions .btn:active{transform:scale(.985)}
+html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-foot{
+  color:#a6afbe!important;font-size:11.5px;line-height:1.6;margin-top:19px;
+}
+html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-progress-track{
+  background:#333e4f!important;border:1px solid rgba(231,233,240,.1);
+}
+html[data-theme="dark"] dialog[data-kind="updates"] #junto-update-progress-text{color:#d4dbe5!important}
+html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-error{color:#ffb2ae!important}
+@media(max-width:380px){
+  html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-card{padding:17px 15px}
+  html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-versions{
+    gap:8px;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  }
+  html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-versions span{padding:10px 8px}
+}
+@media(prefers-reduced-motion:reduce){
+  html[data-theme="dark"] dialog[data-kind="updates"] .junto-update-actions .btn{transition:none}
+}

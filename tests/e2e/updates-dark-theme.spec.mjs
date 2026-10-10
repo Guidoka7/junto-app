@@ -32,7 +32,7 @@ test('Atualizações em dark usa card e versões escuros legíveis sem afetar o 
       };
     });
     expect(styles.card).toContain('rgb(35, 40, 50)');
-    expect(styles.versions).toContain('rgb(44, 52, 66)');
+    expect(styles.versions).toContain('rgba(44, 52, 66, 0.9)');
     expect(styles.card).not.toContain('rgb(255, 255, 255)');
     expect(styles.versions).not.toContain('rgb(255, 255, 255)');
     expect(styles.ink).toBe('rgb(245, 247, 252)');

@@ -22,6 +22,13 @@ export async function buildWeb(){
   if(config.publishableKey&&config.publishableKey.startsWith('eyJ')){let role;try{role=JSON.parse(Buffer.from(config.publishableKey.split('.')[1],'base64url').toString()).role;}catch{}if(role!=='anon')throw new Error('Use apenas chave publishable ou anon.');}
   if(config.publishableKey&&!config.publishableKey.startsWith('eyJ')&&!config.publishableKey.startsWith('sb_publishable_'))throw new Error('Nunca use uma chave secreta no app.');
   if(config.appUrl&&!/^https:\/\/[a-z0-9.-]+(?::\d+)?$/i.test(config.appUrl))throw new Error('JUNTO_APP_URL precisa ser uma URL HTTPS pública.');
+
+  if(config.pushEnabled){
+    const services=await stat(join(root,'android/app/google-services.json')).catch(()=>null);
+    if(!services?.isFile())throw new Error('JUNTO_PUSH_ENABLED exige android/app/google-services.json.');
+    const firebase=JSON.parse(await readFile(join(root,'android/app/google-services.json'),'utf8'));
+    if(!firebase.client?.some(c=>c.client_info?.android_client_info?.package_name==='br.com.junto.app'))throw new Error('Firebase Android: package_name precisa ser br.com.junto.app.');
+  }
   await writeFile(join(dist,'js/config.js'),`window.JuntoCloudConfig=${JSON.stringify(config)};\n`);
   const files=(await walk(dist)).filter(f=>!f.endsWith(`${sep}sw.js`)).sort(),hash=createHash('sha256');
   for(const f of files){hash.update(relative(dist,f));hash.update(await readFile(f));}

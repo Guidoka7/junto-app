@@ -99,6 +99,20 @@ jobs:
       - run: npm run test:android-parser
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
+      - name: Configurar Firebase para o APK (opcional)
+        env:
+          FIREBASE_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_BASE64 }}
+        shell: bash
+        run: |
+          # O secret tem prioridade; sem ele, usa o google-services.json versionado do projeto junto-apk.
+          if [ -n "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" ]; then
+            printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
+          elif [ ! -f android/app/google-services.json ]; then
+            echo 'Firebase não configurado: APK segue sem push remoto (sem mudar os avisos existentes).'
+            exit 0
+          fi
+          node -e 'const f=require("./android/app/google-services.json"); if(!f.project_info?.project_id || !f.client?.some(c=>c.client_info?.android_client_info?.package_name==="br.com.junto.app")) { console.error("Firebase Android não pertence ao pacote br.com.junto.app"); process.exit(1); }'
+          echo 'JUNTO_PUSH_ENABLED=true' >> "$GITHUB_ENV"
       - run: npm run android:sync
       - name: Testes e APK de desenvolvimento
         working-directory: android

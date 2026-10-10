@@ -19,3 +19,8 @@ Thumbs.db
 !.env.example
 playwright-report/
 test-results/
+
+# google-services.json do Android é versionado (identifica o projeto Firebase; não é credencial).
+# Nunca versione a conta de serviço do Firebase:
+*firebase-adminsdk*.json
+service-account*.json

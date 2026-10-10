@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "146530254905",
+    "project_id": "junto-apk",
+    "storage_bucket": "junto-apk.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:146530254905:android:a1379657be409fb0614de8",
+        "android_client_info": {
+          "package_name": "br.com.junto.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBnv2Iq1ZaI76atUqj0GVrd6UoV9hCLiI8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -22,6 +22,9 @@ test('instalador nativo baixa no cache do Juntô, verifica integridade e abre ap
   assert.match(java,/canRequestPackageInstalls\(\)/);
   assert.match(java,/ACTION_MANAGE_UNKNOWN_APP_SOURCES/);
   assert.match(java,/downloadProgress/);
+  // Capacitor mapeia 5.000.000 para Integer, não Long: não usar getLong isoladamente.
+  assert.match(java,/getData\(\)\.opt\("apkSize"\)/);
+  assert.doesNotMatch(java,/call\.getLong\("apkSize"\)/);
   assert.doesNotMatch(java,/CATEGORY_BROWSABLE|Intent\.ACTION_SEND|\.openDownload\(/);
   assert.match(manifest,/REQUEST_INSTALL_PACKAGES/);
 });

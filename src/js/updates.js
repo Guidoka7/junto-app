@@ -85,7 +85,7 @@ import {parseApkRelease,isNewerApk} from '../features/update-core.js';
       ${inProgress?`<div class="junto-update-progress" role="status" aria-live="polite"><div class="junto-update-progress-track"><div id="junto-update-progress-bar" style="width:${transfer.percent}%"></div></div><small id="junto-update-progress-text">${transfer.percent}%</small></div>`:''}
       ${problem?`<p class="junto-update-error" role="alert">${safe(transfer.error)}</p>`:''}
     </div>
-    <div class="junto-update-actions">
+    <div class="junto-update-actions ${download?'has-update':'is-current'}">
       ${canDownload && !needsPermission && !waitingInstaller?'<button class="btn primary wide" data-action="update-download">Baixar e instalar dentro do app ↓</button>':''}
       ${needsPermission?'<button class="btn primary wide" data-action="update-install">Instalar atualização no Android ✓</button>':''}
       ${waitingInstaller?'<button class="btn primary wide" data-action="update-install">Reabrir instalação</button>':''}

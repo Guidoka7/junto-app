@@ -6,7 +6,7 @@ import {parseApkRelease,isNewerApk} from '../features/update-core.js';
   const SNOOZE_KEY = 'junto-apk-update-dismissed-v1';
   const INTERVAL = 60 * 60 * 1000;
   const state = {current:null,latest:null,error:'',checking:false,lastCheck:0};
-  const transfer = {phase:'idle',percent:0,bytes:0,total:0,error:'',version:''};
+  const transfer = {phase:'idle',percent:0,bytes:0,total:0,error:'',version:'',cancelRequested:false};
   let pending=null,offeredVersion='',promise=null,downloadPromise=null;
   const $ = id => document.getElementById(id);
   const safe = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -56,12 +56,12 @@ import {parseApkRelease,isNewerApk} from '../features/update-core.js';
   }
   function modalIsUpdate() {return $('modal')?.open && $('modal')?.dataset.kind==='updates';}
   function updateProgressUI() {
+    emit();
     if (!modalIsUpdate()) return;
     const bar=$('junto-update-progress-bar');
     const text=$('junto-update-progress-text');
     if (bar) bar.style.width=transfer.percent+'%';
     if (text) text.textContent=transfer.percent+'% · '+Math.round(transfer.bytes/1024/1024*10)/10+' MB de '+Math.round(transfer.total/1024/1024*10)/10+' MB';
-    emit();
   }
   function showModal(automatic=false) {
     if (!hasAccess()) return;
@@ -133,7 +133,7 @@ import {parseApkRelease,isNewerApk} from '../features/update-core.js';
     if (!native || !available() || !capable() || downloadPromise) return;
     const candidate=state.latest;
     if (!candidate?.sha256 || !candidate?.apkSize || !candidate?.downloadUrl) return;
-    Object.assign(transfer,{phase:'downloading',percent:0,bytes:0,total:candidate.apkSize,error:'',version:candidate.version});
+    Object.assign(transfer,{phase:'downloading',percent:0,bytes:0,total:candidate.apkSize,error:'',version:candidate.version,cancelRequested:false});
     showModal();
     downloadPromise=(async()=>{
       try {
@@ -145,8 +145,8 @@ import {parseApkRelease,isNewerApk} from '../features/update-core.js';
         if (result?.status==='permissionRequired') window.JuntoApp.toast('APK baixado e verificado.','Autorize a instalação nas configurações do Android e volte ao Juntô.');
         else window.JuntoApp.toast('APK pronto.','Confirme a instalação na janela oficial do Android.');
       } catch(error) {
-        transfer.phase='error';
-        transfer.error=String(error?.message||'Não foi possível baixar a atualização.').slice(0,220);
+        transfer.phase=transfer.cancelRequested?'idle':'error';
+        transfer.error=transfer.cancelRequested?'':String(error?.message||'Não foi possível baixar a atualização.').slice(0,220);
       } finally {
         downloadPromise=null;
         emit();
@@ -199,6 +199,7 @@ import {parseApkRelease,isNewerApk} from '../features/update-core.js';
     if (action==='update-download') {await beginDownload();return;}
     if (action==='update-install') {await installAgain();return;}
     if (action==='update-cancel') {
+      transfer.cancelRequested=true;
       await window.JuntoNativeUpdater?.cancelDownload?.().catch(()=>{});
       return;
     }

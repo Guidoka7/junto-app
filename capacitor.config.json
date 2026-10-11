@@ -1,0 +1,10 @@
+{
+  "appId": "br.com.cinecode.app",
+  "appName": "CineCode",
+  "webDir": "www",
+  "backgroundColor": "#0a0c11",
+  "android": {
+    "backgroundColor": "#0a0c11",
+    "adjustMarginsForEdgeToEdge": "force"
+  }
+}

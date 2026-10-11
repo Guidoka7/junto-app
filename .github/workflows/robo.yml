@@ -1,0 +1,203 @@
+name: Robô de mídia do CineCode
+
+# Ramo isolado do projeto CineCode (não faz parte do Juntô).
+# Cada commit escolhe o que fazer pelas etiquetas na mensagem:
+#   [voz]  narração com voz neural humana (edge-tts)
+#   [videos] vídeos reais (Wikimedia Commons)
+#   [rosto] candidatos de rosto da instrutora (Stable Diffusion XL)
+#   [animar] aberturas faladas da instrutora (SadTalker)
+#   [apk]  monta o APK em saida/CineCode.apk
+# Parâmetros em robo.json. O robô salva os resultados neste ramo com [skip ci].
+on:
+  push:
+    branches: [cinecode-midia]
+
+permissions:
+  contents: write
+
+jobs:
+  plano:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+    outputs:
+      voz: ${{ steps.p.outputs.voz }}
+      videos: ${{ steps.p.outputs.videos }}
+      rosto: ${{ steps.p.outputs.rosto }}
+      animar: ${{ steps.p.outputs.animar }}
+      apk: ${{ steps.p.outputs.apk }}
+      partes: ${{ steps.p.outputs.partes }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: p
+        env:
+          MSG: ${{ github.event.head_commit.message }}
+        run: |
+          for t in voz videos rosto animar apk; do case "$MSG" in *"[$t]"*) echo "$t=1" >> "$GITHUB_OUTPUT";; *) echo "$t=0" >> "$GITHUB_OUTPUT";; esac; done
+          n=$(python3 -c "import json;print(json.load(open('robo.json')).get('partes',1))")
+          s="["; for i in $(seq 0 $((n-1))); do s="$s$i,"; done; echo "partes=${s%,}]" >> "$GITHUB_OUTPUT"
+
+  voz:
+    needs: plano
+    if: needs.plano.outputs.voz == '1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Narrar o curso com voz humana
+        shell: bash
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+          pip install -q edge-tts
+          mkdir -p registro
+          export VOZ=$(python3 -c "import json;print(json.load(open('robo.json'))['voz'])")
+          python tools/narrar_edge.py --tudo 2>&1 | tee registro/voz.log
+          node tools/empacotar-audio.mjs 2>&1 | tee -a registro/voz.log
+      - name: Salvar
+        if: always()
+        run: |
+          git config user.name "cinecode-bot"; git config user.email "cinecode-bot@users.noreply.github.com"
+          git add audio/pack registro || true
+          git commit -qm "Voz humana [skip ci]" || exit 0
+          for i in 1 2 3 4 5 6; do git pull --rebase -q origin cinecode-midia && git push -q origin HEAD:cinecode-midia && break; sleep $((RANDOM % 8 + 3)); done
+
+  videos:
+    needs: plano
+    if: needs.plano.outputs.videos == '1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22 }
+      - name: Baixar vídeos reais (Wikimedia Commons)
+        shell: bash
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+          mkdir -p registro
+          node tools/videos_commons.mjs 2>&1 | tee registro/videos.log
+      - name: Salvar
+        if: always()
+        run: |
+          git config user.name "cinecode-bot"; git config user.email "cinecode-bot@users.noreply.github.com"
+          git add media registro || true
+          git commit -qm "Vídeos reais [skip ci]" || exit 0
+          for i in 1 2 3 4 5 6; do git pull --rebase -q origin cinecode-midia && git push -q origin HEAD:cinecode-midia && break; sleep $((RANDOM % 8 + 3)); done
+
+  rosto:
+    needs: plano
+    if: needs.plano.outputs.rosto == '1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: sdxl-base-1.0
+      - name: Gerar rostos (Stable Diffusion XL)
+        shell: bash
+        run: |
+          mkdir -p registro
+          pip install -q torch --index-url https://download.pytorch.org/whl/cpu 2>&1 | tail -2
+          pip install -q diffusers transformers accelerate safetensors 2>&1 | tail -2
+          python tools/instrutor_ia/retrato.py 2>&1 | tee registro/rosto.log
+      - name: Salvar
+        if: always()
+        run: |
+          git config user.name "cinecode-bot"; git config user.email "cinecode-bot@users.noreply.github.com"
+          git add media registro || true
+          git commit -qm "Rostos da instrutora [skip ci]" || exit 0
+          for i in 1 2 3 4 5 6; do git pull --rebase -q origin cinecode-midia && git push -q origin HEAD:cinecode-midia && break; sleep $((RANDOM % 8 + 3)); done
+
+  animar:
+    needs: plano
+    if: needs.plano.outputs.animar == '1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        parte: ${{ fromJSON(needs.plano.outputs.partes) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.10' }
+      - uses: actions/cache@v4
+        with:
+          path: /tmp/st-models
+          key: sadtalker-v0.0.2-b
+      - name: Instalar SadTalker
+        shell: bash
+        run: |
+          mkdir -p registro; exec > >(tee registro/instalar-${{ matrix.parte }}.log) 2>&1
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+          git clone -q --depth 1 https://github.com/OpenTalker/SadTalker /tmp/SadTalker
+          pip install -q torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cpu
+          grep -v -i -E "^(gradio|torch|torchvision|torchaudio)" /tmp/SadTalker/requirements.txt > /tmp/req.txt
+          pip install -q -r /tmp/req.txt
+          pip install -q edge-tts
+          mkdir -p /tmp/st-models/checkpoints /tmp/st-models/gfpgan/weights
+          R=https://github.com/OpenTalker/SadTalker/releases/download/v0.0.2-rc
+          for f in mapping_00109-model.pth.tar mapping_00229-model.pth.tar SadTalker_V0.0.2_256.safetensors; do [ -s /tmp/st-models/checkpoints/$f ] || wget -q -O /tmp/st-models/checkpoints/$f $R/$f; done
+          F=https://github.com/xinntao/facexlib/releases/download/v0.1.0
+          for f in alignment_WFLW_4HG.pth detection_Resnet50_Final.pth; do [ -s /tmp/st-models/gfpgan/weights/$f ] || wget -q -O /tmp/st-models/gfpgan/weights/$f $F/$f; done
+          [ -s /tmp/st-models/gfpgan/weights/GFPGANv1.4.pth ] || wget -q -O /tmp/st-models/gfpgan/weights/GFPGANv1.4.pth https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth
+          [ -s /tmp/st-models/gfpgan/weights/parsing_parsenet.pth ] || wget -q -O /tmp/st-models/gfpgan/weights/parsing_parsenet.pth https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth
+          cp -r /tmp/st-models/checkpoints /tmp/SadTalker/; mkdir -p /tmp/SadTalker/gfpgan; cp -r /tmp/st-models/gfpgan/weights /tmp/SadTalker/gfpgan/
+          ls -la /tmp/SadTalker/checkpoints
+      - name: Animar aberturas
+        shell: bash
+        run: |
+          R=$(python3 -c "import json;print(json.load(open('robo.json'))['rosto'])")
+          [ -f media/instrutor/rosto.jpg ] || cp media/instrutor/_candidatos/rosto-$R.jpg media/instrutor/rosto.jpg
+          export SADTALKER=/tmp/SadTalker SHARD=${{ matrix.parte }}
+          export SHARDS=$(python3 -c "import json;print(json.load(open('robo.json')).get('partes',1))")
+          export LIMITE=$(python3 -c "import json;print(json.load(open('robo.json')).get('limite',2))")
+          export VOZ=$(python3 -c "import json;print(json.load(open('robo.json'))['voz'])")
+          python tools/instrutor_ia/animar.py 2>&1 | tee registro/animar-${{ matrix.parte }}.log
+      - name: Salvar
+        if: always()
+        run: |
+          git config user.name "cinecode-bot"; git config user.email "cinecode-bot@users.noreply.github.com"
+          git add media registro || true
+          git commit -qm "Instrutora: aberturas parte ${{ matrix.parte }} [skip ci]" || exit 0
+          for i in 1 2 3 4 5 6 7 8; do git pull --rebase -q origin cinecode-midia && git push -q origin HEAD:cinecode-midia && break; sleep $((RANDOM % 10 + 3)); done
+
+  apk:
+    needs: [plano, voz, videos, rosto, animar]
+    if: always() && needs.plano.outputs.apk == '1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with: { ref: cinecode-midia }
+      - run: git pull -q origin cinecode-midia || true
+      - uses: actions/setup-node@v5
+        with: { node-version: 22 }
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: 21 }
+      - name: Montar e compilar
+        shell: bash
+        run: |
+          mkdir -p registro saida
+          exec > >(tee registro/apk.log) 2>&1
+          npm ci
+          node build.mjs
+          npx cap sync android
+          cd android && echo "sdk.dir=$ANDROID_HOME" > local.properties && chmod +x gradlew && ./gradlew assembleDebug --no-daemon -q
+          cp app/build/outputs/apk/debug/app-debug.apk ../saida/CineCode.apk
+      - name: Salvar
+        if: always()
+        run: |
+          git config user.name "cinecode-bot"; git config user.email "cinecode-bot@users.noreply.github.com"
+          git add saida registro || true
+          git commit -qm "APK [skip ci]" || exit 0
+          for i in 1 2 3 4 5 6; do git pull --rebase -q origin cinecode-midia && git push -q origin HEAD:cinecode-midia && break; sleep 5; done

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+www/
+*.log
+.DS_Store
+# narração: só os pacotes por trilha vão para o repositório
+audio/*
+!audio/pack/
+tools/.kokoro/
+__pycache__/

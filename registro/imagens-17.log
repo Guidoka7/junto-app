@@ -1,28 +1,3 @@
 [transformers] `CLIPImageProcessor` requires torchvision (not installed); falling back to `CLIPImageProcessorPil` for backward compatibility. Install torchvision to use the default backend, or import `CLIPImageProcessorPil` directly to silence this warning.
 [transformers] `SiglipImageProcessor` requires torchvision (not installed); falling back to `SiglipImageProcessorPil` for backward compatibility. Install torchvision to use the default backend, or import `SiglipImageProcessorPil` directly to silence this warning.
-parte 17/20: 12 cenas
-/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/site-packages/diffusers/utils/deprecation_utils.py:23: FutureWarning: `torch_dtype` is deprecated and will be removed in version 1.0.0. Please use `dtype` instead.
-  deprecate("torch_dtype", "1.0.0", _TORCH_DTYPE_DEPRECATION_MESSAGE)
-Loading pipeline components...:   0%|          | 0/7 [00:00<?, ?it/s]
-Loading weights:   0%|          | 0/517 [00:00<?, ?it/s][A
-Loading weights:  71%|███████▏  | 369/517 [00:00<00:00, 3687.90it/s][ALoading weights: 100%|██████████| 517/517 [00:00<00:00, 3681.72it/s]
-Loading pipeline components...:  14%|█▍        | 1/7 [00:00<00:02,  2.05it/s]Loading pipeline components...:  29%|██▊       | 2/7 [00:00<00:01,  2.66it/s]
-Loading weights:   0%|          | 0/196 [00:00<?, ?it/s][ALoading weights: 100%|██████████| 196/196 [00:00<00:00, 3744.13it/s]
-Loading pipeline components...:  86%|████████▌ | 6/7 [00:00<00:00,  8.02it/s]Loading pipeline components...: 100%|██████████| 7/7 [00:01<00:00,  6.84it/s]
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-No LoRA keys associated to CLIPTextModel found with the prefix='text_encoder'. This is safe to ignore if LoRA state dict didn't originally have any CLIPTextModel related params. You can also try specifying `prefix=None` to resolve the warning. Otherwise, open an issue if you think it's unexpected: https://github.com/huggingface/diffusers/issues/new
-No LoRA keys associated to CLIPTextModelWithProjection found with the prefix='text_encoder_2'. This is safe to ignore if LoRA state dict didn't originally have any CLIPTextModelWithProjection related params. You can also try specifying `prefix=None` to resolve the warning. Otherwise, open an issue if you think it's unexpected: https://github.com/huggingface/diffusers/issues/new
-The config attributes {'skip_prk_steps': True} were passed to LCMScheduler, but are not expected and will be ignored. Please verify your scheduler_config.json configuration file.
-modelo em 40s
-win3-2: 494s  (cyber security laptop lock)
-word3-2: 457s  (writing long document library laptop)
-xp3-2: 458s  (presenting charts meeting)
-fund1-2: 459s  (code on computer screen)
-git1-2: 458s  (camera taking photo)
-js1-2: 452s  (web developer coding)
-fe1-2: 456s  (user interface design screen)
-sql5-2: 454s  (updating records office)
-host2-2: 456s  (apartment building)
-algo2-2: 452s  (people queue)
-llm2-2: 452s  (person talking to ai assistant)
-auto3-2: 452s  (connected devices)
+parte 17/20: 0 cenas

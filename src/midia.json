@@ -1,128 +1,497 @@
 {
-  "_sobre": "Buscas (em inglês) dos vídeos reais de cada aula no Pexels. 2 vídeos por aula, usados ao fundo das cenas. tools/baixar-videos.mjs baixa para media/broll/.",
-  "aulas": {
-    "inf1": ["person using desktop computer", "computer motherboard close up"],
-    "inf2": ["typing on keyboard close up", "hand using computer mouse"],
-    "inf3": ["organizing files on laptop", "office folders documents"],
-    "inf4": ["installing app on laptop", "smartphone apps screen"],
-    "inf5": ["web browser search laptop", "person browsing internet laptop"],
-    "inf6": ["writing email on laptop", "office worker reading email"],
-    "win1": ["windows laptop desktop screen", "person working laptop office"],
-    "win2": ["cloud storage laptop", "sharing files laptop office"],
-    "win3": ["computer repair technician", "cyber security laptop lock"],
-    "win4": ["office printer printing documents", "scanning documents office"],
-    "hw1": ["computer parts assembling", "installing ram memory computer"],
-    "hw2": ["installing operating system computer", "usb flash drive laptop"],
-    "hw3": ["technician fixing computer", "computer hardware repair tools"],
-    "redes1": ["wifi router lights", "ethernet cables network switch"],
-    "redes2": ["network cables server rack", "data center network"],
-    "redes3": ["office network server room", "vpn security laptop"],
-    "word1": ["writing document on laptop", "person typing report office"],
-    "word2": ["formatting text document laptop", "designer working on document"],
-    "word3": ["printed report pages", "writing long document library laptop"],
-    "word4": ["team reviewing document", "colleagues collaborating laptop"],
-    "xl1": ["spreadsheet on laptop screen", "accountant working spreadsheet"],
-    "xl2": ["calculator and spreadsheet", "financial analyst computer"],
-    "xl3": ["business data spreadsheet", "office worker analyzing numbers"],
-    "xl4": ["business decision meeting", "analyst thinking at computer"],
-    "xl5": ["sales report charts", "counting money calculator"],
-    "xl6": ["searching data computer screen", "inventory warehouse tablet"],
-    "xp1": ["data table screen", "filtering data analyst"],
-    "xp2": ["business analytics dashboard", "data analyst charts screen"],
-    "xp3": ["dashboard charts monitor", "presenting charts meeting"],
-    "xp4": ["data processing computer", "automation workflow computer"],
-    "xp5": ["business intelligence dashboard", "data visualization screen"],
-    "xp6": ["programmer writing code office", "automation robot arm"],
-    "ppt1": ["business presentation slides", "person presenting to team"],
-    "ppt2": ["designing slides laptop", "creative designer computer"],
-    "ppt3": ["public speaking conference", "confident speaker stage"],
-    "ws1": ["video conference call laptop", "calendar planning laptop"],
-    "ws2": ["team collaborating online documents", "coworkers sharing laptop"],
-    "ws3": ["online form filling smartphone", "remote team meeting"],
-    "fund1": ["programmer coding night", "code on computer screen"],
-    "fund2": ["building blocks toy", "programming code closeup"],
-    "fund3": ["road fork decision", "traffic light"],
-    "fund4": ["assembly line factory", "repeating pattern machine"],
-    "comp1": ["computer processor chip macro", "circuit board electricity"],
-    "comp2": ["fiber optic cables light", "global network earth"],
-    "comp3": ["loading website smartphone", "web page browser scrolling"],
-    "term1": ["hacker terminal green code", "developer typing terminal"],
-    "term2": ["server room technician", "password login screen"],
-    "term3": ["data center servers", "remote server connection"],
-    "git1": ["developer saving code", "camera taking photo"],
-    "git2": ["software team collaborating", "developers pair programming"],
-    "git3": ["open source developer community", "programmer laptop coffee shop"],
-    "py1": ["python code screen", "programmer typing code"],
-    "py2": ["shopping list paper", "to do list notebook"],
-    "py3": ["dictionary book pages", "library index cards"],
-    "py4": ["kitchen recipe cooking", "machine factory gears"],
-    "py5": ["error warning computer screen", "debugging code developer"],
-    "py6": ["car factory production line", "lego building blocks"],
-    "py7": ["data scientist working", "automation software developer"],
-    "js1": ["javascript code screen", "web developer coding"],
-    "js2": ["developer writing code laptop", "colorful code editor"],
-    "js3": ["waiting loading smartphone", "delivery package arrival"],
-    "js4": ["clicking button touchscreen", "website interface design"],
-    "lang1": ["world map languages", "different programming code screens"],
-    "lang2": ["corporate office software team", "enterprise server room"],
-    "lang3": ["engineer electronics circuit", "high performance computing"],
-    "web1": ["building construction frame", "website wireframe sketch"],
-    "web2": ["web designer colors", "fashion clothes design"],
-    "web3": ["responsive website devices", "smartphone tablet laptop"],
-    "fe1": ["react developer coding", "user interface design screen"],
-    "fe2": ["filling online form", "web app interface"],
-    "bd1": ["filing cabinet archive", "database server"],
-    "bd2": ["connecting puzzle pieces", "network connections people"],
-    "bd3": ["organizing warehouse shelves", "planning diagram whiteboard"],
-    "bd4": ["bank vault", "backup hard drive"],
-    "sql1": ["searching library books", "data analyst query screen"],
-    "sql2": ["coffee filter", "sorting objects by color"],
-    "sql3": ["sorting cards", "bar chart growth"],
-    "sql4": ["puzzle pieces joining", "handshake partnership"],
-    "sql5": ["writing notebook erasing", "updating records office"],
-    "sql6": ["data analyst deep focus", "complex data visualization"],
-    "nosql1": ["post it notes board", "storage boxes labels"],
-    "nosql2": ["fast car speed", "memory card"],
-    "nosql3": ["people waiting in line", "mail sorting conveyor"],
-    "api1": ["waiter restaurant order", "smartphone app connection"],
-    "api2": ["backend developer servers", "restaurant kitchen chef"],
-    "api3": ["fingerprint login smartphone", "security key access card"],
-    "api4": ["doorbell notification", "plugging cable socket"],
-    "host1": ["internet domain address typing", "house address sign"],
-    "host2": ["cloud data center", "apartment building"],
-    "host3": ["rocket launch", "developer deploying code"],
-    "host4": ["monitoring dashboard screens", "control room operators"],
-    "devops1": ["shipping containers port", "container ship"],
-    "devops2": ["factory conveyor belt automation", "assembly line robots"],
-    "devops3": ["cloud sky timelapse", "servers lights data center"],
-    "sec1": ["padlock security", "typing password"],
-    "sec2": ["hacker hoodie computer", "phishing email warning"],
-    "sec3": ["privacy data protection", "security camera"],
-    "algo1": ["stopwatch timing", "race running track"],
-    "algo2": ["stack of plates", "people queue"],
-    "algo3": ["searching book library", "sorting colored pencils"],
-    "algo4": ["tree branches", "road map navigation"],
-    "mob1": ["mobile app developer", "smartphone apps"],
-    "mob2": ["android phone development", "smartphone testing app"],
-    "mob3": ["app store smartphone", "launch celebration team"],
-    "dados1": ["data analysis charts", "business analyst laptop"],
-    "dados2": ["machine learning data", "robot learning"],
-    "dados3": ["neural network brain", "artificial intelligence abstract"],
-    "llm1": ["artificial intelligence chat", "typing question to ai"],
-    "llm2": ["writing instructions notebook", "person talking to ai assistant"],
-    "llm3": ["ai coding assistant", "developer using ai laptop"],
-    "llm4": ["library search books meaning", "data points network"],
-    "llm5": ["ethics justice scales", "warning sign"],
-    "agent1": ["robot assistant", "autonomous robot working"],
-    "agent2": ["toolbox tools", "robot arm using tools"],
-    "agent3": ["research library books", "memory notes board"],
-    "agent4": ["teamwork robots", "team coordination meeting"],
-    "auto1": ["automated factory", "planning workflow whiteboard"],
-    "auto2": ["alarm clock morning", "scheduled calendar reminder"],
-    "auto3": ["gears connecting", "connected devices"],
-    "auto4": ["chatbot smartphone", "robotic process automation"],
-    "car1": ["clean organized desk", "code review developers"],
-    "car2": ["quality control testing", "checklist inspection"],
-    "car3": ["job interview", "student studying laptop"]
-  }
+ "_sobre": "Buscas (em inglês) dos vídeos reais de cada aula no Pexels. 2 vídeos por aula, usados ao fundo das cenas. tools/baixar-videos.mjs baixa para media/broll/.",
+ "aulas": {
+  "inf1": [
+   "person using desktop computer",
+   "computer motherboard close up"
+  ],
+  "inf2": [
+   "typing on keyboard close up",
+   "hand using computer mouse"
+  ],
+  "inf3": [
+   "organizing files on laptop",
+   "office folders documents"
+  ],
+  "inf4": [
+   "installing app on laptop",
+   "smartphone apps screen"
+  ],
+  "inf5": [
+   "web browser search laptop",
+   "person browsing internet laptop"
+  ],
+  "inf6": [
+   "writing email on laptop",
+   "office worker reading email"
+  ],
+  "win1": [
+   "windows laptop desktop screen",
+   "person working laptop office"
+  ],
+  "win2": [
+   "cloud storage laptop",
+   "sharing files laptop office"
+  ],
+  "win3": [
+   "computer repair technician",
+   "cyber security laptop lock"
+  ],
+  "win4": [
+   "office printer printing documents",
+   "scanning documents office"
+  ],
+  "hw1": [
+   "computer parts assembling",
+   "installing ram memory computer"
+  ],
+  "hw2": [
+   "installing operating system computer",
+   "usb flash drive laptop"
+  ],
+  "hw3": [
+   "technician fixing computer",
+   "computer hardware repair tools"
+  ],
+  "redes1": [
+   "wifi router lights",
+   "ethernet cables network switch"
+  ],
+  "redes2": [
+   "network cables server rack",
+   "data center network"
+  ],
+  "redes3": [
+   "office network server room",
+   "vpn security laptop"
+  ],
+  "word1": [
+   "writing document on laptop",
+   "person typing report office"
+  ],
+  "word2": [
+   "formatting text document laptop",
+   "designer working on document"
+  ],
+  "word3": [
+   "printed report pages",
+   "writing long document library laptop"
+  ],
+  "word4": [
+   "team reviewing document",
+   "colleagues collaborating laptop"
+  ],
+  "xl1": [
+   "spreadsheet on laptop screen",
+   "accountant working spreadsheet"
+  ],
+  "xl2": [
+   "calculator and spreadsheet",
+   "financial analyst computer"
+  ],
+  "xl3": [
+   "business data spreadsheet",
+   "office worker analyzing numbers"
+  ],
+  "xl4": [
+   "business decision meeting",
+   "analyst thinking at computer"
+  ],
+  "xl5": [
+   "sales report charts",
+   "counting money calculator"
+  ],
+  "xl6": [
+   "searching data computer screen",
+   "inventory warehouse tablet"
+  ],
+  "xp1": [
+   "data table screen",
+   "filtering data analyst"
+  ],
+  "xp2": [
+   "business analytics dashboard",
+   "data analyst charts screen"
+  ],
+  "xp3": [
+   "dashboard charts monitor",
+   "presenting charts meeting"
+  ],
+  "xp4": [
+   "data processing computer",
+   "automation workflow computer"
+  ],
+  "xp5": [
+   "business intelligence dashboard",
+   "data visualization screen"
+  ],
+  "xp6": [
+   "programmer writing code office",
+   "automation robot arm"
+  ],
+  "ppt1": [
+   "business presentation slides",
+   "person presenting to team"
+  ],
+  "ppt2": [
+   "designing slides laptop",
+   "creative designer computer"
+  ],
+  "ppt3": [
+   "public speaking conference",
+   "confident speaker stage"
+  ],
+  "ws1": [
+   "video conference call laptop",
+   "calendar planning laptop"
+  ],
+  "ws2": [
+   "team collaborating online documents",
+   "coworkers sharing laptop"
+  ],
+  "ws3": [
+   "online form filling smartphone",
+   "remote team meeting"
+  ],
+  "fund1": [
+   "programmer coding night",
+   "code on computer screen"
+  ],
+  "fund2": [
+   "building blocks toy",
+   "programming code closeup"
+  ],
+  "fund3": [
+   "road fork decision",
+   "traffic light"
+  ],
+  "fund4": [
+   "assembly line factory",
+   "repeating pattern machine"
+  ],
+  "comp1": [
+   "computer processor chip macro",
+   "circuit board electricity"
+  ],
+  "comp2": [
+   "fiber optic cables light",
+   "global network earth"
+  ],
+  "comp3": [
+   "loading website smartphone",
+   "web page browser scrolling"
+  ],
+  "term1": [
+   "hacker terminal green code",
+   "developer typing terminal"
+  ],
+  "term2": [
+   "server room technician",
+   "password login screen"
+  ],
+  "term3": [
+   "data center servers",
+   "remote server connection"
+  ],
+  "git1": [
+   "developer saving code",
+   "camera taking photo"
+  ],
+  "git2": [
+   "software team collaborating",
+   "developers pair programming"
+  ],
+  "git3": [
+   "open source developer community",
+   "programmer laptop coffee shop"
+  ],
+  "py1": [
+   "python programming code glowing on a computer monitor in a dark room, developer silhouette",
+   "programmer typing code"
+  ],
+  "py2": [
+   "shopping list paper",
+   "to do list notebook"
+  ],
+  "py3": [
+   "dictionary book pages",
+   "library index cards"
+  ],
+  "py4": [
+   "kitchen recipe cooking",
+   "machine factory gears"
+  ],
+  "py5": [
+   "frustrated developer rubbing his forehead in front of a monitor with red error light",
+   "debugging code developer"
+  ],
+  "py6": [
+   "car factory production line",
+   "lego building blocks"
+  ],
+  "py7": [
+   "data scientist working",
+   "automation software developer"
+  ],
+  "js1": [
+   "javascript code screen",
+   "web developer coding"
+  ],
+  "js2": [
+   "developer writing code laptop",
+   "colorful code editor"
+  ],
+  "js3": [
+   "waiting loading smartphone",
+   "delivery package arrival"
+  ],
+  "js4": [
+   "clicking button touchscreen",
+   "finger tapping a glowing button on a tablet touchscreen"
+  ],
+  "lang1": [
+   "world map languages",
+   "different programming code screens"
+  ],
+  "lang2": [
+   "corporate office software team",
+   "enterprise server room"
+  ],
+  "lang3": [
+   "engineer electronics circuit",
+   "high performance computing"
+  ],
+  "web1": [
+   "building construction frame",
+   "website wireframe sketch"
+  ],
+  "web2": [
+   "web designer colors",
+   "web designer choosing a color palette on a large monitor in a bright studio"
+  ],
+  "web3": [
+   "responsive website devices",
+   "smartphone tablet laptop"
+  ],
+  "fe1": [
+   "react developer coding",
+   "user interface design screen"
+  ],
+  "fe2": [
+   "filling online form",
+   "web app interface"
+  ],
+  "bd1": [
+   "filing cabinet archive",
+   "database server"
+  ],
+  "bd2": [
+   "connecting puzzle pieces",
+   "network connections people"
+  ],
+  "bd3": [
+   "organizing warehouse shelves",
+   "planning diagram whiteboard"
+  ],
+  "bd4": [
+   "bank vault",
+   "backup hard drive"
+  ],
+  "sql1": [
+   "searching library books",
+   "data analyst query screen"
+  ],
+  "sql2": [
+   "coffee filter",
+   "sorting objects by color"
+  ],
+  "sql3": [
+   "sorting cards",
+   "bar chart growth"
+  ],
+  "sql4": [
+   "puzzle pieces joining",
+   "handshake partnership"
+  ],
+  "sql5": [
+   "writing notebook erasing",
+   "updating records office"
+  ],
+  "sql6": [
+   "data analyst deep focus",
+   "complex data visualization"
+  ],
+  "nosql1": [
+   "post it notes board",
+   "storage boxes labels"
+  ],
+  "nosql2": [
+   "fast car speed",
+   "close-up of computer RAM memory modules on a desk, shallow depth of field"
+  ],
+  "nosql3": [
+   "people waiting in line",
+   "mail sorting conveyor"
+  ],
+  "api1": [
+   "waiter restaurant order",
+   "smartphone app connection"
+  ],
+  "api2": [
+   "backend developer servers",
+   "restaurant kitchen chef"
+  ],
+  "api3": [
+   "fingerprint login smartphone",
+   "security key access card"
+  ],
+  "api4": [
+   "doorbell notification",
+   "plugging cable socket"
+  ],
+  "host1": [
+   "internet domain address typing",
+   "house address sign"
+  ],
+  "host2": [
+   "cloud data center",
+   "apartment building"
+  ],
+  "host3": [
+   "rocket launch",
+   "developer deploying code"
+  ],
+  "host4": [
+   "monitoring dashboard screens",
+   "control room operators"
+  ],
+  "devops1": [
+   "shipping containers port",
+   "container ship"
+  ],
+  "devops2": [
+   "factory conveyor belt automation",
+   "assembly line robots"
+  ],
+  "devops3": [
+   "cloud sky timelapse",
+   "servers lights data center"
+  ],
+  "sec1": [
+   "padlock security",
+   "typing password"
+  ],
+  "sec2": [
+   "hacker hoodie computer",
+   "person in a dark hoodie typing in front of glowing monitors in a dark room, cybersecurity threat"
+  ],
+  "sec3": [
+   "privacy data protection",
+   "security camera"
+  ],
+  "algo1": [
+   "stopwatch timing",
+   "race running track"
+  ],
+  "algo2": [
+   "stack of plates",
+   "people queue"
+  ],
+  "algo3": [
+   "searching book library",
+   "sorting colored pencils"
+  ],
+  "algo4": [
+   "tree branches",
+   "road map navigation"
+  ],
+  "mob1": [
+   "mobile app developer",
+   "smartphone apps"
+  ],
+  "mob2": [
+   "android phone development",
+   "smartphone testing app"
+  ],
+  "mob3": [
+   "app store smartphone",
+   "launch celebration team"
+  ],
+  "dados1": [
+   "data analysis charts",
+   "business analyst laptop"
+  ],
+  "dados2": [
+   "machine learning data",
+   "robot learning"
+  ],
+  "dados3": [
+   "neural network brain",
+   "artificial intelligence abstract"
+  ],
+  "llm1": [
+   "artificial intelligence chat",
+   "typing question to ai"
+  ],
+  "llm2": [
+   "writing instructions notebook",
+   "person talking to ai assistant"
+  ],
+  "llm3": [
+   "ai coding assistant",
+   "developer using ai laptop"
+  ],
+  "llm4": [
+   "library search books meaning",
+   "data points network"
+  ],
+  "llm5": [
+   "ethics justice scales",
+   "caution tape in front of a glowing server room, warning atmosphere"
+  ],
+  "agent1": [
+   "robot assistant",
+   "autonomous robot working"
+  ],
+  "agent2": [
+   "toolbox tools",
+   "robot arm using tools"
+  ],
+  "agent3": [
+   "research library books",
+   "memory notes board"
+  ],
+  "agent4": [
+   "teamwork robots",
+   "team coordination meeting"
+  ],
+  "auto1": [
+   "automated factory",
+   "planning workflow whiteboard"
+  ],
+  "auto2": [
+   "alarm clock morning",
+   "scheduled calendar reminder"
+  ],
+  "auto3": [
+   "gears connecting",
+   "connected devices"
+  ],
+  "auto4": [
+   "chatbot smartphone",
+   "robotic process automation"
+  ],
+  "car1": [
+   "clean organized desk",
+   "code review developers"
+  ],
+  "car2": [
+   "quality control testing",
+   "checklist inspection"
+  ],
+  "car3": [
+   "job interview",
+   "student studying laptop"
+  ]
+ }
 }

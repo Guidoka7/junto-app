@@ -8,3 +8,5 @@ audio/*
 !audio/pack/
 tools/.kokoro/
 __pycache__/
+
+!registro/*.log

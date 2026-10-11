@@ -1,6 +1,0 @@
-sql4-2 (handshake partnership)
-api4-1 (doorbell notification)
-sec1-1 (padlock security)
-algo1-1 (stopwatch timing)
-auto4-1 (chatbot smartphone)
-car2-2 (checklist inspection)

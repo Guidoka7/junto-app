@@ -17,10 +17,15 @@ const MEDIA = path.join(root, 'media');
 const midia = { broll: {}, instrutor: {}, creditos: {} };
 const mediaFiles = [];
 if (fs.existsSync(path.join(MEDIA, 'broll'))) {
-  for (const f of fs.readdirSync(path.join(MEDIA, 'broll')).filter(f => f.endsWith('.webm')).sort()) {
-    const id = f.replace(/-\d+\.webm$/, '');
-    (midia.broll[id] ||= []).push('media/broll/' + f);
-    mediaFiles.push('broll/' + f, 'broll/' + f.replace(/\.webm$/, '.jpg'));
+  // vídeo (.webm + capa .jpg) ou só foto (.jpg, animada pelo app)
+  const fsb = fs.readdirSync(path.join(MEDIA, 'broll'));
+  const nomes = [...new Set(fsb.filter(f => /\.(webm|jpg)$/.test(f)).map(f => f.replace(/\.(webm|jpg)$/, '')))].sort();
+  for (const n of nomes) {
+    const id = n.replace(/-\d+$/, '');
+    const temVideo = fsb.includes(n + '.webm');
+    (midia.broll[id] ||= []).push('media/broll/' + n + (temVideo ? '.webm' : '.jpg'));
+    mediaFiles.push('broll/' + n + '.jpg');
+    if (temVideo) mediaFiles.push('broll/' + n + '.webm');
   }
 }
 if (fs.existsSync(path.join(MEDIA, 'instrutor'))) {

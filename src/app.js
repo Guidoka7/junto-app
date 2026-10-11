@@ -614,7 +614,7 @@ function streakNow() {
 const brollSrc = (l, n = 0) => { const a = ((window.CC.midia || {}).broll || {})[l.id]; return a && a.length ? a[n % a.length] : ''; };
 const iluSrc = brollSrc;
 const mediaThumb = l => { const v = brollSrc(l); return v ? `<span class="thumb-media" aria-hidden="true"><img src="${v.replace(/\.(mp4|webm)$/, '.jpg')}" alt="" loading="lazy" decoding="async"></span>` : ''; };
-const mediaBlock = (l, n, cls) => { const v = brollSrc(l, n); return v ? `<div class="${cls}" aria-hidden="true"><video muted loop playsinline autoplay preload="metadata" poster="${v.replace(/\.(mp4|webm)$/, '.jpg')}" src="${v}"></video></div>` : ''; };
+const mediaBlock = (l, n, cls) => { const v = brollSrc(l, n); if (!v) return ''; return /\.jpg$/.test(v) ? `<div class="${cls} kb" aria-hidden="true"><img src="${v}" alt="" decoding="async"></div>` : `<div class="${cls}" aria-hidden="true"><video muted loop playsinline autoplay preload="metadata" poster="${v.replace(/\.(mp4|webm)$/, '.jpg')}" src="${v}"></video></div>`; };
 function lessonRow(t, l, showTrack) {
   const done = isDone(l.id);
   return `<button class="item" style="--hue:${t.hue}" data-act="play" data-id="${l.id}">

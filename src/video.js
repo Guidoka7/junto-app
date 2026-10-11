@@ -315,7 +315,11 @@ function vShot(s, durMs) {
     }
   }
   box.classList.add('vk-' + s.k);
-  if (s.bg && !reduced()) {
+  if (s.bg && /\.jpg$/.test(s.bg)) {
+    box.classList.add('has-bg');
+    const kb = ['kb1', 'kb2', 'kb3', 'kb4'][(s.bg.length + (s.h || s.text || '').length) % 4];
+    box.insertAdjacentHTML('afterbegin', `<div class="v-bgvid ${kb}" aria-hidden="true"><img src="${esc(s.bg)}" alt="" decoding="async"><i class="v-shade"></i></div>`);
+  } else if (s.bg && !reduced()) {
     box.classList.add('has-bg');
     box.insertAdjacentHTML('afterbegin', `<div class="v-bgvid" aria-hidden="true"><video muted loop playsinline autoplay preload="auto" disablepictureinpicture poster="${esc(s.bg.replace(/\.(mp4|webm)$/, '.jpg'))}" src="${esc(s.bg)}"></video><i class="v-shade"></i></div>`);
     const v = $('video', box); v.muted = true; const p = v.play(); if (p && p.catch) p.catch(() => {});

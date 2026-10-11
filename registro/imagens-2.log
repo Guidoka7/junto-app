@@ -1,30 +1,17 @@
 [transformers] `CLIPImageProcessor` requires torchvision (not installed); falling back to `CLIPImageProcessorPil` for backward compatibility. Install torchvision to use the default backend, or import `CLIPImageProcessorPil` directly to silence this warning.
 [transformers] `SiglipImageProcessor` requires torchvision (not installed); falling back to `SiglipImageProcessorPil` for backward compatibility. Install torchvision to use the default backend, or import `SiglipImageProcessorPil` directly to silence this warning.
-parte 2/20: 13 cenas
+parte 2/20: 1 cenas
 /opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/site-packages/diffusers/utils/deprecation_utils.py:23: FutureWarning: `torch_dtype` is deprecated and will be removed in version 1.0.0. Please use `dtype` instead.
   deprecate("torch_dtype", "1.0.0", _TORCH_DTYPE_DEPRECATION_MESSAGE)
 Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Fetching 19 files:   0%|          | 0/19 [00:00<?, ?it/s]Fetching 19 files:  21%|██        | 4/19 [00:00<00:00, 39.80it/s]Fetching 19 files:  74%|███████▎  | 14/19 [00:00<00:00, 58.15it/s]Fetching 19 files:  89%|████████▉ | 17/19 [00:19<00:00, 58.15it/s]Fetching 19 files:  95%|█████████▍| 18/19 [00:35<00:02,  2.77s/it]Fetching 19 files: 100%|██████████| 19/19 [01:17<00:00,  6.61s/it]Fetching 19 files: 100%|██████████| 19/19 [01:17<00:00,  4.08s/it]
+Fetching 19 files:   0%|          | 0/19 [00:00<?, ?it/s]Fetching 19 files:  26%|██▋       | 5/19 [00:00<00:00, 47.34it/s]Fetching 19 files:  74%|███████▎  | 14/19 [00:00<00:00, 54.05it/s]Fetching 19 files:  89%|████████▉ | 17/19 [00:19<00:00, 54.05it/s]Fetching 19 files:  95%|█████████▍| 18/19 [00:36<00:02,  2.83s/it]Fetching 19 files: 100%|██████████| 19/19 [01:16<00:00,  6.65s/it]Fetching 19 files: 100%|██████████| 19/19 [01:16<00:00,  4.05s/it]
 Loading pipeline components...:   0%|          | 0/7 [00:00<?, ?it/s]
-Loading weights:   0%|          | 0/517 [00:00<?, ?it/s][A
-Loading weights:  36%|███▌      | 185/517 [00:00<00:00, 1836.45it/s][ALoading weights: 100%|██████████| 517/517 [00:00<00:00, 3062.88it/s]
-Loading pipeline components...:  29%|██▊       | 2/7 [00:00<00:01,  4.02it/s]Loading pipeline components...:  71%|███████▏  | 5/7 [00:00<00:00,  7.34it/s]
-Loading weights:   0%|          | 0/196 [00:00<?, ?it/s][ALoading weights: 100%|██████████| 196/196 [00:00<00:00, 3407.15it/s]
-Loading pipeline components...: 100%|██████████| 7/7 [00:00<00:00,  9.35it/s]Loading pipeline components...: 100%|██████████| 7/7 [00:00<00:00,  8.03it/s]
+Loading weights:   0%|          | 0/196 [00:00<?, ?it/s][ALoading weights: 100%|██████████| 196/196 [00:00<00:00, 2586.13it/s]
+Loading pipeline components...:  14%|█▍        | 1/7 [00:00<00:01,  3.50it/s]
+Loading weights:   0%|          | 0/517 [00:00<?, ?it/s][ALoading weights: 100%|██████████| 517/517 [00:00<00:00, 5804.65it/s]
+Loading pipeline components...:  29%|██▊       | 2/7 [00:00<00:01,  4.63it/s]Loading pipeline components...:  71%|███████▏  | 5/7 [00:00<00:00,  8.37it/s]Loading pipeline components...: 100%|██████████| 7/7 [00:00<00:00,  9.04it/s]
 No LoRA keys associated to CLIPTextModel found with the prefix='text_encoder'. This is safe to ignore if LoRA state dict didn't originally have any CLIPTextModel related params. You can also try specifying `prefix=None` to resolve the warning. Otherwise, open an issue if you think it's unexpected: https://github.com/huggingface/diffusers/issues/new
 No LoRA keys associated to CLIPTextModelWithProjection found with the prefix='text_encoder_2'. This is safe to ignore if LoRA state dict didn't originally have any CLIPTextModelWithProjection related params. You can also try specifying `prefix=None` to resolve the warning. Otherwise, open an issue if you think it's unexpected: https://github.com/huggingface/diffusers/issues/new
 The config attributes {'skip_prk_steps': True} were passed to LCMScheduler, but are not expected and will be ignored. Please verify your scheduler_config.json configuration file.
-modelo em 127s
-inf2-1: 437s  (typing on keyboard close up)
-hw2-1: 401s  (installing operating system computer)
-xl2-1: 401s  (calculator and spreadsheet)
-xp6-1: 404s  (programmer writing code office)
-fund4-1: 397s  (assembly line factory)
-py1-1: 399s  (python code screen)
-js4-1: 407s  (clicking button touchscreen)
-bd2-1: 410s  (connecting puzzle pieces)
-nosql2-1: 402s  (fast car speed)
-devops1-1: 417s  (shipping containers port)
-mob1-1: 408s  (mobile app developer)
-llm5-1: 396s  (ethics justice scales)
-car2-1: 417s  (quality control testing)
+modelo em 122s
+py1-1: 453s  (python programming code glowing on a computer monitor in a dark room, developer silhouette)

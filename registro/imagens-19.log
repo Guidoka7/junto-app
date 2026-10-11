@@ -1,29 +1,3 @@
 [transformers] `CLIPImageProcessor` requires torchvision (not installed); falling back to `CLIPImageProcessorPil` for backward compatibility. Install torchvision to use the default backend, or import `CLIPImageProcessorPil` directly to silence this warning.
 [transformers] `SiglipImageProcessor` requires torchvision (not installed); falling back to `SiglipImageProcessorPil` for backward compatibility. Install torchvision to use the default backend, or import `SiglipImageProcessorPil` directly to silence this warning.
-parte 19/20: 12 cenas
-/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/site-packages/diffusers/utils/deprecation_utils.py:23: FutureWarning: `torch_dtype` is deprecated and will be removed in version 1.0.0. Please use `dtype` instead.
-  deprecate("torch_dtype", "1.0.0", _TORCH_DTYPE_DEPRECATION_MESSAGE)
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Fetching 19 files:   0%|          | 0/19 [00:00<?, ?it/s]Fetching 19 files:  16%|█▌        | 3/19 [00:00<00:00, 29.45it/s]Fetching 19 files:  74%|███████▎  | 14/19 [00:00<00:00, 55.14it/s]Fetching 19 files:  89%|████████▉ | 17/19 [00:19<00:00, 55.14it/s]Fetching 19 files:  95%|█████████▍| 18/19 [00:32<00:02,  2.49s/it]Fetching 19 files: 100%|██████████| 19/19 [01:15<00:00,  6.42s/it]Fetching 19 files: 100%|██████████| 19/19 [01:15<00:00,  3.98s/it]
-Loading pipeline components...:   0%|          | 0/7 [00:00<?, ?it/s]
-Loading weights:   0%|          | 0/196 [00:00<?, ?it/s][ALoading weights: 100%|██████████| 196/196 [00:00<00:00, 3151.36it/s]
-Loading pipeline components...:  14%|█▍        | 1/7 [00:00<00:01,  3.30it/s]Loading pipeline components...:  57%|█████▋    | 4/7 [00:00<00:00,  7.30it/s]
-Loading weights:   0%|          | 0/517 [00:00<?, ?it/s][A
-Loading weights:  89%|████████▊ | 458/517 [00:00<00:00, 4557.92it/s][ALoading weights: 100%|██████████| 517/517 [00:00<00:00, 4641.59it/s]
-Loading pipeline components...:  86%|████████▌ | 6/7 [00:00<00:00,  7.90it/s]Loading pipeline components...: 100%|██████████| 7/7 [00:00<00:00,  8.34it/s]
-No LoRA keys associated to CLIPTextModel found with the prefix='text_encoder'. This is safe to ignore if LoRA state dict didn't originally have any CLIPTextModel related params. You can also try specifying `prefix=None` to resolve the warning. Otherwise, open an issue if you think it's unexpected: https://github.com/huggingface/diffusers/issues/new
-No LoRA keys associated to CLIPTextModelWithProjection found with the prefix='text_encoder_2'. This is safe to ignore if LoRA state dict didn't originally have any CLIPTextModelWithProjection related params. You can also try specifying `prefix=None` to resolve the warning. Otherwise, open an issue if you think it's unexpected: https://github.com/huggingface/diffusers/issues/new
-The config attributes {'skip_prk_steps': True} were passed to LCMScheduler, but are not expected and will be ignored. Please verify your scheduler_config.json configuration file.
-modelo em 92s
-win4-2: 409s  (scanning documents office)
-word4-2: 395s  (colleagues collaborating laptop)
-xp4-2: 401s  (automation workflow computer)
-fund2-2: 396s  (programming code closeup)
-git2-2: 392s  (developers pair programming)
-js2-2: 399s  (colorful code editor)
-fe2-2: 396s  (web app interface)
-sql6-2: 391s  (complex data visualization)
-host3-2: 396s  (developer deploying code)
-algo3-2: 398s  (sorting colored pencils)
-llm3-2: 396s  (developer using ai laptop)
-auto4-2: 405s  (robotic process automation)
+parte 19/20: 0 cenas

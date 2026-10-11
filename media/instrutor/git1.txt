@@ -1,0 +1,1 @@
+Oi! Bem-vindo à aula 1 de Git e GitHub. Hoje o assunto é Fotos do seu código. Vou te explicar com uma comparação do dia a dia: git tira fotos do seu trabalho. Bora começar?

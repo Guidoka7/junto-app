@@ -120,7 +120,7 @@ jobs:
     needs: plano
     if: needs.plano.outputs.animar == '1'
     runs-on: ubuntu-latest
-    timeout-minutes: 340
+    timeout-minutes: 355
     strategy:
       fail-fast: false
       matrix:

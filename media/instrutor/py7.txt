@@ -1,0 +1,1 @@
+Olá! Na aula 7 de Python, vamos estudar Python no mundo real. Vou te explicar com uma comparação do dia a dia: o que dá para fazer com Python. Presta atenção nos exemplos, porque no final tem prática.

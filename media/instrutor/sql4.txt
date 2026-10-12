@@ -1,0 +1,1 @@
+Olá! Na aula 4 de SQL, vamos estudar JOIN: juntando tabelas. Vou te explicar com uma comparação do dia a dia: encaixar peças. Presta atenção nos exemplos, porque no final tem prática.

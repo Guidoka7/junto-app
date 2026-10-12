@@ -1,0 +1,1 @@
+Olá! Na aula 1 de Algoritmos e Estruturas, vamos estudar Big-O: medindo a velocidade. Vou te explicar com uma comparação do dia a dia: procurar um brinquedo. Presta atenção nos exemplos, porque no final tem prática.

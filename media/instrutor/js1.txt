@@ -1,0 +1,1 @@
+E aí, tudo certo? Chegou a hora de aprender Primeiros passos em JS, aula 1 de JavaScript. Vou te explicar com uma comparação do dia a dia: javaScript dá vida às páginas. Vem comigo!

@@ -1,0 +1,1 @@
+E aí, tudo certo? Chegou a hora de aprender INSERT, UPDATE e DELETE, aula 5 de SQL. Vou te explicar com uma comparação do dia a dia: escrever no caderno. Vem comigo!

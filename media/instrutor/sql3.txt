@@ -1,0 +1,1 @@
+Oi! Bem-vindo à aula 3 de SQL. Hoje o assunto é Ordenar, limitar e agrupar. Vou te explicar com uma comparação do dia a dia: fila por tamanho. Bora começar?

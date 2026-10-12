@@ -1,0 +1,1 @@
+Oi! Bem-vindo à aula 6 de Python. Hoje o assunto é Classes e objetos. Vou te explicar com uma comparação do dia a dia: classe é a forminha, objeto é o biscoito. Bora começar?

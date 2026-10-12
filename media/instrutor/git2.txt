@@ -1,0 +1,1 @@
+Olá! Na aula 2 de Git e GitHub, vamos estudar Branches e trabalho em equipe. Vou te explicar com uma comparação do dia a dia: galhos de uma árvore. Presta atenção nos exemplos, porque no final tem prática.

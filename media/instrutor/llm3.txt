@@ -1,0 +1,1 @@
+Olá! Na aula 3 de IA Generativa e LLMs, vamos estudar Usando IA no seu código. Vou te explicar com uma comparação do dia a dia: ligar para a IA pelo programa. Presta atenção nos exemplos, porque no final tem prática.

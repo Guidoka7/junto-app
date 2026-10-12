@@ -1,0 +1,1 @@
+Olá! Na aula 3 de Hospedagem e Deploy, vamos estudar Colocando no ar (deploy). Vou te explicar com uma comparação do dia a dia: lançar o foguete. Presta atenção nos exemplos, porque no final tem prática.

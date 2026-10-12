@@ -1,0 +1,16 @@
+
+Running kernel seems to be up-to-date.
+
+No services need to be restarted.
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+total 1012100
+drwxr-xr-x 2 runner runner      4096 Oct 11 22:29 .
+drwxr-xr-x 9 runner runner      4096 Oct 11 22:29 ..
+-rw-r--r-- 1 runner runner 725066984 Oct 11 22:29 SadTalker_V0.0.2_256.safetensors
+-rw-r--r-- 1 runner runner 155779231 Oct 11 22:29 mapping_00109-model.pth.tar
+-rw-r--r-- 1 runner runner 155521183 Oct 11 22:29 mapping_00229-model.pth.tar

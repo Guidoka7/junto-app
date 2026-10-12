@@ -1,0 +1,1 @@
+Olá! Na aula 4 de Excel Avançado e Power BI, vamos estudar Power Query: dados no automático. Vou te explicar com uma comparação do dia a dia: um robô que limpa os dados. Presta atenção nos exemplos, porque no final tem prática.

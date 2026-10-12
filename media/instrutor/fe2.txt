@@ -1,0 +1,1 @@
+Olá! Na aula 2 de Front-end Moderno, vamos estudar Dados, formulários e estilo. Vou te explicar com uma comparação do dia a dia: buscar, mostrar, salvar. Presta atenção nos exemplos, porque no final tem prática.

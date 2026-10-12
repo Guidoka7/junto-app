@@ -1,0 +1,1 @@
+E aí, tudo certo? Chegou a hora de aprender Permissões, usuários e pacotes, aula 2 de Terminal e Linux. Vou te explicar com uma comparação do dia a dia: cada arquivo tem chave. Vem comigo!

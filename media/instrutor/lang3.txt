@@ -1,0 +1,1 @@
+Oi! Bem-vindo à aula 3 de Panorama das Linguagens. Hoje o assunto é C, Go, Rust e PHP. Vou te explicar com uma comparação do dia a dia: ferramentas para trabalhos diferentes. Bora começar?

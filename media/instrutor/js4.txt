@@ -1,0 +1,1 @@
+Olá! Na aula 4 de JavaScript, vamos estudar DOM, eventos e TypeScript. Vou te explicar com uma comparação do dia a dia: a página é uma árvore. Presta atenção nos exemplos, porque no final tem prática.

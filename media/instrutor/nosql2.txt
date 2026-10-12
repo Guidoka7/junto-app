@@ -1,0 +1,1 @@
+Olá! Na aula 2 de NoSQL, Cache e Filas, vamos estudar Cache: memória curta e rápida. Vou te explicar com uma comparação do dia a dia: o pote de biscoito na mesa. Presta atenção nos exemplos, porque no final tem prática.

@@ -1,0 +1,1 @@
+Olá! Na aula 2 de Engenharia e Carreira, vamos estudar Testes automatizados. Vou te explicar com uma comparação do dia a dia: conferir a lição de casa. Presta atenção nos exemplos, porque no final tem prática.

@@ -1,0 +1,1 @@
+Olá! Na aula 3 de Python, vamos estudar Dicionários e conjuntos. Vou te explicar com uma comparação do dia a dia: dicionário é como um dicionário de verdade. Presta atenção nos exemplos, porque no final tem prática.

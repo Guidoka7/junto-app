@@ -1,0 +1,1 @@
+Olá! Na aula 3 de Nuvem e DevOps, vamos estudar Nuvem e escala. Vou te explicar com uma comparação do dia a dia: alugar em vez de construir. Presta atenção nos exemplos, porque no final tem prática.

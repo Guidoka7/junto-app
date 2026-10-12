@@ -1,0 +1,1 @@
+Olá! Na aula 4 de Banco de Dados, vamos estudar Índices, transações e backup. Vou te explicar com uma comparação do dia a dia: índice é o sumário do livro. Presta atenção nos exemplos, porque no final tem prática.

@@ -1,22 +1,22 @@
 
-added 100 packages, and audited 101 packages in 5s
+added 100 packages, and audited 101 packages in 4s
 
 14 packages are looking for funding
   run `npm fund` for details
 
 found 0 vulnerabilities
-mídia real: 123 aulas com vídeo de fundo, 0 aberturas do instrutor
+mídia real: 123 aulas com vídeo de fundo, 123 aberturas do instrutor
 narração de IA incluída (pacotes): 2343 falas
-web: 729 KB | apk index: 730 KB
-✔ Copying web assets from www to android/app/src/main/assets/public in 51.85ms
-✔ Creating capacitor.config.json in android/app/src/main/assets in 931.81μs
-✔ copy android in 62.18ms
-✔ Updating Android plugins in 1.76ms
+web: 759 KB | apk index: 760 KB
+✔ Copying web assets from www to android/app/src/main/assets/public in 1.88s
+✔ Creating capacitor.config.json in android/app/src/main/assets in 570.21μs
+✔ copy android in 1.89s
+✔ Updating Android plugins in 1.23ms
 [info] Found 2 Capacitor plugins for android:
        @capacitor-community/text-to-speech@6.1.0
        @capacitor/app@7.1.2
-✔ update android in 34.10ms
-[info] Sync finished in 0.117s
+✔ update android in 36.59ms
+[info] Sync finished in 1.939s
 Downloading https://services.gradle.org/distributions/gradle-8.11.1-all.zip
 .....................10%......................20%......................30%......................40%......................50%......................60%......................70%......................80%......................90%......................100%
 Note: Some input files use unchecked or unsafe operations.

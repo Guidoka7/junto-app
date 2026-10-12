@@ -1,0 +1,1 @@
+E aí, tudo certo? Chegou a hora de aprender Filas e mensageria, aula 3 de NoSQL, Cache e Filas. Vou te explicar com uma comparação do dia a dia: a fila do pão. Vem comigo!

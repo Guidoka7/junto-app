@@ -1,0 +1,1 @@
+Seja bem-vindo! Esta é a aula 1 de IA Generativa e LLMs: Como um LLM funciona. Vou te explicar com uma comparação do dia a dia: o leitor que leu a biblioteca inteira. No final, você faz um teste e recebe a sua nota.

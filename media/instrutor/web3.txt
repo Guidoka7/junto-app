@@ -1,0 +1,1 @@
+Seja bem-vindo! Esta é a aula 3 de HTML e CSS: Responsivo, acessível e rápido. Vou te explicar com uma comparação do dia a dia: uma página para todas as telas. No final, você faz um teste e recebe a sua nota.

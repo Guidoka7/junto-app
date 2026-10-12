@@ -1,0 +1,1 @@
+Seja bem-vindo! Esta é a aula 2 de Fundamentos e Lógica: Variáveis e tipos de dados. Vou te explicar com uma comparação do dia a dia: variável é uma caixinha com etiqueta. No final, você faz um teste e recebe a sua nota.

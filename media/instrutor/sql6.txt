@@ -1,0 +1,1 @@
+Seja bem-vindo! Esta é a aula 6 de SQL: Subconsultas, CTEs e janelas. Vou te explicar com uma comparação do dia a dia: pergunta dentro de pergunta. No final, você faz um teste e recebe a sua nota.

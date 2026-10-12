@@ -1,0 +1,1 @@
+Seja bem-vindo! Esta é a aula 4 de Automação: Bots, scraping, RPA e IA. Vou te explicar com uma comparação do dia a dia: um robô que usa o computador. No final, você faz um teste e recebe a sua nota.

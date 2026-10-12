@@ -1,0 +1,1 @@
+Seja bem-vindo! Esta é a aula 3 de Algoritmos e Estruturas: Busca e ordenação. Vou te explicar com uma comparação do dia a dia: achar uma palavra no dicionário. No final, você faz um teste e recebe a sua nota.

@@ -1,0 +1,1 @@
+Oi! Bem-vindo à aula 3 de JavaScript. Hoje o assunto é Assíncrono: promises e fetch. Vou te explicar com uma comparação do dia a dia: a senha da lanchonete. Bora começar?

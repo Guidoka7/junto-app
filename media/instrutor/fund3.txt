@@ -1,0 +1,1 @@
+Oi! Bem-vindo à aula 3 de Fundamentos e Lógica. Hoje o assunto é Decisões: se, senão. Vou te explicar com uma comparação do dia a dia: se chover, leva guarda-chuva. Bora começar?

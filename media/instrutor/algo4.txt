@@ -1,0 +1,1 @@
+Oi! Bem-vindo à aula 4 de Algoritmos e Estruturas. Hoje o assunto é Árvores e grafos. Vou te explicar com uma comparação do dia a dia: árvore genealógica. Bora começar?

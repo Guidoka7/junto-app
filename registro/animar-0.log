@@ -1,3 +1,7 @@
-shard 0/1: 2 aberturas para gerar
-ok inf1 em 2147s
-ok inf2 em 2561s
+shard 0/20: 6 aberturas para gerar
+ok xl1 em 2233s
+ok fund3 em 2424s
+ok js3 em 2247s
+ok nosql1 em 2490s
+ok algo4 em 2331s
+ok car1 em 2074s

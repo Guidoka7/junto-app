@@ -1,0 +1,1 @@
+Oi! Bem-vindo à aula 1 de NoSQL, Cache e Filas. Hoje o assunto é Documentos e chave-valor. Vou te explicar com uma comparação do dia a dia: um caderno de fichas soltas. Bora começar?

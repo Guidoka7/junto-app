@@ -1,0 +1,1 @@
+Seja bem-vindo! Esta é a aula 4 de Agentes de IA: MCP, multiagentes e avaliação. Vou te explicar com uma comparação do dia a dia: a tomada universal. No final, você faz um teste e recebe a sua nota.

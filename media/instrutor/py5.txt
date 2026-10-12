@@ -1,0 +1,1 @@
+Seja bem-vindo! Esta é a aula 5 de Python: Erros, arquivos e módulos. Vou te explicar com uma comparação do dia a dia: plano B para quando dá errado. No final, você faz um teste e recebe a sua nota.

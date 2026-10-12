@@ -1,0 +1,1 @@
+Seja bem-vindo! Esta é a aula 6 de Excel Avançado e Power BI: Macros, VBA e automação. Vou te explicar com uma comparação do dia a dia: um gravador de cliques. No final, você faz um teste e recebe a sua nota.

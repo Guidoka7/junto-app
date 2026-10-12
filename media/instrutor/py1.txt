@@ -1,0 +1,1 @@
+Seja bem-vindo! Esta é a aula 1 de Python: Textos e números. Vou te explicar com uma comparação do dia a dia: python é uma linguagem simpática. No final, você faz um teste e recebe a sua nota.

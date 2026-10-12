@@ -1,0 +1,1 @@
+Seja bem-vindo! Esta é a aula 1 de Nuvem e DevOps: Containers com Docker. Vou te explicar com uma comparação do dia a dia: o contêiner de navio. No final, você faz um teste e recebe a sua nota.

@@ -1,0 +1,1 @@
+Seja bem-vindo! Esta é a aula 2 de Panorama das Linguagens: Java, C# e o mundo corporativo. Vou te explicar com uma comparação do dia a dia: as linguagens dos grandes prédios. No final, você faz um teste e recebe a sua nota.

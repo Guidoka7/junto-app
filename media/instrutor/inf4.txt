@@ -1,0 +1,1 @@
+Seja bem-vindo! Esta é a aula 4 de Informática do Zero: Programas e aplicativos. Vou te explicar com uma comparação do dia a dia: cada programa é uma ferramenta. No final, você faz um teste e recebe a sua nota.

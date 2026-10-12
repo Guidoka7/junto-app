@@ -1,0 +1,1 @@
+Seja bem-vindo! Esta é a aula 1 de APIs e Backend: O que é uma API. Vou te explicar com uma comparação do dia a dia: o garçom do restaurante. No final, você faz um teste e recebe a sua nota.

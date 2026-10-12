@@ -1,0 +1,1 @@
+Seja bem-vindo! Esta é a aula 4 de Excel Essencial: Decisões com SE, E e OU. Vou te explicar com uma comparação do dia a dia: o semáforo da planilha. No final, você faz um teste e recebe a sua nota.

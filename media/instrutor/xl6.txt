@@ -1,0 +1,1 @@
+Olá! Na aula 6 de Excel Essencial, vamos estudar Procurar dados: PROCV, PROCX, ÍNDICE. Vou te explicar com uma comparação do dia a dia: a agenda que busca pelo nome. Presta atenção nos exemplos, porque no final tem prática.

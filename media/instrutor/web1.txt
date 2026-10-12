@@ -1,0 +1,1 @@
+Olá! Na aula 1 de HTML e CSS, vamos estudar HTML: o esqueleto. Vou te explicar com uma comparação do dia a dia: hTML é o esqueleto da página. Presta atenção nos exemplos, porque no final tem prática.

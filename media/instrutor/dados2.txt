@@ -1,0 +1,1 @@
+Olá! Na aula 2 de Dados e Machine Learning, vamos estudar Como a máquina aprende. Vou te explicar com uma comparação do dia a dia: ensinar com exemplos. Presta atenção nos exemplos, porque no final tem prática.

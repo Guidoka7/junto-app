@@ -1,0 +1,1 @@
+Olá! Na aula 1 de Terminal e Linux, vamos estudar Primeiros comandos. Vou te explicar com uma comparação do dia a dia: falar com o computador por escrito. Presta atenção nos exemplos, porque no final tem prática.

@@ -1,0 +1,1 @@
+Olá! Na aula 3 de APIs e Backend, vamos estudar Login e autenticação. Vou te explicar com uma comparação do dia a dia: a pulseirinha da festa. Presta atenção nos exemplos, porque no final tem prática.

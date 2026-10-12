@@ -1,0 +1,1 @@
+Oi! Bem-vindo à aula 3 de Banco de Dados. Hoje o assunto é Modelagem e normalização. Vou te explicar com uma comparação do dia a dia: não repetir é a regra de ouro. Bora começar?

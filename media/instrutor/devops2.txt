@@ -1,0 +1,1 @@
+Oi! Bem-vindo à aula 2 de Nuvem e DevOps. Hoje o assunto é CI/CD: a esteira automática. Vou te explicar com uma comparação do dia a dia: a esteira da fábrica de chocolate. Bora começar?

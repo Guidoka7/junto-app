@@ -633,8 +633,15 @@
     openModal(`Plano ${o.name}: guardar ${brl(o.monthly)} por mês.`,`<p class="modal-sub">Cada vez que uma entrada cair, o Juntô pede pra separar a parte dela antes de qualquer gasto. O valor fica protegido no plano escolhido.</p><form class="form" data-form="plan" data-key="${key}">${field('plan-amount','Quanto por mês?','0,00',moneyNumber(o.monthly),true)}<div class="field"><label for="plan-goal">Guardar em qual plano?</label><select id="plan-goal" name="plan-goal">${goals.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('')}<option value="__new">Criar “Cofre da dupla”</option></select></div><label class="check"><input type="checkbox" name="plan-auto" checked><span>Piloto automático<small>Nas entradas marcadas como automáticas, o Juntô confirma e já separa a parte do plano sozinho. Nas outras, ele pergunta.</small></span></label><div class="form-note"><strong>O dia a dia passa a caber em ${brl(o.dailyLimit)} por dia.</strong>Hoje vocês gastam ${brl(o.variable/30.4)}. O Juntô mostra quanto pode gastar por dia, já descontando o que vai pro plano.</div>${formEnd('Começar a guardar primeiro')}</form>`,'plan');
   }
   function incomeDetailModal(id){
-    const i=state.incomes.find(x=>x.id===id);if(!i)return;const receipts=state.received.filter(r=>r.incomeId===id).slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
-    openModal(i.name,`<p class="modal-sub">${esc(first(user(i.person).name))} · ${esc(ruleText(i))}</p><div class="ledger-detail-hero"><strong class="num">${cash(i.amount)}</strong></div>${receipts.length?`<div class="panel">${receipts.map(r=>`<p>${dateText(r.date)} · ${r.status==='received'?cash(r.amount):'Não recebido'}</p>`).join('')}</div>`:'<p class="muted">Ainda sem recebimentos confirmados desta entrada.</p>'}${!cloudSlot||i.person===active?`<button class="btn secondary wide" data-action="income-edit" data-id="${i.id}">Ajustar minha entrada</button>`:`<p class="form-note">${esc(first(user(i.person).name))} ajusta e confirma esta entrada na própria conta.</p>`}`,'income-detail');
+    const i=state.incomes.find(x=>x.id===id);if(!i)return;
+    const receipts=state.received.filter(r=>r.incomeId===id).slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
+    openModal(i.name,`<p class="modal-sub">${esc(first(user(i.person).name))} · ${esc(ruleText(i))}</p><p class="form-note">Valor configurado para cada entrada prevista</p><div class="ledger-detail-hero"><strong class="num">${cash(i.amount)}</strong></div>${receipts.length?`<div class="panel">${receipts.map(r=>`<div class="income-receipt-history"><p>${dateText(r.date)} · ${r.status==='received'?'Recebido: '+cash(r.amount):'Não recebido'}</p>${r.status==='received'&&(!cloudSlot||(r.person||i.person)===cloudSlot)?`<button type="button" class="btn ghost" data-action="income-receipt-correct" data-id="${esc(r.id)}">Corrigir recebimento</button>`:''}</div>`).join('')}</div>`:'<p class="muted">Ainda sem recebimentos confirmados desta entrada.</p>'}${!cloudSlot||i.person===active?`<button class="btn secondary wide" data-action="income-edit" data-id="${i.id}">Ajustar previsão da entrada</button>`:`<p class="form-note">${esc(first(user(i.person).name))} ajusta e confirma esta entrada na própria conta.</p>`}`,'income-detail');
+  }
+  function incomeReceiptCorrectionModal(receiptId){
+    const r=state.received.find(x=>x.id===receiptId&&x.status==='received'),inc=r&&state.incomes.find(i=>i.id===r.incomeId);
+    if(!r||!inc)return;
+    const owner=r.person||inc.person;if(cloudSlot&&owner!==cloudSlot)return;
+    openModal('Corrigir recebimento',`<p class="modal-sub">${esc(inc.name)} · ${dateText(r.date)}. Corrija o valor efetivamente recebido nesta data, sem alterar as outras semanas.</p><form class="form" data-form="income-receipt-correct" data-id="${esc(r.id)}">${field('income-received-correct','Valor realmente recebido','0,00',moneyNumber(r.amount),true)}<p class="form-note">Se esta entrada foi somada ao saldo, somente a diferença será ajustada. Valores já separados nos objetivos permanecem como estão.</p>${formEnd('Salvar recebimento corrigido')}</form>`,'income-receipt-correct');
   }
   function arrivalModal(incId,date){
     const inc=state.incomes.find(i=>i.id===incId);if(!inc||handled(incId,date))return;
@@ -1848,6 +1855,7 @@ ${JSON.stringify(chatContext())}`;
     if(action==='personal-budget')return personalBudgetModal();
     if(action==='budget-profile-import'){budgetProfileDraft=null;document.getElementById('budget-profile-input')?.click();return;}
     if(action==='income-detail')return incomeDetailModal(id);
+    if(action==='income-receipt-correct')return incomeReceiptCorrectionModal(id);
     if(action==='income-edit')return incomeModal(id);
     if(action==='income-arrived')return arrivalModal(id,el.dataset.date);
     if(action==='income-skip'){const inc=state.incomes.find(i=>i.id===id);if(!inc||handled(id,el.dataset.date))return;state.received.push({id:uid(),incomeId:id,date:el.dataset.date,amount:0,status:'skipped',at:Date.now()});log(active,`marcou que ${inc.name.toLowerCase()} de ${first(user(inc.person).name)} não entrou em ${dayMonth(el.dataset.date)}.`);close();persist();toast('Anotado. A previsão foi ajustada.','Essa entrada saiu da conta do mês.','info');return;}
@@ -2113,6 +2121,26 @@ ${JSON.stringify(chatContext())}`;
       log(actor,`registrou ${name.toLowerCase()}: entrada de ${money(amount)}.`);
       close();ledgerTab='history';ledgerMine=true;ledgerFilter='all';ledgerMonth=(pd(date).getFullYear()-new Date().getFullYear())*12+pd(date).getMonth()-new Date().getMonth();persist();
       toast('Entrada registrada.',balanceDelta?`${money(amount)} somados ao saldo de ${first(user(actor).name)}.`:'O recebimento entrou no histórico. Seu saldo permaneceu igual.','coins');return;
+    }
+    if(type==='income-receipt-correct'){
+      const r=state.received.find(x=>x.id===id&&x.status==='received'),inc=r&&state.incomes.find(i=>i.id===r.incomeId);
+      if(!r||!inc){error('Recebimento não encontrado. Atualize a página e tente novamente.');return;}
+      const owner=r.person||inc.person;
+      if(!hasUser(owner)||(cloudSlot&&owner!==cloudSlot)){error('Somente o titular pode corrigir este recebimento.');return;}
+      const amount=amountValue(d,'income-received-correct');
+      if(amount==null)return;
+      if(!Number.isSafeInteger(amount)||amount>99999999999){error('Confira o valor recebido.');return;}
+      const priorBalanceDelta=Number.isSafeInteger(r.balanceDelta)?r.balanceDelta:r.amount;
+      const nextBalanceDelta=priorBalanceDelta===0?0:amount;
+      const nextBalance=user(owner).balance-priorBalanceDelta+nextBalanceDelta;
+      if(!Number.isSafeInteger(nextBalance)||nextBalance<0){error('A correção deixaria seu saldo negativo. Confira o saldo antes de ajustar este recebimento.');return;}
+      const previous=r.amount;
+      user(owner).balance=nextBalance;
+      r.amount=amount;r.balanceDelta=nextBalanceDelta;r.correctedAt=Date.now();r.correctedBy=owner;
+      log(owner,`corrigiu o recebimento de ${inc.name.toLowerCase()} em ${dayMonth(r.date)}: de ${money(previous)} para ${money(amount)}.`);
+      close();persist();incomeDetailModal(inc.id);
+      toast('Recebimento corrigido.',`Valor real: ${money(amount)}. ${priorBalanceDelta===0?'O saldo foi preservado.':'A diferença foi aplicada ao saldo uma única vez.'}`,'check');
+      return;
     }
     if(type==='arrival'&&cloudSlot&&state.incomes.find(i=>i.id===id)?.person!==cloudSlot){error('Confirme apenas os seus recebimentos.');return;}
     if(type==='arrival'){

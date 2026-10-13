@@ -15,6 +15,7 @@ Estado em 13/10/2026: **PR #39 foi mesclado por outro fluxo em 10/10; esta revis
 
 - Plugin oficial `@capacitor/push-notifications@8.0.0`, canal `junto_avisos`, ícone, permissões, recebimento e abertura da central de avisos após login.
 - Consentimento por conta e aparelho. O consentimento antigo, global ao aparelho, não é transferido automaticamente para outra conta.
+- Desativação aguarda as gravações de token em andamento antes de remover o aparelho. Falha/timeout de rede não comprova revogação remota; o app também solicita a invalidação nativa e informa erro se a remoção falhar.
 - Registro do dispositivo após autenticação. A nova migração vincula o token à sessão real do Supabase, obtida do JWT no servidor. Sessão falsa é ignorada/rejeitada; exclusão da sessão remove o dispositivo por FK.
 - Emissor `supabase/functions/junto-push` com `verify_jwt = true`, validação adicional em Auth, membro/dupla conferidos e sessão do remetente revalidada no banco.
 - FCM HTTP v1 com JWT RS256 assinado via Web Crypto, OAuth de curta duração com cache, escopo `firebase.messaging` e endpoints Google fixos.

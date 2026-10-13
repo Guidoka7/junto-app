@@ -15,6 +15,7 @@ let pendingOpen = false;
 let lastSaved = { userId: null, token: null, at: 0 };
 let authGeneration = 0;
 let registrationOwner = null;
+const pendingWrites = new Set();
 let status = configured ? 'Desativadas neste aparelho' : 'Firebase ainda não configurado neste APK';
 const optInKey = uid => OPT_IN + ':' + uid;
 const optedIn = () => Boolean(userId) && localStorage.getItem(optInKey(userId)) === 'yes';
@@ -51,7 +52,7 @@ async function storeToken(token) {
     return;
   }
   const url = window.JuntoCloudConfig.url + '/rest/v1/junto_push_devices?on_conflict=user_id,device_id';
-  const response = await fetch(url, {
+  const write = fetch(url, {
     method: 'POST',
     headers: {
       apikey: window.JuntoCloudConfig.publishableKey,
@@ -59,11 +60,15 @@ async function storeToken(token) {
       'Content-Type': 'application/json',
       Prefer: 'resolution=merge-duplicates,return=minimal'
     },
+    signal: AbortSignal.timeout(10000),
     body: JSON.stringify({
       user_id: uid, device_id: deviceId(), token, platform: 'android',
       enabled: true, updated_at: new Date().toISOString()
     })
   });
+  pendingWrites.add(write);
+  let response;
+  try { response = await write; } finally { pendingWrites.delete(write); }
   if (!response.ok) throw new Error(response.status === 404 || response.status === 400
     ? 'Execute a configuração de dispositivos push no Supabase.'
     : 'O token não pôde ser salvo no Supabase (HTTP ' + response.status + ').');
@@ -75,9 +80,10 @@ async function storeToken(token) {
 
 async function saveRegisteredToken(token) {
   if (!registrationOwner || registrationOwner.uid !== userId || registrationOwner.generation !== authGeneration || !optedIn()) return;
+  const uid = userId, generation = authGeneration;
   currentToken = token;
   try { await storeToken(token); }
-  catch (error) { setStatus('Firebase conectado · ' + error.message); }
+  catch (error) { if (uid === userId && generation === authGeneration && optedIn()) setStatus('Firebase conectado · ' + error.message); }
 }
 
 async function openFromPush() {
@@ -140,6 +146,7 @@ async function removeDevice() {
   const url = window.JuntoCloudConfig.url + '/rest/v1/junto_push_devices?device_id=eq.' + encodeURIComponent(deviceId());
   const response = await fetch(url, {
     method: 'DELETE',
+    signal: AbortSignal.timeout(10000),
     headers: { apikey: window.JuntoCloudConfig.publishableKey, Authorization: 'Bearer ' + accessToken }
   });
   if (!response.ok) throw new Error('Não foi possível desvincular o aparelho (HTTP ' + response.status + ').');
@@ -147,13 +154,21 @@ async function removeDevice() {
 
 async function unlink() {
   if (!nativeAndroid || !configured) return;
-  authGeneration++;
+  const uid = userId, generation = ++authGeneration;
   registrationOwner = null;
-  try { if (userId) await removeDevice(); } finally {
+  try {
+    // Revoke after existing writes settle so a late upsert cannot undo a confirmed DELETE.
+    await Promise.allSettled([...pendingWrites]);
+    if (uid && uid === userId && generation === authGeneration) await removeDevice();
+  } finally {
     // Invalida o token local mesmo se a remoção remota falhar, para evitar envio ao usuário anterior.
-    try { await PushNotifications.unregister(); } catch { /* Sem token válido. */ }
-    currentToken = null;
-    lastSaved = { userId: null, token: null, at: 0 };
+    if (generation === authGeneration) {
+      try { await PushNotifications.unregister(); } catch { /* Sem token válido. */ }
+      if (generation === authGeneration) {
+        currentToken = null;
+        lastSaved = { userId: null, token: null, at: 0 };
+      }
+    }
   }
 }
 

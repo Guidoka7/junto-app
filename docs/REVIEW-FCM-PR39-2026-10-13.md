@@ -17,13 +17,15 @@ O PR #39 foi mesclado por outro fluxo em 10/10/2026, enquanto esta tarefa aguard
 7. Eventos criados durante uma chamada/inibição inicial poderiam ficar na fila sem novo despertar. Implementado despertar posterior agrupado e processamento de lotes limitados. Removido o emissor antigo do cliente para evitar duas chamadas/protocolos concorrentes.
 8. Dois testes de navegador falhavam também no head original f14bf1c: seletor oculto do perfil e timeout padrão de 45s num longo ciclo com dois contextos e PGlite. Corrigido o seletor visível; ampliado somente o timeout desse ciclo para 120s, mantendo suas verificações.
 
+9. Confirmada e corrigida uma corrida entre upsert do token e desativação: a revogação agora aguarda as gravações já iniciadas, com timeout, para que DELETE seja a última gravação confirmada. O novo teste reproduziu a falha antes da correção e passou depois. Resultados tardios também não alteram o estado da conta seguinte.
+
 ## Evidências reproduzíveis
 
 | Verificação | Resultado |
 |---|---|
 | `npm ci` | Instalado a partir do lockfile |
 | Sintaxe / ações / formulários (`npm run check`) | Passou |
-| `node --test --test-concurrency=2 tests/*.test.mjs` | **136 testes passaram**, 0 falhas |
+| `node --test --test-concurrency=2 tests/*.test.mjs` | **137 testes passaram**, 0 falhas |
 | Parser Android (`npm run test:android-parser`) | **15 verificações passaram** |
 | `deno check .../junto-push/index.ts` com Deno 2.9.6 | Passou |
 | Testes novos do despertar no navegador | **2 passaram**; falha do emissor não prejudicou sync/avisos |

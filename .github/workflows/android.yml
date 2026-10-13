@@ -106,7 +106,7 @@ jobs:
         run: |
           # O secret tem prioridade (aceita Base64 ou o JSON colado direto). Sem ele, ou se ele
           # não for um google-services.json do pacote br.com.junto.app, usa o arquivo versionado.
-          valid='const f=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); if(!f.project_info?.project_id || !f.client?.some(c=>c.client_info?.android_client_info?.package_name==="br.com.junto.app")) process.exit(1)'
+          valid='try { const f=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); if(f.private_key || f.type==="service_account" || f.project_info?.project_id!=="junto-apk" || !f.client?.some(c=>c.client_info?.android_client_info?.package_name==="br.com.junto.app")) throw new Error(); } catch { console.error("Firebase Android inválido: use google-services.json de junto-apk / br.com.junto.app, sem credencial Admin SDK."); process.exit(1); }'
           if [ -n "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" ]; then
             tmp="$RUNNER_TEMP/google-services.json"
             if printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" | tr -d ' \r\n' | base64 --decode > "$tmp" 2>/dev/null && node -e "$valid" "$tmp" 2>/dev/null; then

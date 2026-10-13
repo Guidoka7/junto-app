@@ -24,3 +24,6 @@ test-results/
 # Nunca versione a conta de serviço do Firebase:
 *firebase-adminsdk*.json
 service-account*.json
+*adminsdk*.json
+*service-account*.json
+supabase/.temp/

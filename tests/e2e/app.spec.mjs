@@ -437,7 +437,7 @@ test('approved screens remain usable at mobile, tablet and desktop widths in bot
      await page.locator(`button[data-route="${route}"]:visible`).first().click();await expect(page.locator('body')).toHaveAttribute('data-route',route);
      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${width}px ${couple?'dupla':'solo'} ${route}`).toBe(true);
      if(width<760&&route==='home'){
-       const brand=await page.locator('.topbar .mobile-brand').boundingBox(),profile=await page.locator('#mobile-user-switch .profile-photo-button').boundingBox();
+       const brand=await page.locator('.topbar .mobile-brand').boundingBox(),profile=await page.locator('.topbar .profile-photo-button:visible').boundingBox();
        expect(Math.abs(brand.y-profile.y)).toBeLessThanOrEqual(1);
        expect(await page.locator('.topbar').evaluate(el=>el.getBoundingClientRect().height)).toBeLessThanOrEqual(45);
        if(!couple){const invite=await page.locator('#couple-cta').boundingBox();expect(invite.x+invite.width).toBeLessThanOrEqual(profile.x-4);await expect(page.locator('.couple-top-cta span')).toBeVisible();}
@@ -707,6 +707,7 @@ test('bank income records a receipt without creating an expense',async({page})=>
  await fakeNative(page,[event('3','pix','income')]);await page.goto('/');await personal(page);await page.locator('#bank-inbox-button').click();await page.locator('[data-feature="bank-review"]').click();await page.locator('#bank-name').fill('Freela');await page.locator('[data-feature-form="bank-confirm"] [type="submit"]').click();const s=await page.evaluate(()=>window.JuntoApp.getState());expect(s.users[0].balance).toBe(12500);expect(s.received.length).toBe(1);expect(s.transactions.length).toBe(0);
 });
 test('two independent accounts invite, sync offline edits and keep their own profile',async({browser})=>{
+ test.setTimeout(120000); // Two independent contexts and the full SQL/offline lifecycle need more than the default 45s.
  const db=new PGlite();const ids=['11111111-1111-4111-8111-111111111111','22222222-2222-4222-8222-222222222222'];
  await db.exec("create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;");for(const id of ids)await db.query('insert into auth.users values($1)',[id]);await db.exec(await readFile('supabase/setup.sql','utf8'));
  let chain=Promise.resolve(),holdRead=null,releaseRead,readStarted,readFinished;const contexts=[];

@@ -18,6 +18,7 @@ export async function buildWeb(){
   await rm(join(dist,'features'),{recursive:true,force:true});
   await build({absWorkingDir:root,entryPoints:['src/js/native.js','src/js/banking.js','src/js/cloud.js','src/js/push.js','src/js/virada.js','src/js/budget.js','src/js/updates.js'],outdir:join(dist,'js'),bundle:true,format:'iife',platform:'browser',target:['chrome109','safari16'],legalComments:'eof'});
   const config={url:process.env.SUPABASE_URL||'',publishableKey:process.env.SUPABASE_PUBLISHABLE_KEY||'',appUrl:String(process.env.JUNTO_APP_URL||'').replace(/\/+$/,''),pushEnabled:process.env.JUNTO_PUSH_ENABLED==='true'};
+  config.pushDispatchEnabled=process.env.JUNTO_PUSH_DISPATCH_ENABLED==='true';
   if(Boolean(config.url)!==Boolean(config.publishableKey))throw new Error('Defina SUPABASE_URL e SUPABASE_PUBLISHABLE_KEY juntas.');
   if(config.publishableKey&&config.publishableKey.startsWith('eyJ')){let role;try{role=JSON.parse(Buffer.from(config.publishableKey.split('.')[1],'base64url').toString()).role;}catch{}if(role!=='anon')throw new Error('Use apenas chave publishable ou anon.');}
   if(config.publishableKey&&!config.publishableKey.startsWith('eyJ')&&!config.publishableKey.startsWith('sb_publishable_'))throw new Error('Nunca use uma chave secreta no app.');
@@ -26,7 +27,10 @@ export async function buildWeb(){
   if(config.pushEnabled){
     const services=await stat(join(root,'android/app/google-services.json')).catch(()=>null);
     if(!services?.isFile())throw new Error('JUNTO_PUSH_ENABLED exige android/app/google-services.json.');
-    const firebase=JSON.parse(await readFile(join(root,'android/app/google-services.json'),'utf8'));
+    let firebase;
+    try{firebase=JSON.parse(await readFile(join(root,'android/app/google-services.json'),'utf8'));}catch{throw new Error('Firebase Android: JSON inválido.');}
+    if(firebase.private_key||firebase.type==='service_account')throw new Error('Firebase Admin não pode entrar no APK. Use google-services.json do Android.');
+    if(firebase.project_info?.project_id!=='junto-apk')throw new Error('Firebase Android: projeto precisa ser junto-apk.');
     if(!firebase.client?.some(c=>c.client_info?.android_client_info?.package_name==='br.com.junto.app'))throw new Error('Firebase Android: package_name precisa ser br.com.junto.app.');
   }
   await writeFile(join(dist,'js/config.js'),`window.JuntoCloudConfig=${JSON.stringify(config)};\n`);

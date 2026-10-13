@@ -13,8 +13,11 @@ let listenersReady = false;
 let registering = false;
 let pendingOpen = false;
 let lastSaved = { userId: null, token: null, at: 0 };
+let authGeneration = 0;
+let registrationOwner = null;
 let status = configured ? 'Desativadas neste aparelho' : 'Firebase ainda não configurado neste APK';
-const optedIn = () => localStorage.getItem(OPT_IN) === 'yes';
+const optInKey = uid => OPT_IN + ':' + uid;
+const optedIn = () => Boolean(userId) && localStorage.getItem(optInKey(userId)) === 'yes';
 
 function deviceId() {
   let value = localStorage.getItem(DEVICE_ID);
@@ -40,7 +43,9 @@ async function authInfo() {
 
 async function storeToken(token) {
   if (!configured || !optedIn() || !token || !userId) return;
+  const generation = authGeneration;
   const { uid, accessToken } = await authInfo();
+  if (generation !== authGeneration || uid !== userId || !optedIn()) return;
   if (lastSaved.userId === uid && lastSaved.token === token && Date.now() - lastSaved.at < 86400000) {
     setStatus('Ativas neste aparelho · conectado');
     return;
@@ -62,13 +67,14 @@ async function storeToken(token) {
   if (!response.ok) throw new Error(response.status === 404 || response.status === 400
     ? 'Execute a configuração de dispositivos push no Supabase.'
     : 'O token não pôde ser salvo no Supabase (HTTP ' + response.status + ').');
-  if (userId === uid) {
+  if (userId === uid && generation === authGeneration && optedIn()) {
     lastSaved = { userId: uid, token, at: Date.now() };
     setStatus('Ativas neste aparelho · conectado');
   }
 }
 
 async function saveRegisteredToken(token) {
+  if (!registrationOwner || registrationOwner.uid !== userId || registrationOwner.generation !== authGeneration || !optedIn()) return;
   currentToken = token;
   try { await storeToken(token); }
   catch (error) { setStatus('Firebase conectado · ' + error.message); }
@@ -102,6 +108,7 @@ async function register(interactive = false) {
   if (!userId) throw new Error('Entre na sua conta do Juntô primeiro.');
   if (registering) return;
   registering = true;
+  const uid = userId, generation = authGeneration;
   try {
     await initListeners();
     let permission = await PushNotifications.checkPermissions();
@@ -119,8 +126,10 @@ async function register(interactive = false) {
         importance: 4, visibility: 1, vibration: true
       });
     } catch { /* Android anterior ao 8 usa o canal padrão. */ }
-    if (interactive) localStorage.setItem(OPT_IN, 'yes');
+    if (uid !== userId || generation !== authGeneration) return;
+    if (interactive) localStorage.setItem(optInKey(uid), 'yes');
     if (!optedIn()) return;
+    registrationOwner = { uid, generation };
     setStatus('Aguardando token do Firebase…');
     await PushNotifications.register();
   } finally { registering = false; }
@@ -138,6 +147,8 @@ async function removeDevice() {
 
 async function unlink() {
   if (!nativeAndroid || !configured) return;
+  authGeneration++;
+  registrationOwner = null;
   try { if (userId) await removeDevice(); } finally {
     // Invalida o token local mesmo se a remoção remota falhar, para evitar envio ao usuário anterior.
     try { await PushNotifications.unregister(); } catch { /* Sem token válido. */ }
@@ -147,7 +158,7 @@ async function unlink() {
 }
 
 async function disable() {
-  localStorage.removeItem(OPT_IN);
+  if (userId) localStorage.removeItem(optInKey(userId));
   try { await unlink(); setStatus('Desativadas neste aparelho'); }
   catch (error) { setStatus('Desativadas neste aparelho · ' + error.message); }
 }
@@ -167,6 +178,9 @@ function settingsHTML() {
 window.addEventListener('junto:auth-changed', event => {
   const next = event.detail?.userId || null;
   if (next !== userId) {
+    authGeneration++;
+    registrationOwner = null;
+    if (userId && !next && configured) void PushNotifications.unregister().catch(() => {});
     currentToken = null;
     lastSaved = { userId: null, token: null, at: 0 };
   }
@@ -190,28 +204,4 @@ document.addEventListener('click', async event => {
   // Reabre os ajustes para refletir o estado sem trocar a navegação do aplicativo.
   document.querySelector('[data-action="settings"]')?.click();
 });
-// Depois de sincronizar, pede ao servidor o push dos avisos novos para a outra pessoa.
-// O servidor confere no espaço salvo e envia uma vez só; o texto não sai daqui.
-const ANNOUNCED = 'junto-push-announced-v1';
-let senderOff = false;
-async function announce({slot, members, payload}) {
-  if (senderOff || members !== 2 || !slot || !window.JuntoCloudConfig?.url) return;
-  let seen = [];
-  try { seen = JSON.parse(localStorage.getItem(ANNOUNCED) || '[]'); } catch { seen = []; }
-  const fresh = (payload?.notifications || []).filter(n => n?.id && n.to && n.to !== slot && !n.read
-    && Date.now() - Number(n.createdAt || 0) < 3600000 && !seen.includes(n.id)).map(n => n.id).slice(0, 20);
-  if (!fresh.length) return;
-  const accessToken = await window.JuntoCloud?.getAccessToken?.();
-  if (!accessToken) return;
-  const response = await fetch(window.JuntoCloudConfig.url + '/functions/v1/junto-push', {
-    method: 'POST',
-    headers: { apikey: window.JuntoCloudConfig.publishableKey, Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ids: fresh })
-  });
-  if (response.status === 404 || response.status === 503) { senderOff = true; return; }
-  if (!response.ok) return;
-  localStorage.setItem(ANNOUNCED, JSON.stringify([...seen, ...fresh].slice(-200)));
-}
-window.addEventListener('junto:synced', event => { void announce(event.detail || {}).catch(() => {}); });
-
 window.JuntoPush = { settingsHTML, unlink, isConfigured: () => configured };

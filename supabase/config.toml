@@ -1,0 +1,5 @@
+project_id = "junto-app"
+
+[functions.junto-push]
+verify_jwt = true
+entrypoint = "./functions/junto-push/index.ts"

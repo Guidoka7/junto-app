@@ -3,6 +3,7 @@ import {Capacitor} from '@capacitor/core';
 import {clone,equal,mergeStates,validateState,conflictLabel} from '../features/sync-core.js';
 import {escapeHTML as esc,formatMoney,timedFetch,timeoutSignal} from '../features/ui.js';
 import {saveDownload as download} from '../features/download.js';
+import {createPushDispatcher} from '../features/push-dispatch.js';
 const app=window.JuntoApp,PERSONAL_KEY='junto-personal-backup-v1';
 let client=null,user=null,sessionReady=false,checkpoint=null,subscription=null,authLoading=null,authLoadingUID=null,authGeneration=0;
 let syncRunning=false,syncTimer=null,conflict=null,authView='login',passwordRecovery=false;
@@ -14,6 +15,9 @@ const confirmationCallback=new URLSearchParams(location.search).has('code')||/ac
 function confirmationFallback(){authView='login';authNotice='Após confirmar seu e-mail, entre com sua senha para continuar.';open();}
 const parse=key=>{try{return JSON.parse(localStorage.getItem(key)||'null');}catch{return null;}};
 const config=()=>window.JuntoCloudConfig;
+const pushDispatch=createPushDispatcher({enabled:()=>config()?.pushDispatchEnabled===true,invoke:(name,options)=>client.functions.invoke(name,options)});
+function wakePush(){if(checkpoint?.members===2&&user&&sessionReady)void pushDispatch.dispatch(checkpoint.spaceId,user.id);}
+window.addEventListener('junto:auth-changed',()=>pushDispatch.reset());
 let expiryTimer=null,sessionExpiresAt=0;
 function lock(){app.setAccess(false);}
 function showLoading(){lock();document.getElementById('auth-gate').innerHTML='<div class="auth-card"><h1>Juntô</h1><p>Verificando acesso…</p></div>';}
@@ -162,6 +166,7 @@ async function synchronize(force=false){
       lastSync=Date.now();break;
     }
     saveCheckpoint();
+    wakePush();
     setMessage(checkpoint.dirty?'Mudanças aguardando sincronização':`Sincronizado${lastSync?' · '+new Date(lastSync).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):''}`);
     if(checkpoint.dirty&&!conflict)syncSoon();
   }catch(e){

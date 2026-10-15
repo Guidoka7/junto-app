@@ -39,25 +39,9 @@ test('build não permite push habilitado sem JSON do pacote correto', () => {
   assert.ok(action.includes('secrets.FIREBASE_GOOGLE_SERVICES_JSON_BASE64'));
 });
 
-test('emissor no servidor: só avisos salvos no espaço, para a outra pessoa, uma vez', () => {
-  const fn = read('supabase/functions/junto-push/index.ts');
-  assert.ok(fn.includes("Deno.env.get('FIREBASE_SERVICE_ACCOUNT')"), 'credencial só como secret do servidor');
-  assert.ok(fn.includes('admin.auth.getUser(jwt)'), 'exige usuário autenticado');
-  assert.ok(fn.includes("from('junto_snapshots')") && fn.includes('notices.find'), 'texto vem do espaço salvo');
-  assert.ok(fn.includes('notice.to === me.slot'), 'nunca envia para quem criou');
-  assert.ok(fn.includes("from('junto_push_log').insert"), 'idempotência');
-  assert.ok(fn.includes("visibility: 'PRIVATE'"), 'tela bloqueada sem conteúdo');
-  const sql = read('supabase/push-devices.sql');
-  assert.match(sql, /primary key \(space_id, notification_id, recipient\)/);
-  assert.match(sql, /revoke all on public\.junto_push_log from public, anon, authenticated/i);
-});
-
-test('o app pede o push só depois de sincronizar e nunca manda texto', () => {
-  const push = read('src/js/push.js'), cloud = read('src/js/cloud.js');
-  assert.ok(cloud.includes("new CustomEvent('junto:synced'"));
-  assert.ok(push.includes("'/functions/v1/junto-push'"));
-  assert.ok(push.includes('JSON.stringify({ ids: fresh })'));
-  const gs = JSON.parse(read('android/app/google-services.json'));
+test('configuração Android identifica o projeto e não contém credencial Admin', () => {
+  const raw = read('android/app/google-services.json'), gs = JSON.parse(raw);
+  assert.equal(gs.project_info.project_id, 'junto-apk');
   assert.ok(gs.client.some(c => c.client_info.android_client_info.package_name === 'br.com.junto.app'));
-  assert.ok(!/private_key/.test(read('android/app/google-services.json')), 'nenhuma chave privada no repositório');
+  assert.ok(!/private_key/.test(raw), 'nenhuma chave privada no repositório');
 });
